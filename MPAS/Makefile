@@ -24,7 +24,11 @@ OBJS = \
 	seas_ngac_mod.o \
 	seas_data_mod.o \
 	module_smoke_diagnostics.o \
-	module_fire_emissions.o
+	module_fire_emissions.o \
+        pollen_mod.o \
+        module_anthro_emissions.o \
+        module_rwc_emissions.o \
+        module_tactic_sna.o
    
 
 MPAS_SMOKE: $(OBJS)
@@ -37,6 +41,9 @@ module_fire_emissions.o: \
 	mpas_smoke_init.o
 
 mpas_smoke_init.o:
+
+module_tactic_sna.o: \
+        mpas_smoke_init.o
 
 dep_dry_mod_emerson.o: \
 	dep_data_mod.o \
@@ -79,18 +86,20 @@ module_plumerise.o: \
 	mpas_smoke_config.o
 
 mpas_smoke_wrapper.o:      \
-	mpas_smoke_config.o \
-	module_add_emiss_burn.o \
-	module_plumerise.o \
-	module_wetdep_ls.o \
-	dep_dry_simple_mod.o \
-	dep_dry_mod_emerson.o \
-	ssalt_mod.o \
-	dust_fengsha_mod.o \
-	module_smoke_diagnostics.o \
-	module_fire_emissions.o \
-	dep_data_mod.o \
-	rad_data_mod.o
+        mpas_smoke_config.o \
+        module_add_emiss_burn.o \
+        module_plumerise.o \
+        module_wetdep_ls.o \
+        dep_dry_simple_mod.o \
+        dep_dry_mod_emerson.o \
+        dust_fengsha_mod.o \
+        pollen_mod.o \
+        module_anthro_emissions.o \
+        ssalt_mod.o \
+        module_tactic_sna.o \
+        module_smoke_diagnostics.o \
+        dep_data_mod.o \
+        rad_data_mod.o
 
 module_zero_plumegen_coms.o: \
         mpas_smoke_config.o
@@ -103,6 +112,18 @@ ssalt_mod.o: \
 seas_data_mod.o:
 
 seas_ngac_mod.o:
+
+module_anthro_emissions.o: \
+        mpas_smoke_init.o
+
+module_rwc_emissions.o: \
+        mpas_smoke_init.o
+
+pollen_mod.o: \
+        mpas_smoke_config.o \
+        mpas_smoke_init.o \
+        dep_data_mod.o
+
 
 #module_smoke_plumerise.o: module_smoke_plumerise.F90
 #	$(FC) $(CPPFLAGS) $(COREDEF) $(FFLAGS) -c module_smoke_plumerise.F90 $(CPPINCLUDES) $(FCINCLUDES) -I.. -I../../../framework -I../../../external/esmf_time_f90

@@ -135,29 +135,7 @@ contains
        enddo
        enddo
        enddo
-!
-! Set up 2D+chem vars   
-!       do nv = 1, num_chem
-!          if (nv .eq. p_ch4) cycle  ! At some point we'll do something different for gasses
-!          do j = jts,jte
-!          do i = its, ite
-!             dzmin = minval(delz(i,:,j))
-!             ! -- Get necessary info for settling
-!             ! -- Determine the maximum time-step satisying the CFL condition:
-!             ! -- NOTE, diameters and densities are NOT converted to cm and g/cm3 like above
-!             ! -- dt_settl calculations (from original coarsepm_settling)
-!             ! 1.5E-5 = dyn_visc --> dust_data_mod.F90
-!             vsettl = four_ninths * gravity * aero_dens(nv) * ( growth_fac * ( 0.5_RKIND * aero_diam(nv) ))**2.0_RKIND * one_over_dyn_visc
-!             dtmax = dzmin / vsettl
-!             ndt_settl(i,j,nv) = MAX( 1, INT( ntdt /dtmax) )
-!             ! Limit maximum number of iterations
-!             IF (ndt_settl(i,j,nv) > max_iter_settle) ndt_settl(i,j,nv) = max_iter_settle
-!             dt_settl(i,j,nv) = REAL(ntdt,kind=RKIND) /REAL(ndt_settl(i,j,nv),kind=RKIND)
-!         enddo
-!         enddo
-!      enddo
-!      if  (do_timing) call mpas_timer_stop('dep_prep')
-       
+!      
 ! 3D + chem --> vg
 !       if  (do_timing) call mpas_timer_start('vg_and_ddvel_calc')
        do nv = 1, num_chem
@@ -219,13 +197,6 @@ contains
           enddo
        enddo
         
-! Settling 
-!       if  (do_timing) call mpas_timer_start('settling')
-!         if ( settling_opt .gt. 0 ) then
-!             call particle_settling(tend_chem_settle,chem,rho_phy,delz_flip,vg,           &
-!                                    dt_settl,ndt_settl,kts,kte,its,ite,jts,jte,num_chem,ims,ime, jms,jme, kms,kme    )
-!         endif ! settling opt
-!       if  (do_timing) call mpas_timer_stop('settling')
 end subroutine dry_dep_driver_emerson
 !
 !--------------------------------------------------------------------------------
