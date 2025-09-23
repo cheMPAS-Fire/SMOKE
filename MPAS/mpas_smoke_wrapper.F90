@@ -141,17 +141,17 @@ contains
 ! 2D mesh arguments
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland   ! grid
 ! 2D Met input
-    integer,intent(in), dimension(ims:ime, jms:jme) ,optional                 :: isltyp, ivgtyp ! domainant soil, vegetation type
-    integer,intent(in), dimension(ims:ime, jms:jme) ,optional                 :: kpbl          ! k-index of PBLH
-    integer,intent(in), dimension(ims:ime, jms:jme),optional        :: ktop_deep
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme) ,optional             :: u10, v10      ! 10-m winds
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme) ,optional             :: tskin, t2m, dpt2m            ! temperature
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)  ,optional            :: pblh              ! PBL height [m]
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)   ,optional           :: vegfra
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)   ,optional           :: swdown, z0, snowh, znt
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)   ,optional           :: coszen
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)   ,optional           :: raincv, rainncv, mavail                    
-    real(RKIND),intent(inout), dimension(ims:ime, jms:jme)  ,optional         :: rmol, ust
+    integer,intent(in), dimension(ims:ime, jms:jme)                :: isltyp, ivgtyp ! domainant soil, vegetation type
+    integer,intent(in), dimension(ims:ime, jms:jme)                :: kpbl          ! k-index of PBLH
+    integer,intent(in), dimension(ims:ime, jms:jme),optional       :: ktop_deep
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: u10, v10      ! 10-m winds
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: tskin, t2m, dpt2m            ! temperature
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: pblh              ! PBL height [m]
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: vegfra
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: swdown, z0, snowh, znt
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: coszen
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: raincv, rainncv, mavail                    
+    real(RKIND),intent(inout), dimension(ims:ime, jms:jme)         :: rmol, ust
 ! 2D Fire Input
     real(RKIND),intent(in), dimension(ims:ims, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
                                                                           efs_smold, efs_flam, efs_rsmold
@@ -166,10 +166,10 @@ contains
                                                                            RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
                                                                            RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
 ! 3D Met input 
-    real(RKIND),intent(in), dimension(ims:ime, kms:kme, jms:jme),optional    :: p8w,    dz8w,    z_at_w, cldfrac,   &
+    real(RKIND),intent(in), dimension(ims:ime, kms:kme, jms:jme)   :: p8w,    dz8w,    z_at_w, cldfrac,   &
                                                                        p_phy,  t_phy,   u_phy,  v_phy,     &
                                                                        pi_phy, rho_phy, vvel  
-    real(RKIND),intent(inout),dimension(ims:ime, kms:kme, jms:jme),optional            :: nifa, nwfa, hno3_bkgd 
+    real(RKIND),intent(inout),dimension(ims:ime, kms:kme, jms:jme),optional  :: nifa, nwfa, hno3_bkgd 
 ! 3D (2D + first 3 levels) for visibility calculations
     real(RKIND),intent(in),dimension(ims:ime,kms:kme,jms:jme),optional :: qc_vis, qr_vis, qi_vis, qs_vis, qg_vis, blcldw_vis, blcldi_vis
 ! 3D emission input
@@ -235,40 +235,40 @@ contains
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme,1:num_e_ss_out),optional    :: e_ss_out
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme,1:num_e_vol_out),optional   :: e_vol_out
 ! 3D + chem output arrays
-    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem),optional       :: tend_chem_settle
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem)                :: chem
-    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional                            :: aod3d_smoke, aod3d
+    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem),optional       :: tend_chem_settle
+    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional                   :: aod3d_smoke, aod3d
 !>-- Namelist options
-     logical,intent(in),optional                :: do_mpas_smoke
-     logical,intent(in) ,optional               :: do_mpas_dust
-     logical,intent(in) ,optional               :: do_mpas_pollen
-     logical,intent(in) ,optional               :: do_mpas_anthro
-     logical,intent(in) ,optional               :: do_mpas_ssalt
-     logical,intent(in) ,optional               :: do_mpas_volc
-     logical,intent(in) ,optional               :: do_mpas_sna
-     logical,intent(in) ,optional               :: do_mpas_methane
-     logical,intent(in) ,optional               :: calc_bb_emis_online
-     integer,intent(in) ,optional               :: hwp_method
-     real(RKIND),intent(in) ,optional           :: hwp_alpha
-     integer,intent(in) ,optional               :: wetdep_ls_opt
-     real(kind=RKIND),intent(in) ,optional      :: wetdep_ls_alpha
-     integer,intent(in)      ,optional          :: plumerise_opt
-     integer,intent(in)                :: plume_wind_eff
-     real(kind=RKIND),intent(in)  ,optional     :: plume_alpha
-     real(kind=RKIND),intent(in)  ,optional     :: bb_emis_scale_factor, bb_qv_scale_factor
-     real(kind=RKIND),intent(in)  ,optional    :: rwc_emis_scale_factor
-     integer,intent(in)  ,optional              :: ebb_dcycle
-     integer,intent(in)   ,optional             :: drydep_opt
-     integer,intent(in)   ,optional             :: pm_settling
-     logical,intent(in)   ,optional             :: add_fire_heat_flux
-     logical,intent(in)   ,optional             :: add_fire_moist_flux
-     integer,intent(in)   ,optional             :: plumerisefire_frq
-     integer,intent(in)   ,optional             :: bb_beta
-     real(RKIND),intent(in) ,optional           :: dust_alpha, dust_gamma
-     real(RKIND),intent(in)  ,optional          :: dust_drylimit_factor, dust_moist_correction
-     integer,intent(in)     ,optional           :: bb_input_prevh
-     integer,intent(in)     ,optional           :: online_rwc_emis
-     real(RKIND),intent(in)  ,optional          :: pollen_emis_scale_factor, num_pols_per_polp 
+     logical,intent(in)               :: do_mpas_smoke
+     logical,intent(in)               :: do_mpas_dust
+     logical,intent(in)               :: do_mpas_pollen
+     logical,intent(in)               :: do_mpas_anthro
+     logical,intent(in)               :: do_mpas_ssalt
+     logical,intent(in)               :: do_mpas_volc
+     logical,intent(in)               :: do_mpas_sna
+     logical,intent(in)               :: do_mpas_methane
+     logical,intent(in)               :: calc_bb_emis_online
+     integer,intent(in)               :: hwp_method
+     real(RKIND),intent(in)           :: hwp_alpha
+     integer,intent(in)               :: wetdep_ls_opt
+     real(kind=RKIND),intent(in)      :: wetdep_ls_alpha
+     integer,intent(in)               :: plumerise_opt
+     integer,intent(in)               :: plume_wind_eff
+     real(kind=RKIND),intent(in)      :: plume_alpha
+     real(kind=RKIND),intent(in)      :: bb_emis_scale_factor, bb_qv_scale_factor
+     real(kind=RKIND),intent(in)      :: rwc_emis_scale_factor
+     integer,intent(in)               :: ebb_dcycle
+     integer,intent(in)               :: drydep_opt
+     integer,intent(in)               :: pm_settling
+     logical,intent(in)               :: add_fire_heat_flux
+     logical,intent(in)               :: add_fire_moist_flux
+     integer,intent(in)               :: plumerisefire_frq
+     integer,intent(in)               :: bb_beta
+     real(RKIND),intent(in)           :: dust_alpha, dust_gamma
+     real(RKIND),intent(in)           :: dust_drylimit_factor, dust_moist_correction
+     integer,intent(in)               :: bb_input_prevh
+     integer,intent(in)               :: online_rwc_emis
+     real(RKIND),intent(in)           :: pollen_emis_scale_factor, num_pols_per_polp 
 !----------------------------------
 !>-- Local Variables
 !>-- 3D met
