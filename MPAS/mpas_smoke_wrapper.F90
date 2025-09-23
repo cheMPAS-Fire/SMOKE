@@ -36,7 +36,7 @@ contains
 
     subroutine mpas_smoke_driver(                                                            &
            num_chem              , chemistry_start             , chem           ,            &
-           kemit    , kbio, kfire, kvol, krwc, index_smoke_fine, index_smoke_coarse,  &
+           kanthro    , kbio, kfire, kvol, krwc, index_smoke_fine, index_smoke_coarse,       &
            index_dust_fine       , index_dust_coarse           ,                             &
            index_ssalt_fine      , index_ssalt_coarse          ,                             &
            index_polp_tree       , index_polp_grass            , index_polp_weed,            &
@@ -129,28 +129,29 @@ contains
                          ims,ime,jms,jme,kms,kme,        &
                          its,ite,jts,jte,kts,kte
 ! Timestep, day, constants
-    real(RKIND),intent(in) :: dt, julian, g, cp, rd, gmt
+    real(RKIND),intent(in):: dt, julian, g, cp, rd, gmt
 ! Time step #
-    integer,intent(in):: ktau,nblocks
+    integer,intent(in):: ktau
+    integer,intent(in)::nblocks
 ! Dimensions and indexes
     integer,intent(in):: nsoil, nlcat, num_chem, chemistry_start
-    integer,intent(in):: kanthro, kbio, kfire, kvol
+    integer,intent(in):: kanthro, kbio, kfire, kvol, krwc
     integer,intent(in):: num_e_ant_in,  num_e_bb_in,  num_e_bio_in,  num_e_vol_in
     integer,intent(in):: num_e_ant_out, num_e_bb_out, num_e_bio_out, num_e_dust_out, num_e_ss_out, num_e_vol_out
 ! 2D mesh arguments
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland   ! grid
 ! 2D Met input
-    integer,intent(in), dimension(ims:ime, jms:jme)                 :: isltyp, ivgtyp ! domainant soil, vegetation type
-    integer,intent(in), dimension(ims:ime, jms:jme)                 :: kpbl          ! k-index of PBLH
+    integer,intent(in), dimension(ims:ime, jms:jme) ,optional                 :: isltyp, ivgtyp ! domainant soil, vegetation type
+    integer,intent(in), dimension(ims:ime, jms:jme) ,optional                 :: kpbl          ! k-index of PBLH
     integer,intent(in), dimension(ims:ime, jms:jme),optional        :: ktop_deep
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: u10, v10      ! 10-m winds
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: tskin, t2m, dpt2m            ! temperature
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: pblh              ! PBL height [m]
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: vegfra
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: swdown, z0, snowh, znt
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: coszen
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: raincv, rainncv, mavail                    
-    real(RKIND),intent(inout), dimension(ims:ime, jms:jme)          :: rmol, ust
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme) ,optional             :: u10, v10      ! 10-m winds
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme) ,optional             :: tskin, t2m, dpt2m            ! temperature
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)  ,optional            :: pblh              ! PBL height [m]
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)   ,optional           :: vegfra
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)   ,optional           :: swdown, z0, snowh, znt
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)   ,optional           :: coszen
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)   ,optional           :: raincv, rainncv, mavail                    
+    real(RKIND),intent(inout), dimension(ims:ime, jms:jme)  ,optional         :: rmol, ust
 ! 2D Fire Input
     real(RKIND),intent(in), dimension(ims:ims, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
                                                                           efs_smold, efs_flam, efs_rsmold
@@ -165,22 +166,23 @@ contains
                                                                            RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
                                                                            RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
 ! 3D Met input 
-    real(RKIND),intent(in), dimension(ims:ime, kms:kme, jms:jme)    :: p8w,    dz8w,    z_at_w, cldfrac,   &
+    real(RKIND),intent(in), dimension(ims:ime, kms:kme, jms:jme),optional    :: p8w,    dz8w,    z_at_w, cldfrac,   &
                                                                        p_phy,  t_phy,   u_phy,  v_phy,     &
-                                                                       pi_phy, rho_phy, vvel   
+                                                                       pi_phy, rho_phy, vvel  
+    real(RKIND),intent(inout),dimension(ims:ime, kms:kme, jms:jme),optional            :: nifa, nwfa, hno3_bkgd 
 ! 3D (2D + first 3 levels) for visibility calculations
     real(RKIND),intent(in),dimension(ims:ime,kms:kme,jms:jme),optional :: qc_vis, qr_vis, qi_vis, qs_vis, qg_vis, blcldw_vis, blcldi_vis
 ! 3D emission input
-    real(RKIND),intent(in), dimension(ims:ime,1:kemit,jms:jme,1:num_e_ant_in),optional :: e_ant_in
+    real(RKIND),intent(in), dimension(ims:ime,1:kanthro,jms:jme,1:num_e_ant_in),optional :: e_ant_in
     real(RKIND),intent(in), dimension(ims:ime,1:kfire,jms:jme,1:num_e_bb_in),optional  :: e_bb_in
     real(RKIND),intent(in), dimension(ims:ime,1:kbio,jms:jme,1:num_e_bio_in),optional  :: e_bio_in
     real(RKIND),intent(in), dimension(ims:ime,1:kvol,jms:jme,1:num_e_vol_in),optional  :: e_vol_in
 ! JLS - TODO, if we update QV via moist flux, we will need to update the scalar in the driver
-    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme)           :: qv
-    real(RKIND),intent(in), dimension(ims:ime,1:nsoil, jms:jme)               :: smois, tslb
-    real(RKIND),intent(in), dimension(ims:ime,1:nlcat, jms:jme)               :: landusef
+    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional           :: qv
+    real(RKIND),intent(in), dimension(ims:ime,1:nsoil, jms:jme)   ,optional            :: smois, tslb
+    real(RKIND),intent(in), dimension(ims:ime,1:nlcat, jms:jme)  ,optional             :: landusef
 ! Chemistry indexes into MPAS scalar array
-    integer, intent(in) :: index_smoke_fine, index_smoke_coarse,                    &
+    integer, intent(in),optional :: index_smoke_fine, index_smoke_coarse,                    &
                            index_dust_fine,  index_dust_coarse,                     &
                            index_polp_tree,  index_polp_grass,   index_polp_weed,   &
                            index_pols_tree,  index_pols_grass,   index_pols_weed,   &
@@ -189,7 +191,7 @@ contains
                            index_ssalt_fine, index_ssalt_coarse,                    &
                            index_so4_a_fine, index_no3_a_fine, index_nh4_a_fine,    &
                            index_so2, index_nh3, index_ch4
-    integer, intent(in) :: index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
+    integer, intent(in),optional :: index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
                            index_e_bb_in_ch4, &
                            index_e_ant_in_dust_fine, index_e_ant_in_dust_coarse, &
                            index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse, &
@@ -199,7 +201,7 @@ contains
                            index_e_ant_in_nh3, index_e_ant_in_ch4,    &
                            index_e_bio_in_polp_tree, index_e_bio_in_polp_grass, index_e_bio_in_polp_weed, &
                            index_e_vol_in_vash_fine,  index_e_vol_in_vash_coarse
-    integer, intent(in) :: index_e_bb_out_smoke_fine, index_e_bb_out_smoke_coarse, &
+    integer, intent(in),optional :: index_e_bb_out_smoke_fine, index_e_bb_out_smoke_coarse, &
                            index_e_bb_out_ch4, &
                            index_e_ant_out_dust_fine, index_e_ant_out_dust_coarse, &
                            index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
@@ -235,7 +237,38 @@ contains
 ! 3D + chem output arrays
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem),optional       :: tend_chem_settle
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem)                :: chem
-    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme)                            :: aod3d_smoke, aod3d
+    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional                            :: aod3d_smoke, aod3d
+!>-- Namelist options
+     logical,intent(in),optional                :: do_mpas_smoke
+     logical,intent(in) ,optional               :: do_mpas_dust
+     logical,intent(in) ,optional               :: do_mpas_pollen
+     logical,intent(in) ,optional               :: do_mpas_anthro
+     logical,intent(in) ,optional               :: do_mpas_ssalt
+     logical,intent(in) ,optional               :: do_mpas_volc
+     logical,intent(in) ,optional               :: do_mpas_sna
+     logical,intent(in) ,optional               :: do_mpas_methane
+     logical,intent(in) ,optional               :: calc_bb_emis_online
+     integer,intent(in) ,optional               :: hwp_method
+     real(RKIND),intent(in) ,optional           :: hwp_alpha
+     integer,intent(in) ,optional               :: wetdep_ls_opt
+     real(kind=RKIND),intent(in) ,optional      :: wetdep_ls_alpha
+     integer,intent(in)      ,optional          :: plumerise_opt
+     integer,intent(in)                :: plume_wind_eff
+     real(kind=RKIND),intent(in)  ,optional     :: plume_alpha
+     real(kind=RKIND),intent(in)  ,optional     :: bb_emis_scale_factor, bb_qv_scale_factor
+     real(kind=RKIND),intent(in)  ,optional    :: rwc_emis_scale_factor
+     integer,intent(in)  ,optional              :: ebb_dcycle
+     integer,intent(in)   ,optional             :: drydep_opt
+     integer,intent(in)   ,optional             :: pm_settling
+     logical,intent(in)   ,optional             :: add_fire_heat_flux
+     logical,intent(in)   ,optional             :: add_fire_moist_flux
+     integer,intent(in)   ,optional             :: plumerisefire_frq
+     integer,intent(in)   ,optional             :: bb_beta
+     real(RKIND),intent(in) ,optional           :: dust_alpha, dust_gamma
+     real(RKIND),intent(in)  ,optional          :: dust_drylimit_factor, dust_moist_correction
+     integer,intent(in)     ,optional           :: bb_input_prevh
+     integer,intent(in)     ,optional           :: online_rwc_emis
+     real(RKIND),intent(in)  ,optional          :: pollen_emis_scale_factor, num_pols_per_polp 
 !----------------------------------
 !>-- Local Variables
 !>-- 3D met
@@ -248,36 +281,6 @@ contains
     real(RKIND), dimension(ims:ime, 1:nlcat, jms:jme) :: vegfrac
     ! JLS, temporary, need to read in like SMOKE_RRFS/MPAS
     real(RKIND), dimension(ims:ime, jms:jme) :: total_flashrate
-!>-- Namelist options
-     logical,intent(in)                :: do_mpas_smoke
-     logical,intent(in)                :: do_mpas_dust
-     logical,intent(in)                :: do_mpas_pollen
-     logical,intent(in)                :: do_mpas_anthro
-     logical,intent(in)                :: do_mpas_ssalt
-     logical,intent(in)                :: do_mpas_volc
-     logical,intent(in)                :: do_mpas_sna
-     logical,intent(in)                :: do_mpas_methane
-     logical,intent(in)                :: calc_bb_emis_online
-     integer,intent(in)                :: hwp_method
-     real(RKIND),intent(in)            :: hwp_alpha
-     integer,intent(in)                :: wetdep_ls_opt
-     real(kind=RKIND),intent(in)       :: wetdep_ls_alpha
-     integer,intent(in)                :: plumerise_opt
-     integer,intent(in)                :: plume_wind_eff
-     real(kind=RKIND),intent(in)       :: plume_alpha
-     real(kind=RKIND),intent(in)       :: bb_emis_scale_factor, bb_qv_scale_factor
-     real(kind=RKIND),intent(in)       :: rwc_emis_scale_factor,
-     integer,intent(in)                :: ebb_dcycle
-     integer,intent(in)                :: drydep_opt
-     integer,intent(in)                :: pm_settling
-     logical,intent(in)                :: add_fire_heat_flux
-     logical,intent(in)                :: add_fire_moist_flux
-     integer,intent(in)                :: plumerisefire_frq
-     integer,intent(in)                :: bb_beta
-     real(RKIND),intent(in)            :: dust_alpha, dust_gamma
-     real(RKIND),intent(in)            :: dust_drylimit_factor, dust_moist_correction
-     integer,intent(in)                :: bb_input_prevh
-     integer,intent(in)                :: online_rwc_emis
 !>- plume variables
     ! -- buffers
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme) :: ebu,ebu_coarse,ebu_ch4
@@ -325,11 +328,10 @@ contains
          (.not. do_mpas_dust ) .and. (.not. do_mpas_anthro) .and. &
          (.not. do_mpas_ssalt) .and. (.not. do_mpas_sna)    .and. &
          (.not. do_mpas_methane))  return
-
 ! 
+   if (ktau == 1) then
 !   Reorder chemistry indices
-!   TODO if ( ktau ==  1 ) then
-    call set_scalar_indices(chemistry_start,                             &
+      call set_scalar_indices(chemistry_start,                             &
                     index_smoke_fine, index_smoke_coarse,                &
                     index_dust_fine, index_dust_coarse,                  &
                     index_polp_tree, index_polp_grass, index_polp_weed,  &
@@ -338,8 +340,13 @@ contains
                     index_unspc_fine, index_unspc_coarse,                &
                     index_ssalt_fine, index_ssalt_coarse,                &
                     index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
-                    index_so2, index_nh3, index_ch4    
-! endif
+                    index_so2, index_nh3, index_ch4                      ) 
+      call mpas_log_write( ' Initializing dry deposition parameterss ')
+      call aero_dry_dep_init()
+      call mpas_log_write( ' Initializing radiation feedback parameterss ')
+      call aero_rad_init()
+   endif
+!
     uspdavg2d   = 0._RKIND
     hpbl2d      = 0._RKIND
     peak_hr     = 0._RKIND
@@ -370,12 +377,6 @@ contains
         its,ite, jts,jte, kts,kte)
    if  (do_timing) call mpas_timer_stop('smoke_prep')
 
-   if (ktau == 1) then
-      call mpas_log_write( ' Initializing dry deposition parameterss ')
-      call aero_dry_dep_init()
-      call mpas_log_write( ' Initializing radiation feedback parameterss ')
-      call aero_rad_init()
-   endif
         
    if ( do_mpas_smoke ) then
 ! Are we calculating emissions online?
@@ -622,7 +623,7 @@ contains
     if ( do_mpas_anthro ) then
     if  (do_timing) call mpas_timer_start('anthro_driver')
        call mpas_log_write( ' Calling anthro emis driver')
-       call mpas_smoke_anthro_emis_driver(dt,gmt,julday,kemit,        &
+       call mpas_smoke_anthro_emis_driver(dt,gmt,julday,kanthro,      &
             xlat,xlong, chem,num_chem,dz8w,t_phy,rho_phy,             &
             e_ant_in, e_ant_out, num_e_ant_in, num_e_ant_out,         &
             index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
