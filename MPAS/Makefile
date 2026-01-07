@@ -71,7 +71,8 @@ module_smoke_diagnostics.o: \
 
 module_wetdep_ls.o: \
 	mpas_smoke_config.o \
-	mpas_smoke_init.o
+	mpas_smoke_init.o \
+	dep_data_mod.o
 
 module_add_emiss_burn.o: \
 	mpas_smoke_config.o \

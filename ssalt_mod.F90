@@ -204,8 +204,6 @@ CONTAINS
     REAL(RKIND),    INTENT(OUT)   :: bems(imx,jmx,nmx)
 
     REAL(RKIND) :: c0(5), b0(2)
-!  REAL(RKIND), PARAMETER :: c_old(5)=(/1.373, 3.41, 0.057, 1.05, 1.190/) 
-!  REAL(RKIND), PARAMETER :: c_new(5)=(/1.373, 3.41, 0.057, 3.45, 1.607/)
     ! Change suggested by MC
     REAL(RKIND), PARAMETER :: c_old(5)=(/1.373, 3.2, 0.057, 1.05, 1.190/) 
     REAL(RKIND), PARAMETER :: c_new(5)=(/1.373, 3.2, 0.057, 3.45, 1.607/)
@@ -214,64 +212,15 @@ CONTAINS
     REAL(RKIND), PARAMETER :: dr=5.0D-2 ! um   
     REAL(RKIND), PARAMETER :: theta=30.0
     ! Swelling coefficient frh (d rwet / d rd)
-!!!  REAL(RKIND),    PARAMETER :: frh = 1.65
     REAL(RKIND),    PARAMETER :: frh = 2.d0
     LOGICAL, PARAMETER :: old=.TRUE., new=.FALSE.
     REAL(RKIND) :: rho_d, r0, r1, r, r_w, a, b, dfn, r_d, dfm, src
     INTEGER :: i, j, n, nr, ir
     REAL(RKIND) :: dt1,fudge_fac
 
-
-    REAL(RKIND)    :: tcmw(nmx), ar(nmx), tcvv(nmx)
-    REAL(RKIND)    :: ar_wetdep(nmx), kc(nmx)
-    CHARACTER(LEN=20)     :: tcname(nmx), tcunits(nmx)
-    LOGICAL               :: aerosol(nmx)
-
-
     REAL(RKIND) :: tc1(imx,jmx,lmx,nmx)
-    REAL(RKIND), TARGET :: tcms(imx,jmx,lmx,nmx) ! tracer mass (kg; kgS for sulfur case)
-    REAL(RKIND), TARGET :: tcgm(imx,jmx,lmx,nmx) ! g/m3
 
-    !-----------------------------------------------------------------------  
-    ! sea salt specific
-    !-----------------------------------------------------------------------  
-! REAL(RKIND), DIMENSION(nmx) :: ra, rb
-! REAL(RKIND) :: ch_ss(nmx,12)
-
-    !-----------------------------------------------------------------------  
-    ! emissions (input)
-    !-----------------------------------------------------------------------  
-    REAL(RKIND) :: e_an(imx,jmx,2,nmx), e_bb(imx,jmx,nmx), &
-            e_ac(imx,jmx,lmx,nmx)
-
-    !-----------------------------------------------------------------------  
-    ! diagnostics (budget)
-    !-----------------------------------------------------------------------
-!  ! tendencies per time step and process
-!  REAL(RKIND), TARGET :: bems(imx,jmx,nmx), bdry(imx,jmx,nmx), bstl(imx,jmx,nmx)
-!  REAL(RKIND), TARGET :: bwet(imx,jmx,nmx), bcnv(imx,jmx,nmx)!
-
-!  ! integrated tendencies per process
-!  REAL(RKIND), TARGET :: tems(imx,jmx,nmx), tstl(imx,jmx,nmx)
-!  REAL(RKIND), TARGET :: tdry(imx,jmx,nmx), twet(imx,jmx,nmx), tcnv(imx,jmx,nmx)
-
-    ! global mass balance per time step 
-    REAL(RKIND) :: tmas0(nmx), tmas1(nmx)
-    REAL(RKIND) :: dtems(nmx), dttrp(nmx), dtdif(nmx), dtcnv(nmx)
-    REAL(RKIND) :: dtwet(nmx), dtdry(nmx), dtstl(nmx)
-    REAL(RKIND) :: dtems2(nmx), dttrp2(nmx), dtdif2(nmx), dtcnv2(nmx)
-    REAL(RKIND) :: dtwet2(nmx), dtdry2(nmx), dtstl2(nmx)
-
-    ! detailed integrated budgets for individual emissions
-    REAL(RKIND), TARGET :: ems_an(imx,jmx,nmx),    ems_bb(imx,jmx,nmx), ems_tp(imx,jmx)
-    REAL(RKIND), TARGET :: ems_ac(imx,jmx,lmx,nmx)
-    REAL(RKIND), TARGET :: ems_co(imx,jmx,nmx)
-
-    ! executable statements
 ! decrease seasalt emissions (Colarco et al. 2010)
-!
-    !fudge_fac= 1. !.5
-    !fudge_fac= .5 !lzhang
     fudge_fac= .25 !lzhang
 !
     DO n = 1,nmx

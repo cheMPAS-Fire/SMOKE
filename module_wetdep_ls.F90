@@ -4,6 +4,7 @@
 module module_wetdep_ls
   use mpas_kind_types
   use mpas_smoke_init
+  use dep_data_mod
 
 contains
 
@@ -38,7 +39,7 @@ subroutine wetdep_ls(dt,gravity,var,rain,moist,                                 
    one_over_gravdt = 1._RKIND / gravity  / dt
 
     do nv=1,nchem
-      if (nv.eq.p_ch4)cycle
+      if (ls_frac(nv) .lt. 0)cycle
       do i=its,ite
        do j=jts,jte
         var_sum_clw(i,j)=0._RKIND

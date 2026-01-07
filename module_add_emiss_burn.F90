@@ -11,26 +11,39 @@ CONTAINS
                            chem,num_chem,julday,gmt,xlat,xlong,     &
                            fire_end_hr, peak_hr,time_int,           &
                            coef_bb_dc, fire_hist, hwp, hwp_prevd,   &
-                           swdown,ebb_dcycle, ebu,ebu_coarse,ebu_ch4, &
-                           fire_type,&
-                           q_vap, add_fire_moist_flux,              &
+                           swdown,ebb_dcycle, ebu, num_e_bb_in,     &
+                           fire_type, q_vap, add_fire_moist_flux,   &
                            sc_factor, aod3d,                        &
+                           index_e_bb_in_smoke_ultrafine,           &
+                           index_e_bb_in_smoke_fine,                &
+                           index_e_bb_in_smoke_coarse,              &
+                           index_e_bb_in_co, index_e_bb_in_nh3,     &
+                           index_e_bb_in_ch4,                       &
+                           index_e_bb_in_nox, index_e_bb_in_so2,    &
                            ids,ide, jds,jde, kds,kde,               &
                            ims,ime, jms,jme, kms,kme,               &
                            its,ite, jts,jte, kts,kte                )
 
    IMPLICIT NONE
 
-   INTEGER,      INTENT(IN   ) :: julday, num_chem,                 &
+   INTEGER,      INTENT(IN   ) :: julday, num_chem, num_e_bb_in,    &
                                   ids,ide, jds,jde, kds,kde,        &
                                   ims,ime, jms,jme, kms,kme,        &
                                   its,ite, jts,jte, kts,kte
+   INTEGER,      INTENT(IN) :: &
+                           index_e_bb_in_smoke_ultrafine,           &
+                           index_e_bb_in_smoke_fine,                &
+                           index_e_bb_in_smoke_coarse,              &
+                           index_e_bb_in_co, index_e_bb_in_nh3,     &
+                           index_e_bb_in_ch4,                       &
+                           index_e_bb_in_nox, index_e_bb_in_so2
 
    real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, 1:num_chem ),                 &
          INTENT(INOUT ) ::                                   chem
 
-   real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme ),                 &
-         INTENT(INOUT ) ::                                   ebu, ebu_coarse, ebu_ch4, q_vap ! SRB: added q_vap
+   real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_e_bb_in ),                 &
+         INTENT(INOUT ) ::                                   ebu
+   real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(INOUT ) :: q_vap ! SRB: added q_vap
 
    real(RKIND), DIMENSION(ims:ime,jms:jme), INTENT(IN)     :: xlat,xlong, swdown
    real(RKIND), DIMENSION(ims:ime,jms:jme), INTENT(IN)     :: hwp, peak_hr, fire_end_hr !RAR: Shall we make fire_end integer?
@@ -63,7 +76,7 @@ CONTAINS
      do j=jts,jte
       do i=its,ite
        do k=kts,kfire_max
-          if (ebu(i,k,j)<ebb_min) cycle
+          if (ebu(i,k,j,index_e_bb_in_smoke_fine)<ebb_min) cycle
 
            if (ebb_dcycle==1) then
             conv= dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
@@ -71,25 +84,58 @@ CONTAINS
            elseif (ebb_dcycle==2) then
             conv= coef_bb_dc(i,j)*dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
            endif
-            
-            
-           if ( p_smoke_fine > 0 ) then
-              dm_smoke= conv*ebu(i,k,j)
-              chem(i,k,j,p_smoke_fine) = chem(i,k,j,p_smoke_fine) + dm_smoke
-              chem(i,k,j,p_smoke_fine) = MIN(MAX(chem(i,k,j,p_smoke_fine),epsilc),5.e+3_RKIND)        
-              aod3d(i,k,j)= 1.e-6* ext2* chem(i,k,j,p_smoke_fine)*rho_phy(i,k,j)*dz8w(i,k,j)
-           endif
+           
+           dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_fine)
+           chem(i,k,j,p_smoke_fine) = chem(i,k,j,p_smoke_fine) + dm_smoke
+           chem(i,k,j,p_smoke_fine) = MIN(MAX(chem(i,k,j,p_smoke_fine),epsilc),5.e+3_RKIND)
 
-           if ( p_smoke_coarse > 0 ) then 
-              dm_smoke_coarse= conv*ebu_coarse(i,k,j)
-              chem(i,k,j,p_smoke_coarse) = chem(i,k,j,p_smoke_coarse) + dm_smoke_coarse
-              chem(i,k,j,p_smoke_coarse) = MIN(MAX(chem(i,k,j,p_smoke_coarse),epsilc),5.e+3_RKIND)        
-           endif
-           if ( p_ch4 > 0 ) then 
-              dm_ch4= conv_gas*ebu_ch4(i,k,j)
-              chem(i,k,j,p_ch4) = chem(i,k,j,p_ch4) + dm_ch4
-              chem(i,k,j,p_ch4) = MIN(MAX(chem(i,k,j,p_ch4),epsilc),5.e+3_RKIND)        
-           endif
+           aod3d(i,k,j)= 1.e-6* ext2* chem(i,k,j,p_smoke_fine)*rho_phy(i,k,j)*dz8w(i,k,j)
+
+          ! Update AOD for each species?
+          !
+          ! ultrafine smoke
+           if (p_smoke_ultrafine > 0) then
+              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_ultrafine)
+              chem(i,k,j,p_smoke_ultrafine) = chem(i,k,j,p_smoke_ultrafine) + dm_smoke
+              chem(i,k,j,p_smoke_ultrafine) = MIN(MAX(chem(i,k,j,p_smoke_ultrafine),epsilc),5.e+3_RKIND)
+           endif 
+          ! coarse smoke
+           if (p_smoke_coarse > 0) then
+              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_coarse)
+              chem(i,k,j,p_smoke_coarse) = chem(i,k,j,p_smoke_coarse) + dm_smoke
+              chem(i,k,j,p_smoke_coarse) = MIN(MAX(chem(i,k,j,p_smoke_coarse),epsilc),5.e+3_RKIND)   
+           endif 
+          ! CO
+           if (p_co > 0) then
+              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_co)
+              chem(i,k,j,p_co) = chem(i,k,j,p_co) + dm_smoke
+              chem(i,k,j,p_co) = MIN(MAX(chem(i,k,j,p_co),epsilc),5.e+3_RKIND)          
+           endif 
+          ! NOx
+           if (p_nox > 0) then
+              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_nox)
+              chem(i,k,j,p_nox) = chem(i,k,j,p_nox) + dm_smoke
+              chem(i,k,j,p_nox) = MIN(MAX(chem(i,k,j,p_nox),epsilc),5.e+3_RKIND)          
+           endif 
+          ! CH4
+           if (p_ch4 > 0) then
+              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_ch4)
+              chem(i,k,j,p_ch4) = chem(i,k,j,p_ch4) + dm_smoke
+              chem(i,k,j,p_ch4) = MIN(MAX(chem(i,k,j,p_ch4),epsilc),5.e+3_RKIND)         
+           endif 
+          ! SO2
+           if (p_so2 > 0) then
+              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_so2)
+              chem(i,k,j,p_so2) = chem(i,k,j,p_so2) + dm_smoke
+              chem(i,k,j,p_so2) = MIN(MAX(chem(i,k,j,p_so2),epsilc),5.e+3_RKIND)         
+           endif 
+          ! SO2
+           if (p_nh3 > 0) then
+              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_nh3)
+              chem(i,k,j,p_nh3) = chem(i,k,j,p_nh3) + dm_smoke
+              chem(i,k,j,p_nh3) = MIN(MAX(chem(i,k,j,p_nh3),epsilc),5.e+3_RKIND)
+           endif 
+            
 
            ! SRB: Modifying Water Vapor content based on Emissions
            if (add_fire_moist_flux) then
@@ -97,8 +143,8 @@ CONTAINS
              q_vap(i,k,j) = MIN(MAX(q_vap(i,k,j),0._RKIND),1.e+3_RKIND)
            endif
 
-           if ( dbg_opt .and. (k==kts .OR. k==kfire_max) .and. (icall .le. n_dbg_lines) ) then
-          endif
+           !if ( dbg_opt .and. (k==kts .OR. k==kfire_max) .and. (icall .le. n_dbg_lines) ) then
+           !endif
        enddo
        icall = icall + 1
       enddo

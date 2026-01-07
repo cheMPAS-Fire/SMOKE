@@ -22,63 +22,85 @@ module rad_data_mod
       improve_eff(:) = 0._RKIND
 
 ! Mass scattering efficencies from Hand and Malm, (2007)
-      if (p_smoke_fine>0)     sc_eff(p_smoke_fine)       = 3.9_RKIND
-      if (p_smoke_coarse>0)   sc_eff(p_smoke_coarse)     = 2.6_RKIND
-      if (p_dust_fine>0)      sc_eff(p_dust_fine)        = 3.3_RKIND
-      if (p_unspc_fine>0)     sc_eff(p_unspc_fine)       = 3.3_RKIND
-      if (p_dust_coarse>0)    sc_eff(p_dust_coarse)      = 0.7_RKIND
-      if (p_unspc_coarse>0)   sc_eff(p_unspc_coarse)     = 0.7_RKIND
-      if (p_ssalt_fine>0)     sc_eff(p_ssalt_fine)       = 4.5_RKIND
-      if (p_ssalt_coarse>0)   sc_eff(p_ssalt_coarse)     = 1.0_RKIND
-!
-      if (p_polp_all>0)       sc_eff(p_polp_all)         = 2.6_RKIND
-      if (p_polp_tree>0)      sc_eff(p_polp_tree)        = 2.6_RKIND
-      if (p_polp_grass>0)     sc_eff(p_polp_grass)       = 2.6_RKIND
-      if (p_polp_weed>0)      sc_eff(p_polp_weed)        = 2.6_RKIND
-!
-      if (p_pols_all>0)       sc_eff(p_pols_all)         = 3.9_RKIND 
-      if (p_pols_tree>0)      sc_eff(p_pols_tree)        = 3.9_RKIND
-      if (p_pols_grass>0)     sc_eff(p_pols_grass)       = 3.9_RKIND
-      if (p_pols_weed>0)      sc_eff(p_pols_weed)        = 3.9_RKIND
-! Mass Absorbing efficiencies from HRRR-Smoke 
-      if (p_smoke_fine>0)    ab_eff(p_smoke_fine)        = 0.5_RKIND 
-      if (p_smoke_coarse>0)  ab_eff(p_smoke_coarse)      = 0.0_RKIND
-      if (p_dust_fine>0)     ab_eff(p_dust_fine)         = 0.0_RKIND
-      if (p_unspc_fine>0)    ab_eff(p_unspc_fine)        = 0.0_RKIND
-      if (p_dust_coarse>0)   ab_eff(p_dust_coarse)       = 0.0_RKIND
-      if (p_unspc_coarse>0)  ab_eff(p_unspc_coarse)      = 0.0_RKIND
-      if (p_ssalt_fine>0)    ab_eff(p_ssalt_fine)        = 0.0_RKIND
-      if (p_ssalt_coarse>0)  ab_eff(p_ssalt_coarse)      = 0.0_RKIND
-!
-      if (p_polp_all>0)      ab_eff(p_polp_all)          = 0.0_RKIND
-      if (p_polp_tree>0)     ab_eff(p_polp_tree)         = 0.0_RKIND
-      if (p_polp_grass>0)    ab_eff(p_polp_grass)        = 0.0_RKIND
-      if (p_polp_weed>0)     ab_eff(p_polp_weed)         = 0.0_RKIND
-!
-      if (p_pols_all>0)      ab_eff(p_pols_all)          = 0.0_RKIND
-      if (p_pols_tree>0)     ab_eff(p_pols_tree)         = 0.0_RKIND
-      if (p_pols_grass>0)    ab_eff(p_pols_grass)        = 0.0_RKIND
-      if (p_pols_weed>0)     ab_eff(p_pols_weed)         = 0.0_RKIND
-! Extinction from IMPROVE ALGORITHM
-      if (p_smoke_fine>0)     improve_eff(p_smoke_fine)       = 6.1_RKIND
-      if (p_smoke_coarse>0)   improve_eff(p_smoke_coarse)     = 0.6_RKIND
-      if (p_dust_fine>0)      improve_eff(p_dust_fine)        = 1.0_RKIND
-      if (p_unspc_fine>0)     improve_eff(p_unspc_fine)       = 1.0_RKIND
-      if (p_dust_coarse>0)    improve_eff(p_dust_coarse)      = 0.6_RKIND
-      if (p_unspc_coarse>0)   improve_eff(p_unspc_coarse)     = 0.6_RKIND
-      if (p_ssalt_fine>0)     improve_eff(p_ssalt_fine)       = 1.7_RKIND
-      if (p_ssalt_coarse>0)   improve_eff(p_ssalt_coarse)     = 1.7_RKIND
-!
-      if (p_polp_all>0)       improve_eff(p_polp_all)         = 0.6_RKIND
-      if (p_polp_tree>0)      improve_eff(p_polp_tree)        = 0.6_RKIND
-      if (p_polp_grass>0)     improve_eff(p_polp_grass)       = 0.6_RKIND
-      if (p_polp_weed>0)      improve_eff(p_polp_weed)        = 0.6_RKIND
-!
-      if (p_pols_all>0)       improve_eff(p_pols_all)         = 6.1_RKIND 
-      if (p_pols_tree>0)      improve_eff(p_pols_tree)        = 6.1_RKIND
-      if (p_pols_grass>0)     improve_eff(p_pols_grass)       = 6.1_RKIND
-      if (p_pols_weed>0)      improve_eff(p_pols_weed)        = 6.1_RKIND
+      if (p_smoke_ultrafine>0)     sc_eff(p_smoke_ultrafine)  = 3.9_RKIND ! JLS, check
+      if (p_smoke_fine>0)          sc_eff(p_smoke_fine)       = 3.9_RKIND
+      if (p_smoke_coarse>0)        sc_eff(p_smoke_coarse)     = 2.6_RKIND
 
+      if (p_dust_ultrafine>0)      sc_eff(p_dust_ultrafine)   = 3.3_RKIND ! JLS, check
+      if (p_dust_fine>0)           sc_eff(p_dust_fine)        = 3.3_RKIND
+      if (p_dust_coarse>0)         sc_eff(p_dust_coarse)      = 0.7_RKIND
+
+      if (p_unspc_ultrafine>0)     sc_eff(p_unspc_ultrafine)  = 3.3_RKIND
+      if (p_unspc_fine>0)          sc_eff(p_unspc_fine)       = 3.3_RKIND
+      if (p_unspc_coarse>0)        sc_eff(p_unspc_coarse)     = 0.7_RKIND
+!
+      if (p_ssalt_fine>0)          sc_eff(p_ssalt_fine)       = 4.5_RKIND
+      if (p_ssalt_coarse>0)        sc_eff(p_ssalt_coarse)     = 1.0_RKIND
+!
+      if (p_polp_all>0)            sc_eff(p_polp_all)         = 2.6_RKIND
+      if (p_polp_tree>0)           sc_eff(p_polp_tree)        = 2.6_RKIND
+      if (p_polp_grass>0)          sc_eff(p_polp_grass)       = 2.6_RKIND
+      if (p_polp_weed>0)           sc_eff(p_polp_weed)        = 2.6_RKIND
+!
+      if (p_pols_all>0)            sc_eff(p_pols_all)         = 3.9_RKIND 
+      if (p_pols_tree>0)           sc_eff(p_pols_tree)        = 3.9_RKIND
+      if (p_pols_grass>0)          sc_eff(p_pols_grass)       = 3.9_RKIND
+      if (p_pols_weed>0)           sc_eff(p_pols_weed)        = 3.9_RKIND
+! 
+      if (p_bact_fine>0)           sc_eff(p_bact_fine)        = 3.9_RKIND
+! Mass Absorbing efficiencies from HRRR-Smoke 
+      if (p_smoke_ultrafine>0)     ab_eff(p_smoke_ultrafine)  = 0.5_RKIND  ! JLS, check
+      if (p_smoke_fine>0)          ab_eff(p_smoke_fine)       = 0.5_RKIND 
+      if (p_smoke_coarse>0)        ab_eff(p_smoke_coarse)     = 0.0_RKIND
+!     
+      if (p_dust_ultrafine>0)      ab_eff(p_dust_ultrafine)   = 0.0_RKIND
+      if (p_dust_fine>0)           ab_eff(p_dust_fine)        = 0.0_RKIND
+      if (p_dust_coarse>0)         ab_eff(p_dust_coarse)      = 0.0_RKIND
+!      
+      if (p_unspc_ultrafine>0)     ab_eff(p_unspc_ultrafine)  = 0.0_RKIND   
+      if (p_unspc_fine>0)          ab_eff(p_unspc_fine)       = 0.0_RKIND
+      if (p_unspc_coarse>0)        ab_eff(p_unspc_coarse)     = 0.0_RKIND
+!      
+      if (p_ssalt_fine>0)          ab_eff(p_ssalt_fine)       = 0.0_RKIND
+      if (p_ssalt_coarse>0)        ab_eff(p_ssalt_coarse)     = 0.0_RKIND
+!
+      if (p_polp_all>0)            ab_eff(p_polp_all)         = 0.0_RKIND
+      if (p_polp_tree>0)           ab_eff(p_polp_tree)        = 0.0_RKIND
+      if (p_polp_grass>0)          ab_eff(p_polp_grass)       = 0.0_RKIND
+      if (p_polp_weed>0)           ab_eff(p_polp_weed)        = 0.0_RKIND
+!
+      if (p_pols_all>0)            ab_eff(p_pols_all)         = 0.0_RKIND
+      if (p_pols_tree>0)           ab_eff(p_pols_tree)        = 0.0_RKIND
+      if (p_pols_grass>0)          ab_eff(p_pols_grass)       = 0.0_RKIND
+      if (p_pols_weed>0)           ab_eff(p_pols_weed)        = 0.0_RKIND
+!
+      if (p_bact_fine>0)           ab_eff(p_bact_fine)        = 0.0_RKIND
+! Extinction from IMPROVE ALGORITHM
+      if (p_smoke_ultrafine>0)     improve_eff(p_smoke_ultrafine)  = 6.1_RKIND  ! JLS, check
+      if (p_smoke_fine>0)          improve_eff(p_smoke_fine)       = 6.1_RKIND
+      if (p_smoke_coarse>0)        improve_eff(p_smoke_coarse)     = 0.6_RKIND
+!
+      if (p_dust_ultrafine>0)      improve_eff(p_dust_ultrafine)   = 1.0_RKIND  ! JLS, check
+      if (p_dust_fine>0)           improve_eff(p_dust_fine)        = 1.0_RKIND
+      if (p_dust_coarse>0)         improve_eff(p_dust_coarse)      = 0.6_RKIND
+
+      if (p_unspc_ultrafine>0)     improve_eff(p_unspc_ultrafine)  = 1.0_RKIND  ! JLS, check
+      if (p_unspc_fine>0)          improve_eff(p_unspc_fine)       = 1.0_RKIND
+      if (p_unspc_coarse>0)        improve_eff(p_unspc_coarse)     = 0.6_RKIND
+      if (p_ssalt_fine>0)          improve_eff(p_ssalt_fine)       = 1.7_RKIND
+      if (p_ssalt_coarse>0)        improve_eff(p_ssalt_coarse)     = 1.7_RKIND
+!
+      if (p_polp_all>0)            improve_eff(p_polp_all)         = 0.6_RKIND
+      if (p_polp_tree>0)           improve_eff(p_polp_tree)        = 0.6_RKIND
+      if (p_polp_grass>0)          improve_eff(p_polp_grass)       = 0.6_RKIND
+      if (p_polp_weed>0)           improve_eff(p_polp_weed)        = 0.6_RKIND
+!
+      if (p_pols_all>0)            improve_eff(p_pols_all)         = 6.1_RKIND 
+      if (p_pols_tree>0)           improve_eff(p_pols_tree)        = 6.1_RKIND
+      if (p_pols_grass>0)          improve_eff(p_pols_grass)       = 6.1_RKIND
+      if (p_pols_weed>0)           improve_eff(p_pols_weed)        = 6.1_RKIND
+!
+      if (p_bact_fine>0)           improve_eff(p_bact_fine)        = 6.1_RKIND
       !write(*,*) 'JLS, radiation parameters initialized',improve_eff,ab_eff
 
    end subroutine aero_rad_init
