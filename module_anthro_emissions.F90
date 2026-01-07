@@ -23,20 +23,12 @@ contains
                            e_ant_in, e_ant_out, num_e_ant_in, num_e_ant_out,         &
                            index_e_ant_in_unspc_ultrafine,                           &
                            index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
-                           index_e_ant_in_smoke_ultrafine,                           &
-                           index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
-                           index_e_ant_in_dust_ultrafine,                            &
-                           index_e_ant_in_dust_fine,  index_e_ant_in_dust_coarse,    &
                            index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine,     &
                            index_e_ant_in_nh4_a_fine,                                &
                            index_e_ant_in_so2, index_e_ant_in_nh3,                   &
                            index_e_ant_in_ch4, index_e_ant_in_nox, index_e_ant_in_co,&
                            index_e_ant_out_unspc_ultrafine,                          &
                            index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
-                           index_e_ant_out_smoke_ultrafine,                          &
-                           index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse, &
-                           index_e_ant_out_dust_ultrafine,                           &
-                           index_e_ant_out_dust_fine, index_e_ant_out_dust_coarse,   &
                            index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine,   &
                            index_e_ant_out_nh4_a_fine,                               &
                            index_e_ant_out_so2, index_e_ant_out_nh3,                 &
@@ -54,22 +46,14 @@ contains
                                   its,ite, jts,jte, kts,kte,         &
                                   num_e_ant_in, num_e_ant_out,       &
                                   index_e_ant_in_unspc_ultrafine,    &
-                                  index_e_ant_in_smoke_ultrafine,    &
-                                  index_e_ant_in_dust_ultrafine,     &
            index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
-           index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
-           index_e_ant_in_dust_fine,  index_e_ant_in_dust_coarse,    &
            index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine,     &
            index_e_ant_in_nh4_a_fine,                                &
            index_e_ant_in_so2, index_e_ant_in_nh3,                   &
            index_e_ant_in_ch4,                                       &
            index_e_ant_in_nox, index_e_ant_in_co,                    &
                                   index_e_ant_out_unspc_ultrafine,   &
-                                  index_e_ant_out_smoke_ultrafine,   &
-                                  index_e_ant_out_dust_ultrafine,    &
            index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
-           index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse, &
-           index_e_ant_out_dust_fine, index_e_ant_out_dust_coarse,   &
            index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine,   &
            index_e_ant_out_nh4_a_fine,                               &
            index_e_ant_out_so2, index_e_ant_out_nh3,                 &
@@ -114,36 +98,6 @@ contains
          emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_unspc_coarse)
          chem(i,k,j,p_unspc_coarse)   = chem(i,k,j,p_unspc_coarse) + emis
          e_ant_out(i,k,j,index_e_ant_out_unspc_coarse) = e_ant_out(i,k,j,index_e_ant_out_unspc_coarse) + emis
-      endif
-      if (p_dust_ultrafine .gt. 0 .and. index_e_ant_in_dust_ultrafine .gt. 0 ) then
-         emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_dust_ultrafine)
-         chem(i,k,j,p_dust_ultrafine)   = chem(i,k,j,p_dust_ultrafine) + emis
-         e_ant_out(i,k,j,index_e_ant_out_dust_ultrafine) = e_ant_out(i,k,j,index_e_ant_out_dust_ultrafine) + emis
-      endif
-      if (p_dust_fine   .gt. 0  .and. index_e_ant_in_dust_fine .gt. 0 ) then
-         emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_dust_fine)
-         chem(i,k,j,p_dust_fine)   = chem(i,k,j,p_dust_fine) + emis
-         e_ant_out(i,k,j,index_e_ant_out_dust_fine) = e_ant_out(i,k,j,index_e_ant_out_dust_fine) + emis
-      endif
-      if (p_dust_coarse   .gt. 0 .and. index_e_ant_in_dust_coarse .gt. 0 ) then
-         emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_dust_coarse)
-         chem(i,k,j,p_dust_coarse)   = chem(i,k,j,p_dust_coarse) + emis
-         e_ant_out(i,k,j,index_e_ant_out_dust_coarse) =  e_ant_out(i,k,j,index_e_ant_out_dust_coarse) + emis
-      endif
-      if (p_smoke_ultrafine .gt. 0 .and. index_e_ant_in_smoke_ultrafine .gt. 0 ) then
-         emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_smoke_ultrafine)
-         chem(i,k,j,p_smoke_ultrafine)   = chem(i,k,j,p_smoke_ultrafine) + emis
-         e_ant_out(i,k,j,index_e_ant_out_smoke_ultrafine) = e_ant_out(i,k,j,index_e_ant_out_smoke_ultrafine) + emis
-      endif
-      if (p_smoke_fine   .gt. 0 .and. index_e_ant_in_smoke_fine .gt. 0 ) then
-         emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_smoke_fine)
-         chem(i,k,j,p_smoke_fine)   = chem(i,k,j,p_smoke_fine) + emis
-         e_ant_out(i,k,j,index_e_ant_out_smoke_fine) = e_ant_out(i,k,j,index_e_ant_out_smoke_fine) + emis
-      endif
-      if (p_smoke_coarse   .gt. 0 .and. index_e_ant_in_smoke_coarse .gt. 0 ) then
-         emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_smoke_coarse)
-         chem(i,k,j,p_smoke_coarse)   = chem(i,k,j,p_smoke_coarse) + emis
-         e_ant_out(i,k,j,index_e_ant_out_smoke_coarse) = e_ant_out(i,k,j,index_e_ant_out_smoke_coarse) + emis
       endif
       if (p_ch4 .gt. 0 .and. index_e_ant_in_ch4 .gt. 0 ) then
         emis = conv_gas*e_ant_in(i,k,j,index_e_ant_in_ch4)

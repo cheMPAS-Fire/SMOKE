@@ -52,7 +52,6 @@ contains
            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
            index_e_bb_in_co, index_e_bb_in_nh3, index_e_bb_in_ch4,                           &
            index_e_bb_in_nox, index_e_bb_in_so2, &
-           index_e_ant_in_dust_ultrafine, index_e_ant_in_dust_fine, index_e_ant_in_dust_coarse,     &
            index_e_ant_in_unspc_ultrafine, index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,  &
            index_e_ant_in_smoke_ultrafine,index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
            index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine, &
@@ -64,7 +63,6 @@ contains
            index_e_bb_out_smoke_ultrafine, index_e_bb_out_smoke_fine, index_e_bb_out_smoke_coarse, & 
            index_e_bb_out_nox, index_e_bb_out_ch4,index_e_bb_out_co,                         &
            index_e_bb_out_so2,index_e_bb_out_nh3,       &
-           index_e_ant_out_dust_ultrafine, index_e_ant_out_dust_fine, index_e_ant_out_dust_coarse,      &
            index_e_ant_out_unspc_ultrafine, index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse,   &
            index_e_ant_out_smoke_ultrafine, index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse,   &
            index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine, &
@@ -208,7 +206,6 @@ contains
                            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
                            index_e_bb_in_co, index_e_bb_in_ch4, index_e_bb_in_nox, &
                            index_e_bb_in_so2, index_e_bb_in_nh3, &
-                           index_e_ant_in_dust_ultrafine, index_e_ant_in_dust_fine, index_e_ant_in_dust_coarse, &
                            index_e_ant_in_unspc_ultrafine, index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse, &
                            index_e_ant_in_smoke_ultrafine, index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse, &
                            index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine, &
@@ -220,7 +217,6 @@ contains
     integer, intent(in),optional :: &
                            index_e_bb_out_smoke_ultrafine, index_e_bb_out_smoke_fine, index_e_bb_out_smoke_coarse, &
                            index_e_bb_out_ch4, index_e_bb_out_co, index_e_bb_out_nox, index_e_bb_out_nh3, index_e_bb_out_so2, &
-                           index_e_ant_out_dust_ultrafine, index_e_ant_out_dust_fine, index_e_ant_out_dust_coarse, &
                            index_e_ant_out_unspc_ultrafine, index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
                            index_e_ant_out_smoke_ultrafine, index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse, &
                            index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine, &
@@ -654,20 +650,12 @@ contains
             e_ant_in, e_ant_out, num_e_ant_in, num_e_ant_out,         &
             index_e_ant_in_unspc_ultrafine,                           &
             index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
-            index_e_ant_in_smoke_ultrafine,                           &
-            index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
-            index_e_ant_in_dust_ultrafine,                            &
-            index_e_ant_in_dust_fine,  index_e_ant_in_dust_coarse,    &
             index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine,     &
             index_e_ant_in_nh4_a_fine,                                &
             index_e_ant_in_so2, index_e_ant_in_nh3,index_e_ant_in_ch4,&
             index_e_ant_in_nox, index_e_ant_in_co,                    &
             index_e_ant_out_unspc_ultrafine,                          &
             index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
-            index_e_ant_out_smoke_ultrafine,                          &
-            index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse, &
-            index_e_ant_out_dust_ultrafine,                           &
-            index_e_ant_out_dust_fine, index_e_ant_out_dust_coarse,   &
             index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine,   &
             index_e_ant_out_nh4_a_fine,                               &
             index_e_ant_out_so2, index_e_ant_out_nh3,                 &
