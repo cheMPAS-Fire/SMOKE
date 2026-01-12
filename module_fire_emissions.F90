@@ -202,13 +202,13 @@ module module_fire_emissions
   !-------------------------------------------------------------------------------
     subroutine calculate_smoke_emissions(dt, julday, nlcat, EFs_map, fre_avg,       &
                                          ebb_dcycle, area, nblocks, ktau,           &
-                                         bb_input_prevh, ebu,                       &
+                                         bb_input_prevh, ebu, num_e_bb_in,          &
                                          ids, ide, jds, jde, kds, kde,              &
                                          ims, ime, jms, jme, kms, kme,              &
                                          its, ite, jts, jte, kts, kte)
   
       implicit none
-      INTEGER, INTENT(IN) :: julday, nlcat
+      INTEGER, INTENT(IN) :: julday, nlcat, num_e_bb_in
       INTEGER, INTENT(IN) :: ids, ide, jds, jde, kds, kde
       INTEGER, INTENT(IN) :: ims, ime, jms, jme, kms, kme
       INTEGER, INTENT(IN) :: its, ite, jts, jte, kts, kte
@@ -220,10 +220,10 @@ module module_fire_emissions
       REAL(RKIND), INTENT(IN),   DIMENSION(ims:ime, jms:jme, nblocks)   :: fre_avg
       REAL(RKIND), INTENT(IN),   DIMENSION(ims:ime, jms:jme)            :: EFs_map
       REAL(RKIND), INTENT(IN),   DIMENSION(ims:ime, jms:jme)            :: area !we need it for first v level 
-      REAL(RKIND), INTENT(INOUT),DIMENSION(ims:ime, kms:kme, jms:jme)   :: ebu
+      REAL(RKIND), INTENT(INOUT),DIMENSION(ims:ime, kms:kme, jms:jme, num_e_bb_in)   :: ebu
 
       !Local variables
-      INTEGER :: i, j, blk, hour_int
+      INTEGER :: i, j, blk, hour_int, nv
       REAL(RKIND) ::  hour_tmp
       REAL(RKIND), PARAMETER :: fg_to_ug = 1.0e6
       REAL(RKIND), PARAMETER :: to_s = 3600.0
@@ -244,14 +244,16 @@ module module_fire_emissions
       ENDIF
     
       !if ebb_dcycle == 2 then ebb_dc1 do not use blocks? should be 24
+      DO nv = 1, num_e_bb_in
       DO j = jts, jte
         DO i = its, ite
            IF (fre_avg(i,j,blk) > 0.0_RKIND) THEN
-              ebu(i,kts,j) = (fre_avg(i,j,blk) * EFs_map(i,j) * fg_to_ug) / ( area(i,j) * to_s) !we need the area of the grids
+              ebu(i,kts,j,nv) = (fre_avg(i,j,blk) * EFs_map(i,j) * fg_to_ug) / ( area(i,j) * to_s) !we need the area of the grids
            ELSE
-              ebu(i,kts,j) = 0.0_RKIND
+              ebu(i,kts,j,nv) = 0.0_RKIND
            END IF
         END DO
+      END DO
       END DO
   
     end subroutine calculate_smoke_emissions
@@ -263,14 +265,15 @@ module module_fire_emissions
   ! Handles multiple fire age "blocks" (nblocks) using coef_bb_dc and fire_hist.
   !-------------------------------------------------------------------------------
   ! Apply diurnal cycle depending on fire type
-subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,            &
+subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,          &
                            chem,num_chem,julday,gmt,xlat,xlong,     &
                            fire_end_hr,peak_hr,time_int,coef_bb_dc, &
                            fire_hist,hwp,hwp_avg,hwp_prev_day,      &  !I think fire_hist replaced sc_factor
-                           vegfrac, eco_id, nblocks,                 &
+                           vegfrac, eco_id, nblocks,                &
                            lu_nofire, lu_qfire, lu_sfire,           &
-                           swdown,ebb_dcycle,ebu,fire_type,  &
-                           q_vap, add_fire_moist_flux,              &
+                           swdown,ebb_dcycle,ebu,num_e_bb_in,       &
+                           index_e_bb_in_smoke_fine,                &
+                           fire_type,  q_vap, add_fire_moist_flux,  &
                            plume_beta_qv, hwp_alpha,                &
                            ids,ide, jds,jde, kds,kde,               &
                            ims,ime, jms,jme, kms,kme,               &
@@ -278,16 +281,18 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,            &
 
   implicit none
 
-  INTEGER,      INTENT(IN   ) ::  julday,num_chem,                  &
+  INTEGER,      INTENT(IN   ) ::  julday, num_chem, num_e_bb_in,    &
                                   ids,ide, jds,jde, kds,kde,        &
                                   ims,ime, jms,jme, kms,kme,        &
                                   its,ite, jts,jte, kts,kte
+  INTEGER, INTENT(IN) :: index_e_bb_in_smoke_fine
 
   REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_chem ),                 &
          INTENT(INOUT ) ::                                   chem   ! shall we set num_chem=1 here?
 
-  REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme ),                 &
-         INTENT(INOUT ) ::                                   ebu, q_vap ! SRB: added q_vap
+  REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_e_bb_in ),                 &
+         INTENT(INOUT ) ::                                   ebu
+  REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme), INTENT(INOUT) :: q_vap ! SRB: added q_vap
   INTEGER,      INTENT(IN), DIMENSION(ims:ime,jms:jme) :: eco_id
   REAL(RKIND),  INTENT(IN), DIMENSION(ims:ime,jms:jme,20) :: vegfrac      
  
@@ -348,7 +353,7 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,            &
   if (ebb_dcycle==2) then
     do j=jts,jte
       do i=its,ite
-        if (ebu(i,kts,j)<ebb_min) then
+        if (ebu(i,kts,j,index_e_bb_in_smoke_fine)<ebb_min) then
            fire_type(i,j) = 0
            lu_nofire(i,j) = 1.0
         else
@@ -364,7 +369,7 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,            &
           else if (eco_id(i,j)==8) then
             fire_type(i,j) = 2    ! slash burn and wildfires in the east, eastern temperate forest ecosystem
             ! SRB: Eastern wildland fires if FRE>1E6MJ and eco region is 8 and the fire is not older than 7 hrs
-            if ( ebu(i,kts,j)*3600*(1/0.416) .ge. 1.E6 .and. fire_end_hr(i,j) .le. 8 ) then
+            if ( ebu(i,kts,j,index_e_bb_in_smoke_fine)*3600*(1/0.416) .ge. 1.E6 .and. fire_end_hr(i,j) .le. 8 ) then
               fire_type(i,j) = 4
             endif 
           else if (lu_sfire(i,j)>0.8) then

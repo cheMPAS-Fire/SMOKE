@@ -139,7 +139,7 @@ contains
 ! 3D + chem --> vg
 !       if  (do_timing) call mpas_timer_start('vg_and_ddvel_calc')
        do nv = 1, num_chem
-          if (nv .eq. p_ch4) cycle  ! At some point we'll do something different for gasses
+          if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
           ! Convert diameter to cm and aerodens to g/cm3
           dp       = aero_diam(nv) * 100._RKIND
           aerodens = aero_dens(nv) * 1.e-3_RKIND
@@ -159,7 +159,7 @@ contains
 ! 2D + chem (surface dep)
        k=kts 
        do nv = 1, num_chem
-          if (nv .eq. p_ch4) cycle  ! At some point we'll do something different for gasses
+          if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
           ! Convert diameter to cm and aerodens to g/cm3
           dp       = aero_diam(nv) * 100._RKIND
           aerodens = aero_dens(nv) * 1.e-3_RKIND
@@ -335,7 +335,7 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
 !
 !--- Local------
      integer, parameter :: max_iter_settle = 10
-     real(RKIND), parameter :: one_over_dyn_visc = 1.e5_RKIND
+     real(RKIND), parameter :: one_over_dyn_visc = 1.e5_RKIND ! 5.5248E5_RKIND
      INTEGER :: k,n,l2,i,j,nv
      REAL(RKIND) :: temp_tc, transfer_to_below_level, vd_wrk1
   
@@ -344,7 +344,7 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
      ntdt = INT(dt)
 
      do nv = 1,num_chem
-     if (nv .eq. p_ch4) cycle  ! At some point we'll do something different for gasses
+     if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
      ! -- NOTE, diameters and densities are NOT converted to cm and g/cm3 like in Emerson
      vsettl = four_ninths * gravity * aero_dens(nv) * ( growth_fac * ( 0.5_RKIND * aero_diam(nv) ))**2.0_RKIND * one_over_dyn_visc
 

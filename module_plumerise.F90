@@ -26,12 +26,11 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
                              curr_secs,xlat, xlong , uspdavg2d,      &
                              hpbl2d,  alpha,                         &
                              frp_min, frp_wthreshold,zpbl_lim,uspd_lim,   &
+                             ebu_in, ebu, num_e_bb_in,               &
                              ids,ide, jds,jde, kds,kde,              &
                              ims,ime, jms,jme, kms,kme,              &
                              its,ite, jts,jte, kts,kte,              & 
-                             errmsg, errflg,                         &
-                             ebu_in,ebu,ebu_in_coarse,ebu_coarse,    &
-                             ebu_in_ch4,ebu_ch4                     )
+                             errmsg, errflg                          )
 
   use mpas_smoke_config
   use module_zero_plumegen_coms
@@ -39,7 +38,7 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
   IMPLICIT NONE
 
    REAL(RKIND), intent(in) :: frp_min, frp_wthreshold, zpbl_lim, uspd_lim
-   integer, intent(in) :: kfire
+   integer, intent(in) :: kfire, num_e_bb_in
     
    real(kind=RKIND), DIMENSION( ims:ime, jms:jme), INTENT(IN ) :: frp_inst         ! RAR: FRP array
 
@@ -57,9 +56,9 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
    real(RKIND) :: curr_secs
    INTEGER,      INTENT(IN   ) :: wind_eff_opt
    REAL(RKIND), INTENT(IN)    :: alpha !  SRB: Enrainment constant for plumerise scheme
-   real(kind=RKIND), DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(INOUT ), optional ::  ebu, ebu_coarse, ebu_ch4
+   real(kind=RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_e_bb_in ), INTENT(INOUT ) ::  ebu
    real(kind=RKIND), INTENT(IN )  :: g, con_cp, con_rd
-   real(kind=RKIND), DIMENSION( ims:ime, 1:kfire, jms:jme ), INTENT(IN ), optional  :: ebu_in, ebu_in_coarse, ebu_in_ch4
+   real(kind=RKIND), DIMENSION( ims:ime, 1:kfire, jms:jme, num_e_bb_in ), INTENT(IN )  :: ebu_in
    real(kind=RKIND), DIMENSION( ims:ime, jms:jme ), INTENT(OUT ) :: flam_frac
    real(kind=RKIND), DIMENSION( ims:ime , kms:kme , jms:jme )         ,               &
           INTENT(IN   ) ::   z,z_at_w,vvel,u_phy,v_phy,rho_phy,pi_phy,q_vap,theta_phy,wind_phy                     ! RAR, SRB
@@ -82,17 +81,15 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
         endif
 
 ! RAR: setting to zero the ebu emissions at the levels k>1, this is necessary when the plumerise is called, so the emissions at k>1 are updated
-       !do nv=1,num_ebu
+        do nv=1,num_e_bb_in
           do j=jts,jte
             do k=kts,kte
                do i=its,ite
-                 ebu(i,k,j)=0._RKIND
-                 if(present(ebu_in_coarse))ebu_coarse(i,k,j)=0._RKIND
-                 if(present(ebu_in_ch4))ebu_ch4(i,k,j)=0._RKIND
+                 ebu(i,k,j,nv)=0._RKIND
                enddo
             enddo
           enddo
-       !enddo
+        enddo
 
 ! RAR: new FRP based approach
 ! Haiqin: do_plumerise is added to the namelist options
@@ -151,15 +148,12 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
 
                ! RAR: emission distribution
                dz_plume= z_at_w(i,kp2,j) - z_at_w(i,kp1,j)
+               do nv=1,num_e_bb_in
                do k=kp1,kp2-1
-                     ebu(i,k,j)=flam_frac(i,j)*ebu_in(i,kts,j)*(z_at_w(i,k+1,j)-z_at_w(i,k,j))/dz_plume
-                     if(present(ebu_in_coarse))ebu_coarse(i,k,j)=flam_frac(i,j)*ebu_in_coarse(i,kts,j)*(z_at_w(i,k+1,j)-z_at_w(i,k,j))/dz_plume 
-                     if(present(ebu_in_ch4))ebu_ch4(i,k,j)=flam_frac(i,j)*ebu_in_ch4(i,kts,j)*(z_at_w(i,k+1,j)-z_at_w(i,k,j))/dz_plume 
+                     ebu(i,k,j,nv)=flam_frac(i,j)*ebu_in(i,kts,j,nv)*(z_at_w(i,k+1,j)-z_at_w(i,k,j))/dz_plume
                enddo
-               ebu(i,kts,j)= (1._RKIND - flam_frac(i,j))* ebu_in(i,kts,j)
-               if(present(ebu_in_coarse))ebu_coarse(i,kts,j)= (1._RKIND - flam_frac(i,j))* ebu_in_coarse(i,kts,j)
-               if(present(ebu_in_ch4))ebu_ch4(i,kts,j)= (1._RKIND - flam_frac(i,j))* ebu_in_ch4(i,kts,j)
-            !   ebu(i,kts,j) = ebu_in(i,j)
+               ebu(i,kts,j,nv)= (1._RKIND - flam_frac(i,j))* ebu_in(i,kts,j,nv)
+               enddo
 
                ! For output diagnostic
                k_min(i,j) = kp1
