@@ -17,6 +17,99 @@ module module_rwc_emissions
 
 contains
 
+! SRB: Adding plumerise estimation from Briggs parameterization [02/04/2026]
+subroutine plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, zmid, EFF_H, kmax, kts, kte )
+
+        REAL(RKIND), INTENT(IN)  :: wind_10m ! 10m Wind speed [m/s]
+        REAL(RKIND), INTENT(IN)  :: T_1      ! Temp at Level 1 (midpoint) [K]
+        REAL(RKIND), INTENT(IN)  :: T_2      ! Temp at Level 2 (midpoint) [K]
+        REAL(RKIND), INTENT(IN)  :: PBL_H    ! PBL Height [m]
+        REAL(RKIND), INTENT(IN)  :: zmid(:)  ! w point height AGL [m]
+        INTEGER,     INTENT(IN)  :: kts, kte
+        REAL(RKIND), INTENT(OUT) :: EFF_H    ! Effective plume height [m]
+        INTEGER,     INTENT(OUT) :: kmax     ! Model level for effective plume height
+
+        ! Local variables
+        REAL(RKIND) :: Fb, Vs, Ds, Ts, Hs  ! Buoyancy forcing, Stack exit vel, Stack dia, Stack exit temp, Stack height
+        REAL(RKIND) :: U_stack             ! Ambient wind at the stack height, for now use 10m wind speed
+        REAL(RKIND) :: S_param             ! Stability parameter
+        REAL(RKIND) :: dTemp_dz, dTheta_dz ! Temperature gradients
+        REAL(RKIND) :: plumerise 
+        REAL(RKIND) :: z_1, z_2            ! Midpoint height of Levels 1 and 2 [m]
+        INTEGER     :: kmin
+
+        ! Constants
+        REAL(RKIND), PARAMETER :: GRAV           = 9.81    ! gravity [m/s^2]
+        REAL(RKIND), PARAMETER :: DRY_ADIABATIC  = 0.0098  ! dry adiabatic lapse rate [K/m]
+
+        ! Defaults for Briggs
+        REAL(RKIND), PARAMETER :: RWC_STACK_HT   = 7.0     ! Stack height [m]
+        REAL(RKIND), PARAMETER :: RWC_STACK_DIA  = 0.2     ! Stack diameter [m]
+        REAL(RKIND), PARAMETER :: RWC_STACK_VEL  = 3.0     ! Exit velocity [m/s]
+        REAL(RKIND), PARAMETER :: RWC_STACK_TEMP = 450.0   ! Exit temperature [K]
+
+        ! Briggs equations:
+        ! Fb = g * Vs * r^2 * (1 - Ta/Ts)
+        ! Stable: dH = 2.6 * (Fb / (U * s))^(1/3)
+        ! Neutral/Unstable: dH = 21.425 * Fb^(3/4) / U
+
+        ! Load Defaults
+        Hs = RWC_STACK_HT
+        Ds = RWC_STACK_DIA
+        Vs = RWC_STACK_VEL
+        Ts = RWC_STACK_TEMP
+
+        z_1 = zmid(kts)
+        z_2 = zmid(kts+1)
+
+        ! Ensure wind speed is not zero
+        U_stack = MAX( wind_10m, 0.1_RKIND )
+
+        ! Calculate Buoyancy Flux (Fb)
+
+        Fb = GRAV * Vs * ((Ds/2.0_RKIND)**2_RKIND) * (1.0_RKIND - (T_1 / Ts))
+        IF ( Fb < 0.0_RKIND ) Fb = 0.0_RKIND ! Ensure +ve value
+
+        ! Calculate Vertical Potential Temp Gradient (dTheta/dz)
+        dTemp_dz  = ( T_2 - T_1 ) / ( z_2 - z_1 )
+        dTheta_dz = dTemp_dz + DRY_ADIABATIC
+
+        ! Determine Rise based on Stability
+        IF ( dTheta_dz > 0.001_RKIND ) THEN        ! --- Stable regime
+            ! Calculate Stability Parameter
+            S_param = ( GRAV / T_1 ) * dTheta_dz
+            IF ( S_param < 0.0001_RKIND ) S_param = 0.0001
+
+            plumerise = 2.6_RKIND * ( Fb / ( U_stack * S_param ) )**(0.3333_RKIND)
+
+        ELSE        ! --- Neutral/Unstable regime
+
+            plumerise = 21.425_RKIND * ( Fb**0.75_RKIND ) / U_stack
+
+            ! Cap at PBL Height (minus stack height) to prevent injections which are unlikely for RWC sources
+            IF ( (Hs + plumerise) > PBL_H ) THEN
+                 plumerise = MAX( 0.0_RKIND, PBL_H - Hs )
+                 ! Change to allow for some injection above PBL_H later? Takes care of night time very shallow PBL_H with calm winds
+            END IF
+
+        END IF
+
+        ! Final plumerise
+        EFF_H = Hs + plumerise
+
+        ! Map to model levels
+        kmin = 1
+        kmax = kmin
+        do k = kmin, kte-1
+           if (zmid(k) >= EFF_H) then
+              kmax = k
+              exit
+           end if
+        end do
+        if (zmid(kte-1) < EFF_H) kmax = 10 ! Sanity check and limit 
+        if (kmax > 10) kmax = 10 ! Sanity check and limit 
+
+  end subroutine plume_rise_briggs_rwc
 
   subroutine mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,krwc,                     &
                            xlat,xlong,xland,chem,num_chem,dz8w,t_phy,rho_phy,        &
