@@ -17,14 +17,138 @@ module module_rwc_emissions
 
 contains
 
+
+  subroutine mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,krwc,                     &
+                           xlat,xlong,xland,chem,num_chem,dz8w,t_phy,rho_phy,        &
+                           z_at_w,zmid,pblh,wind10m,rwc_emis_scale_factor,           &
+                           max_rwc_plume,plumerise_opt_rwc,                          &
+                           RWC_denominator,RWC_annual_sum,                           &
+                           RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse,   &
+                           RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse,   &
+                           e_ant_out,  num_e_ant_out,                                &
+                           index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
+                           index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
+                           index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
+                           index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse, &
+                           ids,ide, jds,jde, kds,kde,                                &
+                           ims,ime, jms,jme, kms,kme,                                &
+                           its,ite, jts,jte, kts,kte                                 )
+
+   IMPLICIT NONE
+
+   INTEGER,      INTENT(IN   ) :: ktau,julday, num_chem, krwc,           &
+                                  ids,ide, jds,jde, kds,kde,         &
+                                  ims,ime, jms,jme, kms,kme,         &
+                                  its,ite, jts,jte, kts,kte,         &
+                                  num_e_ant_out,       &
+           index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
+           index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
+           index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
+           index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse
+
+   REAL(RKIND), INTENT(IN    ) :: dt,gmt,rwc_emis_scale_factor
+
+   REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: xlat,xlong,xland,pblh
+   REAL(RKIND),DIMENSION(ims:ime,1:krwc,jms:jme),INTENT(IN) :: RWC_annual_sum_smoke_fine,RWC_annual_sum_smoke_coarse, &
+                                                        RWC_annual_sum_unspc_fine,RWC_annual_sum_unspc_coarse, &
+                                                        RWC_annual_sum
+   REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: RWC_denominator,wind10m
+   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme),INTENT(IN) :: dz8w,rho_phy,t_phy,zmid,z_at_w
+   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme,1:num_e_ant_out),INTENT(INOUT) :: e_ant_out
+   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme,1:num_chem), INTENT(INOUT)     :: chem
+
+   INTEGER,DIMENSION(ims:ime,jms:jme), INTENT(OUT) :: max_rwc_plume
+                                              
+   INTEGER, INTENT(IN) :: plumerise_opt_rwc
+ 
+  ! local
+   INTEGER :: i,j,k,n,kemit,kk
+   INTEGER, PARAMETER :: offset_from_kts = 1
+   REAL(RKIND) :: conv_aer, conv_gas, emis, t_phy_f, frac
+   REAL(RKIND) :: T_1,T_2,wind_10m,EFF_H, PBL_H 
+   REAL(RKIND), DIMENSION(kts:kte) :: z_mid
+   REAL(RKIND), DIMENSION(its:ite,jts:jte) :: rwc_t_thresh_grid
+
+   REAL(RKIND), PARAMETER :: rwc_t_thresh = 283.15_RKIND ! [ 50 F]
+   REAL(RKIND), PARAMETER :: spd_r = 1._RKIND/86400._RKIND
+   REAL(RKIND), PARAMETER :: emis_max = 1.0_RKIND
+
+! TODO, read in TBL or define otherwise  
+   rwc_t_thresh_grid(:,:) = rwc_t_thresh
+
+! For now, just the surface
+   k = kts
+   kemit = kts + offset_from_kts
+
+   do j = jts, jte
+   do i = its, ite
+     ! Is it cold enough to emit wood burning emissions? And are we over land? And do we have any emissions?
+      if ( t_phy(i,k,j) .lt. rwc_t_thresh_grid(i,j) .and. (( xland(i,j)-1.5) .lt. 0.) .and. RWC_denominator(i,j) .gt. 0.) then
+        ! Conversion factor for aerosol emissions (ug/m2/s) --> ug/kg
+         conv_aer = dt / (rho_phy(i,k,j) *  dz8w(i,k,j))
+        ! Conversion factor for gas phase emissions (mol/m2/s) --> ppm/ppm
+         conv_gas = 60._RKIND * 1.E6_RKIND * 4.828E-4_RKIND * dt / ( rho_phy(i,k,j) * dz8w(i,k,j) )
+        ! Convert temperature to Fahrenheit
+         t_phy_f = 1.8_RKIND * (t_phy(i,k,j)-273.15_RKIND) + 32._RKIND
+        ! Calculate the fraction of total emisisons based on the linear equation, convert from /day to /sec
+         frac = (42.12_RKIND - 0.79_RKIND*t_phy_f) / RWC_denominator(i,j) * spd_r
+   
+        ! Call Brigg's plumerise?
+         if ( plumerise_opt_rwc .gt. 0 ) then
+            T_1 = t_phy(i,kts,j)
+            T_2 = t_phy(i,kts+1,j)
+            wind_10m = wind10m(i,j)
+            PBL_H    = pblh(i,j)
+            do kk = kts,kte
+               z_mid(kk)     = zmid(i,kk,j) - z_at_w(i,kts,j)
+            enddo
+            call plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, z_mid, EFF_H, kemit, kts, kte )
+            max_rwc_plume(i,j) = kemit
+         endif
+
+         if ( p_smoke_fine .gt. 0 ) then
+            emis = min(emis_max,rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_smoke_fine(i,1,j))
+            chem(i,kemit,j,p_smoke_fine) = chem(i,kemit,j,p_smoke_fine) + emis
+            if ( index_e_ant_out_smoke_fine .gt. 0 ) then
+               e_ant_out(i,kemit,j,index_e_ant_out_smoke_fine) = e_ant_out(i,kemit,j,index_e_ant_out_smoke_fine) + emis
+            endif
+         endif
+         if ( p_unspc_fine .gt. 0 ) then
+              emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_fine(i,1,j),emis_max)
+              chem(i,kemit,j,p_unspc_fine) = chem(i,kemit,j,p_unspc_fine) + emis
+              if ( index_e_ant_out_unspc_fine .gt. 0 ) then
+                 e_ant_out(i,kemit,j,index_e_ant_out_unspc_fine) = e_ant_out(i,kemit,j,index_e_ant_out_unspc_fine) + emis
+              endif
+         endif
+       ! Unspeciated coarse emissions can be added to multiple bins, depending on what is available
+         emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_coarse(i,1,j),emis_max)
+         if ( p_smoke_coarse .gt. 0 ) then
+             chem(i,kemit,j,p_smoke_coarse) = chem(i,kemit,j,p_smoke_coarse) + emis
+         elseif ( p_unspc_coarse .gt. 0 ) then
+             chem(i,kemit,j,p_unspc_coarse) = chem(i,kemit,j,p_unspc_coarse) + emis
+         elseif ( p_dust_coarse .gt. 0 ) then
+             chem(i,kemit,j,p_dust_coarse) = chem(i,kemit,j,p_dust_coarse) + emis
+         endif
+         if ( index_e_ant_out_unspc_coarse.gt. 0 ) then
+                 e_ant_out(i,kemit,j,index_e_ant_out_unspc_coarse) = e_ant_out(i,kemit,j,index_e_ant_out_unspc_coarse) + emis
+         elseif ( index_e_ant_out_smoke_coarse .gt. 0 ) then
+                 e_ant_out(i,kemit,j,index_e_ant_out_smoke_coarse) = e_ant_out(i,kemit,j,index_e_ant_out_smoke_coarse) + emis
+         endif
+      endif ! Temp check
+   enddo
+   enddo        
+
+  end subroutine mpas_smoke_rwc_emis_driver
+
+
 ! SRB: Adding plumerise estimation from Briggs parameterization [02/04/2026]
-subroutine plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, zmid, EFF_H, kmax, kts, kte )
+  subroutine plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, zmid, EFF_H, kmax, kts, kte )
 
         REAL(RKIND), INTENT(IN)  :: wind_10m ! 10m Wind speed [m/s]
         REAL(RKIND), INTENT(IN)  :: T_1      ! Temp at Level 1 (midpoint) [K]
         REAL(RKIND), INTENT(IN)  :: T_2      ! Temp at Level 2 (midpoint) [K]
         REAL(RKIND), INTENT(IN)  :: PBL_H    ! PBL Height [m]
-        REAL(RKIND), INTENT(IN)  :: zmid(:)  ! w point height AGL [m]
+        REAL(RKIND), DIMENSION(kts:kte),INTENT(IN)  :: zmid     ! w point height AGL [m]
         INTEGER,     INTENT(IN)  :: kts, kte
         REAL(RKIND), INTENT(OUT) :: EFF_H    ! Effective plume height [m]
         INTEGER,     INTENT(OUT) :: kmax     ! Model level for effective plume height
@@ -36,17 +160,22 @@ subroutine plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, zmid, EFF_H, kmax, 
         REAL(RKIND) :: dTemp_dz, dTheta_dz ! Temperature gradients
         REAL(RKIND) :: plumerise 
         REAL(RKIND) :: z_1, z_2            ! Midpoint height of Levels 1 and 2 [m]
-        INTEGER     :: kmin
+        INTEGER     :: kmin, k
 
         ! Constants
         REAL(RKIND), PARAMETER :: GRAV           = 9.81    ! gravity [m/s^2]
         REAL(RKIND), PARAMETER :: DRY_ADIABATIC  = 0.0098  ! dry adiabatic lapse rate [K/m]
 
         ! Defaults for Briggs
+        ! For one story home, STACK_HT minimum = 15ft ~ 5 m, two story = 9 m, 
+        ! Assume roughly 50/50 split in US of 1/2 story homes
         REAL(RKIND), PARAMETER :: RWC_STACK_HT   = 7.0     ! Stack height [m]
-        REAL(RKIND), PARAMETER :: RWC_STACK_DIA  = 0.2     ! Stack diameter [m]
+        ! Most common chimneys are 6in or 8in, split the difference
+        REAL(RKIND), PARAMETER :: RWC_STACK_DIA  = 0.1778  ! Stack diameter [m] = 7 inches
+        ! Recommended velocity to prevent creosote buildup
         REAL(RKIND), PARAMETER :: RWC_STACK_VEL  = 3.0     ! Exit velocity [m/s]
-        REAL(RKIND), PARAMETER :: RWC_STACK_TEMP = 450.0   ! Exit temperature [K]
+        ! 250F is minimum temperature to prevent creosote buildup - pick a nice round number
+        REAL(RKIND), PARAMETER :: RWC_STACK_TEMP = 400.0   ! Exit temperature [K] = 260.33F
 
         ! Briggs equations:
         ! Fb = g * Vs * r^2 * (1 - Ta/Ts)
@@ -98,7 +227,7 @@ subroutine plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, zmid, EFF_H, kmax, 
         EFF_H = Hs + plumerise
 
         ! Map to model levels
-        kmin = 1
+        kmin = kts
         kmax = kmin
         do k = kmin, kte-1
            if (zmid(k) >= EFF_H) then
@@ -110,102 +239,5 @@ subroutine plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, zmid, EFF_H, kmax, 
         if (kmax > 10) kmax = 10 ! Sanity check and limit 
 
   end subroutine plume_rise_briggs_rwc
-
-  subroutine mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,krwc,                     &
-                           xlat,xlong,xland,chem,num_chem,dz8w,t_phy,rho_phy,        &
-                           rwc_emis_scale_factor,                                    &
-                           RWC_denominator,RWC_annual_sum,           &
-                           RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse,   &
-                           RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse,   &
-                           e_ant_out,  num_e_ant_out,         &
-                           index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
-                           index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
-                           index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
-                           index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse, &
-                           ids,ide, jds,jde, kds,kde,                                &
-                           ims,ime, jms,jme, kms,kme,                                &
-                           its,ite, jts,jte, kts,kte                                 )
-
-   IMPLICIT NONE
-
-   INTEGER,      INTENT(IN   ) :: ktau,julday, num_chem, krwc,           &
-                                  ids,ide, jds,jde, kds,kde,         &
-                                  ims,ime, jms,jme, kms,kme,         &
-                                  its,ite, jts,jte, kts,kte,         &
-                                  num_e_ant_out,       &
-           index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
-           index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
-           index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
-           index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse
-
-   REAL(RKIND), INTENT(IN    ) :: dt,gmt,rwc_emis_scale_factor
-
-   REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: xlat,xlong,xland
-   REAL(RKIND),DIMENSION(ims:ime,1:krwc,jms:jme),INTENT(IN) :: RWC_annual_sum_smoke_fine,RWC_annual_sum_smoke_coarse, &
-                                                        RWC_annual_sum_unspc_fine,RWC_annual_sum_unspc_coarse, &
-                                                        RWC_annual_sum
-   REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: RWC_denominator
-   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme),INTENT(IN) :: dz8w,rho_phy,t_phy
-   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme,1:num_e_ant_out),INTENT(INOUT) :: e_ant_out
-   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme,1:num_chem), INTENT(INOUT)     :: chem
-                                                                               
-  ! local
-   INTEGER :: i,j,k,n,kemit
-   INTEGER, PARAMETER :: offset_from_kts = 1
-   REAL(RKIND) :: conv_aer, conv_gas, emis, t_phy_f, frac
-   REAL(RKIND), DIMENSION(its:ite,jts:jte) :: rwc_t_thresh_grid
-
-   REAL(RKIND), PARAMETER :: rwc_t_thresh = 283.15_RKIND ! [ 50 F]
-   REAL(RKIND), PARAMETER :: spd_r = 1./86400._RKIND
-   REAL(RKIND), PARAMETER :: emis_max = 1.0_RKIND
-
-! TODO, read in TBL or define otherwise  
-   rwc_t_thresh_grid(:,:) = rwc_t_thresh
-
-! For now, just the surface
-   k = kts
-   kemit = kts + offset_from_kts
-
-   do j = jts, jte
-   do i = its, ite
-     ! Is it cold enough to emit wood burning emissions? And are we over land?
-      if ( t_phy(i,k,j) .lt. rwc_t_thresh_grid(i,j) .and. (( xland(i,j)-1.5) .lt. 0.) .and. RWC_denominator(i,j) .gt. 0.) then
-        ! Conversion factor for aerosol emissions (ug/m2/s) --> ug/kg
-         conv_aer = dt / (rho_phy(i,k,j) *  dz8w(i,k,j))
-        ! Conversion factor for gas phase emissions (mol/m2/s) --> ppm/ppm
-         conv_gas = 60._RKIND * 1.E6_RKIND * 4.828E-4_RKIND * dt / ( rho_phy(i,k,j) * dz8w(i,k,j) )
-        ! Convert temperature to Fahrenheit
-         t_phy_f = 1.8_RKIND * (t_phy(i,k,j)-273.15_RKIND) + 32._RKIND
-        ! Calculate the fraction of total emisisons based on the linear equation, convert from /day to /sec
-         frac = (42.12_RKIND - 0.79_RKIND*t_phy_f) / RWC_denominator(i,j) * spd_r
-         if ( p_smoke_fine .gt. 0 .and. index_e_ant_out_smoke_fine .gt. 0 ) then
-            emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_smoke_fine(i,1,j),emis_max)
-            chem(i,kemit,j,p_smoke_fine) = chem(i,kemit,j,p_smoke_fine) + emis
-            e_ant_out(i,kemit,j,index_e_ant_out_smoke_fine) = e_ant_out(i,kemit,j,index_e_ant_out_smoke_fine) + emis
-         endif
-         if ( (p_smoke_coarse .gt. 0 .or. p_unspc_coarse .gt. 0 ) .and. index_e_ant_out_smoke_coarse .gt. 0 ) then
-            emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_smoke_coarse(i,1,j),emis_max)
-            if ( p_smoke_coarse .gt. 0 ) then
-                    chem(i,kemit,j,p_smoke_coarse) = chem(i,kemit,j,p_smoke_coarse) + emis
-            elseif ( p_unspc_coarse .gt. 0 ) then
-                    chem(i,kemit,j,p_unspc_coarse) = chem(i,kemit,j,p_unspc_coarse) + emis
-            endif
-            e_ant_out(i,kemit,j,index_e_ant_out_smoke_coarse) =  e_ant_out(i,kemit,j,index_e_ant_out_smoke_coarse) + emis
-         endif
-         if ( p_unspc_fine .gt. 0 .and. index_e_ant_out_unspc_fine .gt. 0 ) then
-              emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_fine(i,1,j),emis_max)
-              chem(i,kemit,j,p_unspc_fine) = chem(i,kemit,j,p_unspc_fine) + emis
-              e_ant_out(i,kemit,j,index_e_ant_out_unspc_fine) = e_ant_out(i,kemit,j,index_e_ant_out_unspc_fine) + emis
-         endif
-         if ( p_unspc_coarse .gt. 0 .and. index_e_ant_out_unspc_coarse .gt. 0 ) then
-              emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_coarse(i,1,j),emis_max)
-              chem(i,kemit,j,p_unspc_coarse) = chem(i,kemit,j,p_unspc_coarse) + emis
-              e_ant_out(i,kemit,j,index_e_ant_out_unspc_coarse) = e_ant_out(i,kemit,j,index_e_ant_out_unspc_coarse) + emis
-         endif
-      endif ! Temp check
-   enddo
-   enddo        
-
-  end subroutine mpas_smoke_rwc_emis_driver
 
 end module module_rwc_emissions

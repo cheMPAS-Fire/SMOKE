@@ -78,7 +78,7 @@ contains
            nblocks               , EFs_map,                                                  &
            eco_id, efs_smold, efs_flam, efs_rsmold,fmc_avg,                                  &
            hfx_bb                , qfx_bb         ,  frac_grid_burned    ,                   &
-           min_bb_plume          , max_bb_plume,                                             &
+           min_bb_plume          , max_bb_plume,  max_rwc_plume,                             &
            sandfrac_in           , clayfrac_in           , uthres_in            ,            &
            uthres_sg_in          , albedo_drag_in        , feff_in              ,            &
            sep_in                ,                                                           &
@@ -103,7 +103,7 @@ contains
            num_pols_per_polp     , pollen_emis_scale_factor,                                 &
            tree_pollen_emis_scale_factor, grass_pollen_emis_scale_factor        ,            &
            weed_pollen_emis_scale_factor,                                                    &
-           bb_input_prevh        , rwc_emis_scale_factor,                 &
+           bb_input_prevh        , rwc_emis_scale_factor, plumerise_opt_rwc     ,            &
            RWC_denominator       , RWC_annual_sum       ,                                    &
            RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse,                           &
            RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse,                           &
@@ -235,7 +235,7 @@ contains
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: frp_out, fre_out, EFs_map
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: hwp, coef_bb_dc
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: hfx_bb, qfx_bb, frac_grid_burned
-    integer,intent(inout),dimension(ims:ime,jms:jme),optional      :: min_bb_plume, max_bb_plume
+    integer,intent(inout),dimension(ims:ime,jms:jme),optional      :: min_bb_plume, max_bb_plume, max_rwc_plume
 ! 2D + chem output arrays
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme, 1:num_chem),optional :: wetdep_resolved
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme, 1:num_chem),optional :: drydep_flux
@@ -272,6 +272,7 @@ contains
      integer,intent(in)               :: wetdep_ls_opt
      real(kind=RKIND),intent(in)      :: wetdep_ls_alpha
      integer,intent(in)               :: plumerise_opt
+     integer,intent(in)               :: plumerise_opt_rwc
      integer,intent(in)               :: plume_wind_eff
      real(kind=RKIND),intent(in)      :: plume_alpha
      real(kind=RKIND),intent(in)      :: bb_emis_scale_factor, bb_qv_scale_factor
@@ -671,13 +672,14 @@ contains
 
     if ( do_mpas_rwc ) then
        call mpas_log_write( ' Calling online residential wood combustion driver')
-       call mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,krwc,            &
+       call mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,krwc,       &
             xlat,xlong, xland, chem,num_chem,dz8w,t_phy,rho_phy,      &
-            rwc_emis_scale_factor,                                    &
-            RWC_denominator, RWC_annual_sum,         &
+            z_at_w,zmid,pblh,wind10m,rwc_emis_scale_factor,           &
+            max_rwc_plume, plumerise_opt_rwc,                         &
+            RWC_denominator, RWC_annual_sum,                          &
             RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse,   &
             RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse,   &
-            e_ant_out, num_e_ant_out,         &
+            e_ant_out, num_e_ant_out,                                 &
             index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
             index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
             index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
