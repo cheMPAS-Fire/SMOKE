@@ -21,6 +21,7 @@ module mpas_smoke_wrapper
    use dust_fengsha_mod,      only : gocart_dust_fengsha_driver
    use pollen_mod,            only : pollen_driver
    use module_anthro_emissions
+   use module_anthro_pt_emissions
    use module_rwc_emissions
    use module_tactic_sna
    use ssalt_mod
@@ -49,6 +50,10 @@ contains
            index_no3_a_fine      , index_so4_a_fine            , index_nh4_a_fine,           &
            index_nh3             , index_so2                   , index_ch4,                  &
            index_co              , index_nox                   , index_bact_fine,            &
+           e_ant_ptegu_in        , num_e_ant_ptegu_in          , num_ptegu,                  &
+           index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,     &
+           index_e_ant_ptegu_in_unspc_fine, config_anthro_pt_scheme,                         &
+           ant_pt_local_cell_idx, ant_pt_rank,  myrank,                                        &
            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
            index_e_bb_in_co, index_e_bb_in_nh3, index_e_bb_in_ch4,                           &
            index_e_bb_in_nox, index_e_bb_in_so2, &
@@ -148,6 +153,10 @@ contains
     integer,intent(in):: kanthro, kbio, kfire, kvol, krwc
     integer,intent(in):: num_e_ant_in,  num_e_bb_in,  num_e_bio_in,  num_e_vol_in
     integer,intent(in):: num_e_ant_out, num_e_bb_out, num_e_bio_out, num_e_dust_out, num_e_ss_out, num_e_vol_out
+    integer,intent(in):: num_e_ant_ptegu_in, num_ptegu
+! INLN PTEGU
+    integer,intent(in),dimension(1:num_ptegu),optional :: ant_pt_local_cell_idx, ant_pt_rank
+    integer,intent(in) :: myrank
 ! 2D mesh arguments
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland   ! grid
 ! 2D Met input
@@ -187,6 +196,7 @@ contains
     real(RKIND),intent(in), dimension(ims:ime,1:kfire,jms:jme,1:num_e_bb_in),optional  :: e_bb_in
     real(RKIND),intent(in), dimension(ims:ime,1:kbio,jms:jme,1:num_e_bio_in),optional  :: e_bio_in
     real(RKIND),intent(in), dimension(ims:ime,1:kvol,jms:jme,1:num_e_vol_in),optional  :: e_vol_in
+    real(RKIND),intent(in), dimension(25,1:num_ptegu,1:num_e_ant_ptegu_in),optional    :: e_ant_ptegu_in
 ! JLS - TODO, if we update QV via moist flux, we will need to update the scalar in the driver
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional           :: qv
     real(RKIND),intent(in), dimension(ims:ime,1:nsoil, jms:jme)   ,optional            :: smois, tslb
@@ -228,6 +238,8 @@ contains
                            index_e_vol_out_vash_fine,  index_e_vol_out_vash_coarse, &
                            index_e_dust_out_dust_ultrafine, index_e_dust_out_dust_fine, index_e_dust_out_dust_coarse, &
                            index_e_ss_out_ssalt_fine, index_e_ss_out_ssalt_coarse
+    integer, intent(in),optional ::  index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,  &
+                                     index_e_ant_ptegu_in_unspc_fine
 ! 2D dust input arrays 
     real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional  :: sandfrac_in, clayfrac_in, uthres_in, &        ! dust (FENGSHA) input
                                                                      uthres_sg_in, albedo_drag_in, feff_in, sep_in ! dust (FENGSHA) input
@@ -266,6 +278,7 @@ contains
      logical,intent(in)               :: do_mpas_rwc
      character(len=*),intent(in)      :: config_extra_chemical_tracers
      logical,intent(in)               :: config_ultrafine, config_coarse
+     logical,intent(in)               :: config_anthro_pt_scheme
      logical,intent(in)               :: calc_bb_emis_online
      integer,intent(in)               :: hwp_method
      real(RKIND),intent(in)           :: hwp_alpha
@@ -373,6 +386,7 @@ contains
       call aero_wet_dep_init()
       call mpas_log_write( ' Initializing radiation feedback parameterss ')
       call aero_rad_init()
+
    endif
 !
     uspdavg2d   = 0._RKIND
@@ -667,6 +681,22 @@ contains
             ids,ide, jds,jde, kds,kde,                                &
             ims,ime, jms,jme, kms,kme,                                &
             its,ite, jts,jte, kts,kte                                 )
+       if ( config_anthro_pt_scheme .and. num_e_ant_ptegu_in .gt. 0 ) then
+       call mpas_log_write( ' Calling anthro point source emis driver')
+       call mpas_smoke_anthro_pt_emis_driver(dt,gmt,julday,ktau,                     &
+                           xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
+                           z_at_w,zmid,pblh,wind10m,                                 &
+                           e_ant_ptegu_in,num_ptegu,num_e_ant_ptegu_in,              &
+                           index_e_ant_ptegu_in_unspc_fine,                          &
+                           index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
+                           index_STKLT, index_STKLG,                                 &
+                           ant_pt_local_cell_idx,ant_pt_rank,myrank,                   &
+                           ids,ide, jds,jde, kds,kde,                                &
+                           ims,ime, jms,jme, kms,kme,                                &
+                           its,ite, jts,jte, kts,kte                                 )
+       endif
+
+
     if  (do_timing) call mpas_timer_stop('anthro_driver')
     endif
 

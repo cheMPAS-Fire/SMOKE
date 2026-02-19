@@ -13,7 +13,7 @@ module module_rwc_emissions
 
   private
 
-  public :: mpas_smoke_rwc_emis_driver
+  public :: mpas_smoke_rwc_emis_driver, plume_rise_briggs_rwc
 
 contains
 
@@ -72,6 +72,15 @@ contains
    REAL(RKIND), PARAMETER :: rwc_t_thresh = 283.15_RKIND ! [ 50 F]
    REAL(RKIND), PARAMETER :: spd_r = 1._RKIND/86400._RKIND
    REAL(RKIND), PARAMETER :: emis_max = 1.0_RKIND
+   ! For one story home, STACK_HT minimum = 15ft ~ 5 m, two story = 9 m, 
+   ! Assume roughly 50/50 split in US of 1/2 story homes
+   REAL(RKIND), PARAMETER :: RWC_STACK_HT   = 7.0     ! Stack height [m]
+   ! Most common chimneys are 6in or 8in, split the difference
+   REAL(RKIND), PARAMETER :: RWC_STACK_DIA  = 0.1778  ! Stack diameter [m] = 7 inches
+   ! Recommended velocity to prevent creosote buildup
+   REAL(RKIND), PARAMETER :: RWC_STACK_VEL  = 3.0     ! Exit velocity [m/s]
+   ! 250F is minimum temperature to prevent creosote buildup - pick a nice round number
+   REAL(RKIND), PARAMETER :: RWC_STACK_TEMP = 400.0   ! Exit temperature [K] = 260.33F
 
 ! TODO, read in TBL or define otherwise  
    rwc_t_thresh_grid(:,:) = rwc_t_thresh
@@ -102,12 +111,14 @@ contains
             do kk = kts,kte
                z_mid(kk)     = zmid(i,kk,j) - z_at_w(i,kts,j)
             enddo
-            call plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, z_mid, EFF_H, kemit, kts, kte )
+            call plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, z_mid, EFF_H, kemit, kts, kte, &
+                                        RWC_STACK_HT,RWC_STACK_DIA,RWC_STACK_VEL,RWC_STACK_TEMP )
             max_rwc_plume(i,j) = kemit
          endif
 
          if ( p_smoke_fine .gt. 0 ) then
             emis = min(emis_max,rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_smoke_fine(i,1,j))
+            emis = 0._RKIND
             chem(i,kemit,j,p_smoke_fine) = chem(i,kemit,j,p_smoke_fine) + emis
             if ( index_e_ant_out_smoke_fine .gt. 0 ) then
                e_ant_out(i,kemit,j,index_e_ant_out_smoke_fine) = e_ant_out(i,kemit,j,index_e_ant_out_smoke_fine) + emis
@@ -115,6 +126,7 @@ contains
          endif
          if ( p_unspc_fine .gt. 0 ) then
               emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_fine(i,1,j),emis_max)
+              emis = 0._RKIND
               chem(i,kemit,j,p_unspc_fine) = chem(i,kemit,j,p_unspc_fine) + emis
               if ( index_e_ant_out_unspc_fine .gt. 0 ) then
                  e_ant_out(i,kemit,j,index_e_ant_out_unspc_fine) = e_ant_out(i,kemit,j,index_e_ant_out_unspc_fine) + emis
@@ -142,7 +154,8 @@ contains
 
 
 ! SRB: Adding plumerise estimation from Briggs parameterization [02/04/2026]
-  subroutine plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, zmid, EFF_H, kmax, kts, kte )
+  subroutine plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, zmid, EFF_H, kmax, kts, kte, &
+                                    RWC_STACK_HT,RWC_STACK_DIA,RWC_STACK_VEL,RWC_STACK_TEMP )
 
         REAL(RKIND), INTENT(IN)  :: wind_10m ! 10m Wind speed [m/s]
         REAL(RKIND), INTENT(IN)  :: T_1      ! Temp at Level 1 (midpoint) [K]
@@ -152,6 +165,8 @@ contains
         INTEGER,     INTENT(IN)  :: kts, kte
         REAL(RKIND), INTENT(OUT) :: EFF_H    ! Effective plume height [m]
         INTEGER,     INTENT(OUT) :: kmax     ! Model level for effective plume height
+
+        REAL(RKIND), INTENT(IN)  :: RWC_STACK_HT,RWC_STACK_DIA,RWC_STACK_VEL,RWC_STACK_TEMP 
 
         ! Local variables
         REAL(RKIND) :: Fb, Vs, Ds, Ts, Hs  ! Buoyancy forcing, Stack exit vel, Stack dia, Stack exit temp, Stack height
@@ -165,17 +180,6 @@ contains
         ! Constants
         REAL(RKIND), PARAMETER :: GRAV           = 9.81    ! gravity [m/s^2]
         REAL(RKIND), PARAMETER :: DRY_ADIABATIC  = 0.0098  ! dry adiabatic lapse rate [K/m]
-
-        ! Defaults for Briggs
-        ! For one story home, STACK_HT minimum = 15ft ~ 5 m, two story = 9 m, 
-        ! Assume roughly 50/50 split in US of 1/2 story homes
-        REAL(RKIND), PARAMETER :: RWC_STACK_HT   = 7.0     ! Stack height [m]
-        ! Most common chimneys are 6in or 8in, split the difference
-        REAL(RKIND), PARAMETER :: RWC_STACK_DIA  = 0.1778  ! Stack diameter [m] = 7 inches
-        ! Recommended velocity to prevent creosote buildup
-        REAL(RKIND), PARAMETER :: RWC_STACK_VEL  = 3.0     ! Exit velocity [m/s]
-        ! 250F is minimum temperature to prevent creosote buildup - pick a nice round number
-        REAL(RKIND), PARAMETER :: RWC_STACK_TEMP = 400.0   ! Exit temperature [K] = 260.33F
 
         ! Briggs equations:
         ! Fb = g * Vs * r^2 * (1 - Ta/Ts)
@@ -195,7 +199,6 @@ contains
         U_stack = MAX( wind_10m, 0.1_RKIND )
 
         ! Calculate Buoyancy Flux (Fb)
-
         Fb = GRAV * Vs * ((Ds/2.0_RKIND)**2_RKIND) * (1.0_RKIND - (T_1 / Ts))
         IF ( Fb < 0.0_RKIND ) Fb = 0.0_RKIND ! Ensure +ve value
 
