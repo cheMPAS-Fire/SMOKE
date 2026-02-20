@@ -17,7 +17,8 @@ module dep_dry_mod_emerson
 
   private
 
-  public :: dry_dep_driver_emerson, particle_settling_wrapper
+  public :: dry_dep_driver_emerson, particle_settling_wrapper, &
+            particle_settling_aersett
 
 contains
     subroutine dry_dep_driver_emerson(rmol,ustar,znt,num_chem,ddvel,         &
@@ -138,23 +139,33 @@ contains
 !      
 ! 3D + chem --> vg
 !       if  (do_timing) call mpas_timer_start('vg_and_ddvel_calc')
-       do nv = 1, num_chem
-          if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
-          ! Convert diameter to cm and aerodens to g/cm3
-          dp       = aero_diam(nv) * 100._RKIND
-          aerodens = aero_dens(nv) * 1.e-3_RKIND
-          do j = jts, jte
-          do k = kts, kte
-          do i = its, ite
-             ! Cunningham correction factor
-             Cc = 1._RKIND + 2._RKIND * freepath(i,k,j) / dp * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * dp / freepath(i,k,j) ) )
-             ! Gravitational Settling
-             vg(i,k,j,nv) = aerodens * dp * dp * g100 * Cc / &       ! Convert gravity to cm/s^2
-                    ( 18._RKIND * airkinvisc(i,k,j) * (rho_phy(i,k,j)*1.e-3_RKIND) ) ! Convert density to mol/cm^
+
+       if ( settling_opt .eq. 1 ) then
+          do nv = 1, num_chem
+             if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
+             ! Convert diameter to cm and aerodens to g/cm3
+             dp       = aero_diam(nv) * 100._RKIND
+             aerodens = aero_dens(nv) * 1.e-3_RKIND
+             do j = jts, jte
+             do k = kts, kte
+             do i = its, ite
+                ! Cunningham correction factor
+                Cc = 1._RKIND + 2._RKIND * freepath(i,k,j) / dp * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * dp / freepath(i,k,j) ) )
+                ! Gravitational Settling
+                vg(i,k,j,nv) = aerodens * dp * dp * g100 * Cc / &       ! Convert gravity to cm/s^2
+                       ( 18._RKIND * airkinvisc(i,k,j) * (rho_phy(i,k,j)*1.e-3_RKIND) ) ! Convert density to mol/cm^
+             enddo
+             enddo
+             enddo
           enddo
-          enddo
-          enddo
-       enddo
+       elseif (settling_opt .eq. 2 ) then
+        ! Calculate setting velocities based on AERSETT, accounting for non-sphericity
+           call particle_settling_aersett(t_phy,rho_phy,p_phy,vg,num_chem,  &
+                           ids,ide, jds,jde, kds,kde,                       &
+                           ims,ime, jms,jme, kms,kme,                       &
+                           its,ite, jts,jte, kts,kte                        )
+      
+       endif
 
 ! 2D + chem (surface dep)
        k=kts 
@@ -348,4 +359,163 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
 
 
 end subroutine particle_settling_wrapper
+
+
+subroutine particle_settling_aersett(t_phy,rho_phy,p_phy,vg, num_chem,          &
+                                     ids,ide, jds,jde, kds,kde,                 &
+                                     ims,ime, jms,jme, kms,kme,                 &
+                                     its,ite, jts,jte, kts,kte                  )
+
+   IMPLICIT NONE
+
+   INTEGER, INTENT(IN ) :: kts, kte,its,ite,jts,jte,ims,ime, jms,jme, kms,kme, ids, ide, jds, jde, kds, kde
+   INTEGER, INTENT(IN ) :: num_chem
+   REAL(RKIND), DIMENSION(ims:ime,kms:kme,jms:jme), INTENT (IN)  :: rho_phy, t_phy, p_phy
+   REAL(RKIND), DIMENSION(ims:ime,kms:kme,jms:jme,1:num_chem), INTENT(INOUT) :: vg
+
+  real(RKIND), parameter  :: beta=1.458e-6_RKIND
+     ! The beta constant in kg/(s.m.K^.5) in the expression for dynamic viscosity.
+     ! Value from the US Standard Atmosphere, 1976
+  real(RKIND), parameter  :: S=110.4_RKIND
+       ! The Sutherland constant S=110.4 K in the expression for dynamic viscosity
+     ! Value from the US Standard Atmosphere, 1976 (Eq.51)
+
+   LOGICAL, PARAMETER :: use_LUT = .false.
+
+   INTEGER :: i,j,k,nv
+
+   REAL(RKIND) :: D, rho_p, rho_a, aspect_p, mu_a, mfp_a, temp_a
+
+   do nv = 1,num_chem
+    ! Particle diameter, density 
+      D        = aero_diam(nv)
+      rho_p    = aero_dens(nv)
+      aspect_p = 1.05_RKIND !aero_aspect(nv)
+    !  
+      do j = jts,jte
+      do k = kts,kte
+      do i = its,ite
+        ! Air density 
+         rho_a  = rho_phy(i,k,j)
+         mu_a  =  beta * t_phy(i,k,j)**1.5 / (t_phy(i,k,j)+S)
+         mfp_a = sqrt(3.13159_RKIND/8._RKIND) * mu_a/0.4987445_RKIND * 1._RKIND/sqrt(p_phy(i,k,j)*rho_a) ! Jennings 1988
+         temp_a = t_phy(i,k,j)
+        !
+         vg(i,k,j,nv) = vinfty_aersett_spheroids_avg(D, rho_p, rho_a, mu_a, mfp_a, aspect_p, temp_a, use_LUT)
+        !
+      end do
+      end do
+      end do
+   end do
+
+
+end subroutine particle_settling_aersett
+
+  function vinfty_aersett_spheroids_avg(D, rho_p, rho_a, mu_a, mfp_a, aspect_p, temp_a, use_LUT)
+    ! Settling speed for a spheroid following MaMa25.
+    ! The probability distribution of orientation is taken into account as described in MaMa25.
+    ! if use_LUT is set to true, exectution is faster to the price of a (vary) small numerical error.
+    real(RKIND), intent(IN) :: D, rho_p, rho_a, mu_a, mfp_a, temp_a
+    real(RKIND), intent(IN) :: aspect_p
+    logical, intent(IN) :: use_LUT
+
+    real(RKIND) :: vinfty_aersett_spheroids_avg
+
+    real(RKIND) :: a, alpha, w0, v0, v90
+
+    a = D * aspect_p**(2.0_RKIND / 3.0_RKIND)
+    alpha = a * (1._RKIND - exp(3.0_RKIND * (1._RKIND-aspect_p))) * 9.8_RKIND * (3.14159 * D**3 / 6.0_RKIND) * (rho_p - rho_a) &
+         & / (16 * boltzmann * temp_a)
+ !
+    w0 = ialpha_LUT(alpha)
+ !
+    v90 = vinfty_aersett_spheroids(D, rho_p, rho_a, mu_a, mfp_a, aspect_p, 90, use_LUT)
+    if(w0<0.01) then
+       vinfty_aersett_spheroids_avg = v90
+    else
+       v0 = vinfty_aersett_spheroids(D, rho_p, rho_a, mu_a, mfp_a, aspect_p, 0, use_LUT)
+       vinfty_aersett_spheroids_avg = w0 * v0 + (1.0 - w0) * v90
+    endif
+  end function vinfty_aersett_spheroids_avg
+
+  function ialpha_LUT(alpha)
+    ! Calculate I(alpha) from the LUT initialized by aersett_init
+    real(RKIND) :: ialpha_LUT
+    real(RKIND), intent(IN) ::  alpha
+    integer :: index
+    if (alpha .le. alpha_min) then
+       ialpha_LUT = 1. / 3.
+    else if (alpha .ge. alpha_max) then
+       ialpha_LUT = 0.
+    else
+       index = 1 + floor((alpha - alpha_min) / alpha_step)
+       ialpha_LUT = ialpha_ar(index)
+    endif
+  end function ialpha_LUT
+
+  function vinfty_aersett_spheroids(D, rho_p, rho_a, mu_a, mfp_a, aspect_p, angle_p, use_LUT)
+    ! Settling speed for a spheroid following MaMa23. the spheroid has to be either horizontally (angle_p=90)
+    ! or vertically (angle_p=0) oriented so.
+    ! if use_LUT is set to true, exectution is faster to the price of a (vary) small numerical error. 
+    real(RKIND), intent(IN) :: D, rho_p, rho_a, mu_a, mfp_a
+    real(RKIND), intent(IN) :: aspect_p
+    integer, intent(IN) :: angle_p
+    logical, intent(IN) :: use_LUT
+
+    real(RKIND) :: vinfty_aersett_spheroids, a_lam_phi, Cc
+    real(RKIND) :: Kn, R_tilde, phi
+
+    call phi_and_a(angle_p, aspect_p, phi, a_lam_phi)
+
+
+    Kn = 2. * mfp_a/( D*aspect_p**(2./3.) * phi )
+    Cc = 1. + Kn * ( 1.257 + 0.4 * exp( -1.1/Kn ) )
+    vinfty_aersett_spheroids = 4. * Cc * D**2. * (rho_p - rho_a) * 9.8_RKIND / (3. * mu_a * a_lam_phi)
+    R_tilde = Cc * D**3 * rho_a * (rho_p - rho_a) * 9.8_RKIND / (18. * mu_a**2)
+    if(R_tilde>Re_0)then
+      vinfty_aersett_spheroids = vinfty_aersett_spheroids * sfunc(R_tilde)
+    endif
+
+  end function vinfty_aersett_spheroids
+
+  function sfunc(R)
+    ! the S function described in MaMa23
+    real(RKIND), intent(IN) :: R
+    real(RKIND)             :: sfunc
+    sfunc = 1. - (1. + (R /4.880)**(-0.4335))**(-1.905)
+  end function sfunc
+
+
+  subroutine phi_and_a(angle_p, aspect_p, phi, a)
+    ! Calculate Phi and A from the formulae in MaMa23
+    integer, intent(IN) :: angle_p
+    real(RKIND), intent(IN) :: aspect_p
+    real(RKIND), intent(OUT) :: phi, a
+    real(RKIND) :: part1, part2, Ep, Gp, eccen, aspect_round
+    real(RKIND), parameter  :: f = 0.9113
+
+    eccen = (1. - aspect_p**(-2._RKIND))**(0.5)
+    Ep = asin(eccen)/eccen
+    Gp = (1./aspect_p) - Ep
+    aspect_round = aspect_p**2. - 1.
+
+    if ( angle_p==0 ) then
+
+        part1 = ( 2. * aspect_p**2. - 1. )/( ( aspect_round )**0.5 ) * log( aspect_p + ( aspect_round )**0.5 ) - aspect_p
+        part2 = 2. * Ep * f + (Gp/eccen**2.) * (eccen**2. * ( 4. - 2.*f) - 4. + ( 3. - ( Pi/( 2. * aspect_p**2. ) )) * f)
+        phi = ( 1.657 / ( 8. * ( aspect_round ) ) ) * part1 * part2
+        a   = 64 * aspect_p**(2./3.) * eccen**3. / ( -2. * eccen + ( 1 + eccen**2) * log((1+eccen)/(1-eccen)) )
+    else if ( angle_p==90 ) then
+
+        part1 = ( 2. * aspect_p**2. - 3. )/( ( aspect_round )**0.5 ) * log( aspect_p + ( aspect_round )**0.5 ) + aspect_p
+        part2 = Ep * ( 4. + ( Pi/2 - 1. ) * f ) + ( Gp/eccen**2. ) * ( 2. + ( ( 4. * eccen**2 + Pi - 6. )/4. ) * f )
+        phi   = ( 1.657 / ( 16. * ( aspect_round ) ) ) * part1 * part2
+        a     = 64*aspect_p**(2./3.) * 2. * eccen**3. / (2. * eccen + ( 3. * eccen**2. - 1. ) * log((1+eccen)/(1-eccen)) )
+    else
+       print*, "Angle is either 0 or 90."
+    end if
+
+  end subroutine phi_and_a
+
+
 end module dep_dry_mod_emerson
