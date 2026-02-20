@@ -83,8 +83,12 @@ CONTAINS
             conv_gas = dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
            elseif (ebb_dcycle==2) then
             conv= coef_bb_dc(i,j)*dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
+            conv_gas = coef_bb_dc(i,j)* dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
            endif
            
+           conv = conv*sc_factor
+           conv_gas = conv_gas*sc_factor
+
            dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_fine)
            chem(i,k,j,p_smoke_fine) = chem(i,k,j,p_smoke_fine) + dm_smoke
            chem(i,k,j,p_smoke_fine) = MIN(MAX(chem(i,k,j,p_smoke_fine),epsilc),5.e+3_RKIND)
