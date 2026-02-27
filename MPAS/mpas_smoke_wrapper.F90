@@ -51,6 +51,7 @@ contains
            index_nh3             , index_so2                   , index_ch4,                  &
            index_co              , index_nox                   , index_bact_fine,            &
            e_ant_ptegu_in        , num_e_ant_ptegu_in          , num_ptegu,                  &
+           e_ant_stack_groups_in , num_e_ant_stack_groups_in   ,                             &
            index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,     &
            index_e_ant_ptegu_in_unspc_fine, config_anthro_pt_scheme,                         &
            ant_pt_local_cell_idx, ant_pt_rank,  myrank,                                        &
@@ -153,7 +154,7 @@ contains
     integer,intent(in):: kanthro, kbio, kfire, kvol, krwc
     integer,intent(in):: num_e_ant_in,  num_e_bb_in,  num_e_bio_in,  num_e_vol_in
     integer,intent(in):: num_e_ant_out, num_e_bb_out, num_e_bio_out, num_e_dust_out, num_e_ss_out, num_e_vol_out
-    integer,intent(in):: num_e_ant_ptegu_in, num_ptegu
+    integer,intent(in):: num_e_ant_ptegu_in, num_ptegu, num_e_ant_stack_groups_in
 ! INLN PTEGU
     integer,intent(in),dimension(1:num_ptegu),optional :: ant_pt_local_cell_idx, ant_pt_rank
     integer,intent(in) :: myrank
@@ -197,6 +198,7 @@ contains
     real(RKIND),intent(in), dimension(ims:ime,1:kbio,jms:jme,1:num_e_bio_in),optional  :: e_bio_in
     real(RKIND),intent(in), dimension(ims:ime,1:kvol,jms:jme,1:num_e_vol_in),optional  :: e_vol_in
     real(RKIND),intent(in), dimension(25,1:num_ptegu,1:num_e_ant_ptegu_in),optional    :: e_ant_ptegu_in
+    real(RKIND),intent(in), dimension(1:num_ptegu,1:num_e_ant_stack_groups_in),optional:: e_ant_stack_groups_in
 ! JLS - TODO, if we update QV via moist flux, we will need to update the scalar in the driver
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional           :: qv
     real(RKIND),intent(in), dimension(ims:ime,1:nsoil, jms:jme)   ,optional            :: smois, tslb
@@ -687,10 +689,11 @@ contains
                            xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
                            z_at_w,zmid,pblh,wind10m,                                 &
                            e_ant_ptegu_in,num_ptegu,num_e_ant_ptegu_in,              &
+                           e_ant_stack_groups_in, num_e_ant_stack_groups_in,         &
                            index_e_ant_ptegu_in_unspc_fine,                          &
                            index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
                            index_STKLT, index_STKLG,                                 &
-                           ant_pt_local_cell_idx,ant_pt_rank,myrank,                   &
+                           ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
                            ids,ide, jds,jde, kds,kde,                                &
                            ims,ime, jms,jme, kms,kme,                                &
                            its,ite, jts,jte, kts,kte                                 )
