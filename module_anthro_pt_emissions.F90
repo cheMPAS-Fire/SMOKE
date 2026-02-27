@@ -22,9 +22,9 @@ contains
   subroutine mpas_smoke_anthro_pt_emis_driver(dt,gmt,julday,ktau,                    &
                            xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
                            z_at_w,zmid,pblh,wind10m,                                 &
-                           e_ant_ptegu_in,num_ptegu,num_e_ant_ptegu_in,              & 
+                           e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,              & 
                            e_ant_stack_groups_in, num_e_ant_stack_groups_in,         & 
-                           index_e_ant_ptegu_in_unspc_fine,                          &
+                           index_e_ant_pt_in_unspc_fine,                          &
                            index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
                            index_STKLT, index_STKLG,                                 &
                            ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
@@ -38,9 +38,9 @@ contains
                                   ids,ide, jds,jde, kds,kde,         &
                                   ims,ime, jms,jme, kms,kme,         &
                                   its,ite, jts,jte, kts,kte,         &
-                                  num_e_ant_ptegu_in, num_ptegu,     &
+                                  num_e_ant_pt_in, num_anthro_pt,     &
                                   num_e_ant_stack_groups_in,         &
-                                  index_e_ant_ptegu_in_unspc_fine,   &
+                                  index_e_ant_pt_in_unspc_fine,   &
                                   index_STKHT, index_STKDM,          &
                                   index_STKTK, index_STKVE,          &
                                   index_STKLT, index_STKLG
@@ -49,9 +49,9 @@ contains
 
    REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: xlat,xlong,wind10m,pblh,xland
    REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme),INTENT(IN) :: dz8w,rho_phy,t_phy,zmid,z_at_w
-   REAL(RKIND),DIMENSION(25,1:num_ptegu,1:num_e_ant_ptegu_in),INTENT(IN)        :: e_ant_ptegu_in
-   REAL(RKIND),DIMENSION(1:num_ptegu,1:num_e_ant_stack_groups_in),INTENT(IN)        :: e_ant_stack_groups_in
-   INTEGER,DIMENSION(1:num_ptegu),INTENT(IN) :: ant_pt_local_cell_idx,ant_pt_rank
+   REAL(RKIND),DIMENSION(25,1:num_anthro_pt,1:num_e_ant_pt_in),INTENT(IN)        :: e_ant_pt_in
+   REAL(RKIND),DIMENSION(1:num_anthro_pt,1:num_e_ant_stack_groups_in),INTENT(IN)        :: e_ant_stack_groups_in
+   INTEGER,DIMENSION(1:num_anthro_pt),INTENT(IN) :: ant_pt_local_cell_idx,ant_pt_rank
    INTEGER,INTENT(IN) :: myrank
 
    REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme,1:num_chem), INTENT(INOUT)     :: chem
@@ -69,7 +69,7 @@ contains
 ! Set the hour index to use
    h = FLOOR(gmt) + 1
 ! Loop over the EGUs
-   do ii = 1,num_ptegu
+   do ii = 1,num_anthro_pt
 ! Skip if we are on the wrong rank for this EGU
       if (myrank /= ant_pt_rank(ii)) cycle
 ! Otherwise the index is just the local index
@@ -104,8 +104,8 @@ contains
       conv_gas = 60._RKIND * 1.E6_RKIND * 4.828E-4_RKIND * dt / ( rho_phy(i,k,j) * dz8w(i,k,j) )
 !
 ! Start applyting the emissions, selecting the correct hour, h
-      if (p_unspc_fine .gt. 0 .and. index_e_ant_ptegu_in_unspc_fine .gt. 0 ) then
-         emis = conv_aer*e_ant_ptegu_in(h,ii,index_e_ant_ptegu_in_unspc_fine)
+      if (p_unspc_fine .gt. 0 .and. index_e_ant_pt_in_unspc_fine .gt. 0 ) then
+         emis = conv_aer*e_ant_pt_in(h,ii,index_e_ant_pt_in_unspc_fine)
          chem(i,k,j,p_unspc_fine)   = chem(i,k,j,p_unspc_fine) + emis
          !e_ant_out(i,k,j,index_e_ant_out_unspc_fine) = e_ant_out(i,k,j,index_e_ant_out_unspc_fine) + emis
       endif

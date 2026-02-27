@@ -50,10 +50,10 @@ contains
            index_no3_a_fine      , index_so4_a_fine            , index_nh4_a_fine,           &
            index_nh3             , index_so2                   , index_ch4,                  &
            index_co              , index_nox                   , index_bact_fine,            &
-           e_ant_ptegu_in        , num_e_ant_ptegu_in          , num_ptegu,                  &
+           e_ant_pt_in        , num_e_ant_pt_in          , num_anthro_pt,                  &
            e_ant_stack_groups_in , num_e_ant_stack_groups_in   ,                             &
            index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,     &
-           index_e_ant_ptegu_in_unspc_fine, config_anthro_pt_scheme,                         &
+           index_e_ant_pt_in_unspc_fine, config_anthro_pt_scheme,                         &
            ant_pt_local_cell_idx, ant_pt_rank,  myrank,                                        &
            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
            index_e_bb_in_co, index_e_bb_in_nh3, index_e_bb_in_ch4,                           &
@@ -154,9 +154,9 @@ contains
     integer,intent(in):: kanthro, kbio, kfire, kvol, krwc
     integer,intent(in):: num_e_ant_in,  num_e_bb_in,  num_e_bio_in,  num_e_vol_in
     integer,intent(in):: num_e_ant_out, num_e_bb_out, num_e_bio_out, num_e_dust_out, num_e_ss_out, num_e_vol_out
-    integer,intent(in):: num_e_ant_ptegu_in, num_ptegu, num_e_ant_stack_groups_in
+    integer,intent(in):: num_e_ant_pt_in, num_anthro_pt, num_e_ant_stack_groups_in
 ! INLN PTEGU
-    integer,intent(in),dimension(1:num_ptegu),optional :: ant_pt_local_cell_idx, ant_pt_rank
+    integer,intent(in),dimension(1:num_anthro_pt),optional :: ant_pt_local_cell_idx, ant_pt_rank
     integer,intent(in) :: myrank
 ! 2D mesh arguments
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland   ! grid
@@ -197,8 +197,8 @@ contains
     real(RKIND),intent(in), dimension(ims:ime,1:kfire,jms:jme,1:num_e_bb_in),optional  :: e_bb_in
     real(RKIND),intent(in), dimension(ims:ime,1:kbio,jms:jme,1:num_e_bio_in),optional  :: e_bio_in
     real(RKIND),intent(in), dimension(ims:ime,1:kvol,jms:jme,1:num_e_vol_in),optional  :: e_vol_in
-    real(RKIND),intent(in), dimension(25,1:num_ptegu,1:num_e_ant_ptegu_in),optional    :: e_ant_ptegu_in
-    real(RKIND),intent(in), dimension(1:num_ptegu,1:num_e_ant_stack_groups_in),optional:: e_ant_stack_groups_in
+    real(RKIND),intent(in), dimension(25,1:num_anthro_pt,1:num_e_ant_pt_in),optional    :: e_ant_pt_in
+    real(RKIND),intent(in), dimension(1:num_anthro_pt,1:num_e_ant_stack_groups_in),optional:: e_ant_stack_groups_in
 ! JLS - TODO, if we update QV via moist flux, we will need to update the scalar in the driver
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional           :: qv
     real(RKIND),intent(in), dimension(ims:ime,1:nsoil, jms:jme)   ,optional            :: smois, tslb
@@ -241,7 +241,7 @@ contains
                            index_e_dust_out_dust_ultrafine, index_e_dust_out_dust_fine, index_e_dust_out_dust_coarse, &
                            index_e_ss_out_ssalt_fine, index_e_ss_out_ssalt_coarse
     integer, intent(in),optional ::  index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,  &
-                                     index_e_ant_ptegu_in_unspc_fine
+                                     index_e_ant_pt_in_unspc_fine
 ! 2D dust input arrays 
     real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional  :: sandfrac_in, clayfrac_in, uthres_in, &        ! dust (FENGSHA) input
                                                                      uthres_sg_in, albedo_drag_in, feff_in, sep_in ! dust (FENGSHA) input
@@ -683,14 +683,14 @@ contains
             ids,ide, jds,jde, kds,kde,                                &
             ims,ime, jms,jme, kms,kme,                                &
             its,ite, jts,jte, kts,kte                                 )
-       if ( config_anthro_pt_scheme .and. num_e_ant_ptegu_in .gt. 0 ) then
+       if ( config_anthro_pt_scheme .and. num_e_ant_pt_in .gt. 0 ) then
        call mpas_log_write( ' Calling anthro point source emis driver')
        call mpas_smoke_anthro_pt_emis_driver(dt,gmt,julday,ktau,                     &
                            xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
                            z_at_w,zmid,pblh,wind10m,                                 &
-                           e_ant_ptegu_in,num_ptegu,num_e_ant_ptegu_in,              &
+                           e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,              &
                            e_ant_stack_groups_in, num_e_ant_stack_groups_in,         &
-                           index_e_ant_ptegu_in_unspc_fine,                          &
+                           index_e_ant_pt_in_unspc_fine,                          &
                            index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
                            index_STKLT, index_STKLG,                                 &
                            ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
