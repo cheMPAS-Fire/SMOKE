@@ -10,6 +10,9 @@ OBJS = \
 	dep_dry_simple_mod.o \
 	dep_dry_mod_emerson.o \
 	dep_data_mod.o \
+        module_data_rrtmgaeropt.o \
+	module_peg_util.o \
+        mpas_mie_module.o \
 	rad_data_mod.o \
 	module_wetdep_ls.o \
 	module_zero_plumegen_coms.o \
@@ -55,7 +58,8 @@ dep_data_mod.o: \
 	mpas_smoke_init.o
 
 rad_data_mod.o: \
-	mpas_smoke_init.o
+	mpas_smoke_init.o \
+	mpas_mie_module.o
 
 dust_fengsha_mod.o: \
 	mpas_smoke_config.o \
@@ -65,10 +69,15 @@ dust_fengsha_mod.o: \
 dust_data_mod.o: \
 	mpas_smoke_init.o
 
+module_peg_util.o: \
+        module_peg_util.o
+
 module_smoke_diagnostics.o: \
 	mpas_smoke_config.o \
 	mpas_smoke_init.o \
-	rad_data_mod.o
+	rad_data_mod.o \
+	module_data_rrtmgaeropt.o \
+	mpas_mie_module.o
 
 module_wetdep_ls.o: \
 	mpas_smoke_config.o \
@@ -102,10 +111,21 @@ mpas_smoke_wrapper.o:      \
         module_tactic_sna.o \
         module_smoke_diagnostics.o \
         dep_data_mod.o \
-        rad_data_mod.o
+        rad_data_mod.o \
+        module_data_rrtmgaeropt.o \
+        mpas_mie_module.o
 
 module_zero_plumegen_coms.o: \
         mpas_smoke_config.o
+
+module_data_rrtmgaeropt.o: \
+        mpas_smoke_init.o \
+	module_peg_util.o
+
+mpas_mie_module.o: \
+        mpas_smoke_init.o \
+	module_data_rrtmgaeropt.o \
+	module_peg_util.o
 
 ssalt_mod.o: \
 	seas_ngac_mod.o \
