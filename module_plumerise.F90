@@ -20,7 +20,7 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
                              wind_phy,                               &   ! SRB: added wind_phy
                              z_at_w,z,g,con_cp,con_rd,               &   ! scale_fire_emiss is part of config_flags
                              frp_inst, k_min, k_max,                 &   ! RAR:
-                             wind_eff_opt,                           &
+                             wind_eff_opt, plumerise_opt,            &
                              do_plumerise,                           &
                              kpbl_thetav, kpbl,                      &   ! SRB: added kpbl_thetav and kpbl
                              curr_secs,xlat, xlong , uspdavg2d,      &
@@ -54,7 +54,7 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
                                   ims,ime, jms,jme, kms,kme,               &
                                   its,ite, jts,jte, kts,kte
    real(RKIND) :: curr_secs
-   INTEGER,      INTENT(IN   ) :: wind_eff_opt
+   INTEGER,      INTENT(IN   ) :: wind_eff_opt, plumerise_opt !SRB
    REAL(RKIND), INTENT(IN)    :: alpha !  SRB: Enrainment constant for plumerise scheme
    real(kind=RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_e_bb_in ), INTENT(INOUT ) ::  ebu
    real(kind=RKIND), INTENT(IN )  :: g, con_cp, con_rd
@@ -111,15 +111,42 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                enddo
 
 ! RAR: the plume rise calculation step:
-               CALL plumerise(kte,1,1,1,1,1,1,                      &
-                              u_in, v_in, w_in, theta_in ,pi_in,    &
-                              rho_phyin, qv_in, zmid, z_lev,        &
-                              wind_eff_opt,                         &
-                              frp_inst(i,j), k_min(i,j),            & 
-                              k_max(i,j), dbg_opt, g, con_cp,       &
-                              con_rd, cpor, errmsg, errflg,         &
-                              icall, xlat(i,j), xlong(i,j),         & 
-                              curr_secs, alpha, frp_min )
+               select case (plumerise_opt)
+               
+               case (1)
+                 CALL plumerise(kte,1,1,1,1,1,1,                      &
+                                u_in, v_in, w_in, theta_in ,pi_in,    &
+                                rho_phyin, qv_in, zmid, z_lev,        &
+                                wind_eff_opt,                         &
+                                frp_inst(i,j), k_min(i,j),            & 
+                                k_max(i,j), dbg_opt, g, con_cp,       &
+                                con_rd, cpor, errmsg, errflg,         &
+                                icall, xlat(i,j), xlong(i,j),         & 
+                                curr_secs, alpha, frp_min )
+               case (2)
+                  CALL plumerise_sofiev(kte,1,1,1,1,1,1,                   & 
+                                        u_in, v_in, w_in, theta_in, pi_in, &
+                                        rho_phyin, qv_in,                  &
+                                        zmid, z_lev,                       & 
+                                        frp_inst(i,j),                     & ! FRP in W
+                                        xlat(i,j), xlong(i,j),             &
+                                        k_min(i,j), k_max(i,j), ierr,      & 
+                                        kpbl_in = kpbl(i,j), cp_in=con_cp )
+               
+               case (3)
+                  CALL plumerise_briggs(kte,1,1,1,1,1,1,                   & 
+                                        u_in, v_in, w_in, theta_in, pi_in, &
+                                        rho_phyin, qv_in,                  &
+                                        zmid, z_lev,                       &
+                                        frp_inst(i,j),                     &
+                                        xlat(i,j), xlong(i,j),             &
+                                        k_min(i,j), k_max(i,j), ierr,      & 
+                                        kpbl_in = kpbl(i,j), cp_in=con_cp )
+               case default
+                ! SRB: Distribute emissions in the first two layers if no plumerise option is selected
+                 k_min(i,j) = 1
+                 k_max(i,j) = 2
+
                if(errflg/=0) return
               
                kp1= k_min(i,j)
