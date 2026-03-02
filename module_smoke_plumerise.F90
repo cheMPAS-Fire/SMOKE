@@ -2549,10 +2549,10 @@ subroutine hybrid_weights_and_height(kte, u, v, w, theta, qv, zlev, kpbl, frp_w,
   real(RKIND), intent(in) :: hp_f, hp_s, hp_b
   real(RKIND), intent(out) :: hp_h, wf, ws, wb
 
-  ! tunable-but-fixed constants (no namelist knobs)
+  ! Some constants (tunable)
   real(RKIND), parameter :: Pf0 = 1.0e6_RKIND
-  real(RKIND), parameter :: sigma_out = 2000.0_RKIND   ! outlier penalty scale (m)
-  real(RKIND), parameter :: wb_cap = 0.50_RKIND        ! cap Briggs influence
+  real(RKIND), parameter :: sigma_out = 2000.0_RKIND   ! outlier scale (m)
+  real(RKIND), parameter :: wb_cap = 0.50_RKIND        ! cap Briggs
 
   real(RKIND) :: Habl, N2_ft, U_pbl, wrms, rho_dummy
   real(RKIND) :: qv_pbl, logfrp
