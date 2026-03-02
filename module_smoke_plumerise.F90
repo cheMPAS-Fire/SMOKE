@@ -2179,7 +2179,7 @@ END function ESAT_PR
 
 subroutine plumerise_sofiev(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_in, &
                             zmid, z_lev, frp_w, lat, lon, k_min, k_max, ierr,     &
-                            kpbl_in, cp_in)
+                            kpbl_in, cp_in, hp_out)
   use mpas_kind_types
   implicit none
 
@@ -2190,6 +2190,7 @@ subroutine plumerise_sofiev(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_i
   real(RKIND), intent(in) :: frp_w, lat, lon
   integer, intent(inout) :: k_min, k_max
   integer, intent(out) :: ierr
+  real(RKIND), intent(out), optional :: hp_out
   integer, intent(in), optional :: kpbl_in
   real(RKIND), intent(in), optional :: cp_in
 
@@ -2241,6 +2242,7 @@ subroutine plumerise_sofiev(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_i
 
   ! Final plume top height
   Hp_final = max(hp_min, min(Hp_final, z_lev(kte)))
+  if (present(hp_out)) hp_out = Hp_final
 
   ! Get the k-index
   k_max = height_to_k(kte, z_lev, Hp_final)
@@ -2513,6 +2515,125 @@ real(RKIND) function temperature_from_theta_pi(theta, pi, cp)
   real(RKIND), intent(in) :: theta, pi, cp
   temperature_from_theta_pi = theta * (pi / cp)
 end function temperature_from_theta_pi
+
+! Sigmoid function for mapping variables
+real(RKIND) function sigmoid(x)
+  use mpas_kind_types
+  implicit none
+  real(RKIND), intent(in) :: x
+  sigmoid = 1.0_RKIND / (1.0_RKIND + exp(-x))
+end function sigmoid
+
+! Median estimation
+real(RKIND) function median3(a,b,c)
+  use mpas_kind_types
+  implicit none
+  real(RKIND), intent(in) :: a,b,c
+  if ((a>=b .and. a<=c) .or. (a<=b .and. a>=c)) then
+     median3 = a
+  else if ((b>=a .and. b<=c) .or. (b<=a .and. b>=c)) then
+     median3 = b
+  else
+     median3 = c
+  end if
+end function median3
+
+! Hybrid plumerise approach
+subroutine hybrid_weights_and_height(kte, u, v, w, theta, qv, zlev, kpbl, frp_w, &
+                                     hp_f, hp_s, hp_b, hp_h, wf, ws, wb)
+  use mpas_kind_types
+  implicit none
+  integer, intent(in) :: kte, kpbl
+  real(RKIND), intent(in) :: u(kte), v(kte), w(kte), theta(kte), qv(kte), zlev(kte)
+  real(RKIND), intent(in) :: frp_w
+  real(RKIND), intent(in) :: hp_f, hp_s, hp_b
+  real(RKIND), intent(out) :: hp_h, wf, ws, wb
+
+  ! tunable-but-fixed constants (no namelist knobs)
+  real(RKIND), parameter :: Pf0 = 1.0e6_RKIND
+  real(RKIND), parameter :: sigma_out = 2000.0_RKIND   ! outlier penalty scale (m)
+  real(RKIND), parameter :: wb_cap = 0.50_RKIND        ! cap Briggs influence
+
+  real(RKIND) :: Habl, N2_ft, U_pbl, wrms, rho_dummy
+  real(RKIND) :: qv_pbl, logfrp
+  real(RKIND) :: s_frp_hi, s_stable, s_windy, s_conv, s_moist
+  real(RKIND) :: sf, ss, sb
+  real(RKIND) :: hmed, pf, ps, pb, sumw
+  integer :: k
+
+  Habl = max(0.0_RKIND, min(zlev(kpbl), zlev(kte)))
+  call compute_N2_ft(kte, theta, zlev, kpbl, N2_ft)
+
+  ! PBL means
+  U_pbl = 0.0_RKIND
+  wrms  = 0.0_RKIND
+  qv_pbl= 0.0_RKIND
+  do k = 1, kpbl
+     U_pbl  = U_pbl  + sqrt(u(k)*u(k) + v(k)*v(k))
+     wrms   = wrms   + w(k)*w(k)
+     qv_pbl = qv_pbl + qv(k)
+  end do
+  U_pbl  = U_pbl / real(max(1,kpbl), RKIND)
+  wrms   = sqrt(wrms / real(max(1,kpbl), RKIND))
+  qv_pbl = qv_pbl / real(max(1,kpbl), RKIND)
+
+  logfrp = log10(max(frp_w,1.0_RKIND))
+
+  ! Smooth indicators based on sigmoid function
+  s_frp_hi = sigmoid((logfrp - 7.0_RKIND)/0.6_RKIND)              ! ~1 for FRP >> 1e7 W
+  s_stable = sigmoid((N2_ft  - 1.5e-4_RKIND)/6.0e-5_RKIND)        ! stable FT
+  s_windy  = sigmoid((U_pbl  - 6.0_RKIND)/2.0_RKIND)              ! windy PBL
+  s_conv   = sigmoid((wrms   - 0.7_RKIND)/0.4_RKIND)              ! convective/turbulent PBL
+  s_moist  = sigmoid((qv_pbl - 0.0035_RKIND)/0.0015_RKIND)        ! moist PBL
+
+  ! Base scores: The coefficients are chosen based on how well the scheme works in certain conditions
+  ! Freitas: high FRP + convective/moist
+  sf = 0.15_RKIND + 0.65_RKIND*(s_frp_hi*s_conv) + 0.20_RKIND*s_moist
+
+  ! Sofiev: moderate FRP and stable FT
+  ss = 0.45_RKIND + 0.25_RKIND*(1.0_RKIND - s_frp_hi) + 0.25_RKIND*s_stable + 0.05_RKIND*s_moist
+
+  ! Briggs: windy + stable/neutral
+  sb = 0.10_RKIND + 0.60_RKIND*(s_windy*s_stable*(1.0_RKIND - s_conv)) + 0.30_RKIND*(s_windy*(1.0_RKIND - s_moist))
+
+  ! Estimate outlier relative to median height and penalize the scores
+  hmed = median3(hp_f, hp_s, hp_b)
+  pf = exp( -((abs(hp_f - hmed)/sigma_out)**2) )
+  ps = exp( -((abs(hp_s - hmed)/sigma_out)**2) )
+  pb = exp( -((abs(hp_b - hmed)/sigma_out)**2) )
+
+  ! Adjusted scores after considering the penalties
+  sf = sf * pf
+  ss = ss * ps
+  sb = sb * pb
+
+  ! Normalize scores
+  sumw = sf + ss + sb
+  if (sumw <= 1.0e-12_RKIND) then
+     wf = 0.0_RKIND; ws = 1.0_RKIND; wb = 0.0_RKIND
+  else
+     wf = sf/sumw
+     ws = ss/sumw
+     wb = sb/sumw
+  end if
+
+  ! Cap Briggs influence and re-normalize; since Briggs is not wildfire focused
+  if (wb > wb_cap) then
+     wb = wb_cap
+     sumw = wf + ws + wb
+     wf = wf/sumw
+     ws = ws/sumw
+     wb = wb/sumw
+  end if
+
+  ! Estimate the hybrid plume height
+  hp_h = wf*hp_f + ws*hp_s + wb*hp_b
+
+  ! Sanity check
+  hp_h = max(100.0_RKIND, min(hp_h, zlev(kte)))
+
+end subroutine hybrid_weights_and_height
+
 
 
 !      ------------------------------------------------------------------------
