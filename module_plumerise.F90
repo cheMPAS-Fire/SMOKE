@@ -70,6 +70,10 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
       REAL, DIMENSION(ims:ime, jms:jme), INTENT (IN) :: uspdavg2d, hpbl2d ! SRB
       real(RKIND), dimension (kte) :: u_in ,v_in ,w_in ,theta_in ,pi_in, rho_phyin ,qv_in ,zmid, z_lev, uspd ! SRB
       real(kind=RKIND) :: dz_plume, cpor, con_rocp ! SRB
+      ! SRB
+      integer :: kmin_f, kmax_f, kmin_s, kmax_s, kmin_b, kmax_b
+      real(RKIND) :: hp_f, hp_s, hp_b84, hp_h
+      real(RKIND) :: wf, ws, wb
 
 ! MPI variables
 
@@ -123,16 +127,19 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                                 con_rd, cpor, errmsg, errflg,         &
                                 icall, xlat(i,j), xlong(i,j),         & 
                                 curr_secs, alpha, frp_min )
+                 if(errflg/=0) return
+
                case (2)
                   CALL plumerise_sofiev(kte,1,1,1,1,1,1,                   & 
                                         u_in, v_in, w_in, theta_in, pi_in, &
                                         rho_phyin, qv_in,                  &
                                         zmid, z_lev,                       & 
-                                        frp_inst(i,j),                     & ! FRP in W
+                                        frp_inst(i,j),                     & 
                                         xlat(i,j), xlong(i,j),             &
                                         k_min(i,j), k_max(i,j), ierr,      & 
                                         kpbl_in = kpbl(i,j), cp_in=con_cp )
-               
+                  if(ierr/=0) return
+
                case (3)
                   CALL plumerise_briggs(kte,1,1,1,1,1,1,                   & 
                                         u_in, v_in, w_in, theta_in, pi_in, &
@@ -142,12 +149,58 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                                         xlat(i,j), xlong(i,j),             &
                                         k_min(i,j), k_max(i,j), ierr,      & 
                                         kpbl_in = kpbl(i,j), cp_in=con_cp )
+                  if(ierr/=0) return
+
+               case (4)
+                  kmin_f = 1; kmax_f = 2
+                  CALL plumerise(kte,1,1,1,1,1,1,                     &
+                                u_in, v_in, w_in, theta_in ,pi_in,    &
+                                rho_phyin, qv_in, zmid, z_lev,        &
+                                wind_eff_opt,                         &
+                                frp_inst(i,j), kmin_f,                & 
+                                kmax_f, dbg_opt, g, con_cp,           &
+                                con_rd, cpor, errmsg, errflg,         &
+                                icall, xlat(i,j), xlong(i,j),         & 
+                                curr_secs, alpha, frp_min )
+                  if(errflg/=0) return
+                  hp_f = z_lev(max(2, min(kte, k_max(i,j))))
+
+                  kmin_s = 2; kmax_s = 3
+                  CALL plumerise_sofiev(kte,                               & 
+                                        u_in, v_in, w_in, theta_in, pi_in, &
+                                        rho_phyin, qv_in,                  &
+                                        zmid, z_lev,                       & 
+                                        frp_inst(i,j),                     & ! FRP in W
+                                        xlat(i,j), xlong(i,j),             &
+                                        kmin_s, kmax_s, ierr,      & 
+                                        kpbl_in = kpbl(i,j), cp_in=con_cp,  &
+                                        hp_out = hp_s )
+                  if(ierr/=0) return
+
+                  kmin_b = 2; kmax_b = 3;
+                  CALL plumerise_briggs(kte,                               & 
+                                        u_in, v_in, w_in, theta_in, pi_in, &
+                                        rho_phyin, qv_in,                  &
+                                        zmid, z_lev,                       &
+                                        frp_inst(i,j),                     &
+                                        xlat(i,j), xlong(i,j),             &
+                                        kmin_b, kmax_b, ierr,      & 
+                                        kpbl_in = kpbl(i,j), cp_in=con_cp,  &
+                                        hp_b84 = hp_b84 )
+                  if(ierr/=0) return
+
+                  call hybrid_weights_and_height(kte,                               & 
+                                                 u_in, v_in, w_in, theta_in, qv_in, & 
+                                                 z_lev, kpbl(i,j),frp_inst(i,j),    & 
+                                                 hp_f, hp_s, hp_b84, hp_h, wf, ws, wb)
+
+                  k_min(i,j) = min(kmin_f, min(kmin_s, kmin_b))
+                  k_max(i,j) = height_to_k(kte, z_lev, hp_h)
+
                case default
                 ! SRB: Distribute emissions in the first two layers if no plumerise option is selected
                  k_min(i,j) = 1
                  k_max(i,j) = 2
-
-               if(errflg/=0) return
               
                kp1= k_min(i,j)
                kp2= k_max(i,j)   
