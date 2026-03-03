@@ -117,7 +117,7 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
 ! RAR: the plume rise calculation step:
                select case (plumerise_opt)
                
-               case (1)
+               case (1) ! Freitas scheme
                  CALL plumerise(kte,1,1,1,1,1,1,                      &
                                 u_in, v_in, w_in, theta_in ,pi_in,    &
                                 rho_phyin, qv_in, zmid, z_lev,        &
@@ -129,7 +129,7 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                                 curr_secs, alpha, frp_min )
                  if(errflg/=0) return
 
-               case (2)
+               case (2) ! Sofiev scheme
                   CALL plumerise_sofiev(kte,1,1,1,1,1,1,                   & 
                                         u_in, v_in, w_in, theta_in, pi_in, &
                                         rho_phyin, qv_in,                  &
@@ -140,7 +140,7 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                                         kpbl_in = kpbl(i,j), cp_in=con_cp )
                   if(ierr/=0) return
 
-               case (3)
+               case (3) ! Briggs scheme
                   CALL plumerise_briggs(kte,1,1,1,1,1,1,                   & 
                                         u_in, v_in, w_in, theta_in, pi_in, &
                                         rho_phyin, qv_in,                  &
@@ -151,7 +151,7 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                                         kpbl_in = kpbl(i,j), cp_in=con_cp )
                   if(ierr/=0) return
 
-               case (4)
+               case (4) ! Hybrid scheme
                   kmin_f = 1; kmax_f = 2
                   CALL plumerise(kte,1,1,1,1,1,1,                     &
                                 u_in, v_in, w_in, theta_in ,pi_in,    &
