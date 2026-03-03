@@ -53,7 +53,7 @@ contains
            e_ant_pt_in        , num_e_ant_pt_in          , num_anthro_pt,                  &
            e_ant_stack_groups_in , num_e_ant_stack_groups_in   ,                             &
            index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,     &
-           index_e_ant_pt_in_unspc_fine, config_anthro_pt_scheme,                         &
+           index_e_ant_pt_in_unspc_fine,                         &
            ant_pt_local_cell_idx, ant_pt_rank,  myrank,                                        &
            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
            index_e_bb_in_co, index_e_bb_in_nh3, index_e_bb_in_ch4,                           &
@@ -97,7 +97,7 @@ contains
            do_mpas_smoke         , do_mpas_dust          , do_mpas_pollen        ,           &
            do_mpas_anthro        , do_mpas_ssalt         , do_mpas_volc          ,           &
            do_mpas_sna           , do_mpas_methane       , do_mpas_hab           ,           &
-           do_mpas_rwc           ,                                                           &
+           do_mpas_rwc           , do_mpas_anthro_pt     ,                                   &
            calc_bb_emis_online   , bb_beta               ,                                   &
            hwp_method            , hwp_alpha             , wetdep_ls_opt        ,            &
            wetdep_ls_alpha       , plumerise_opt         , plume_wind_eff       ,            &
@@ -109,6 +109,7 @@ contains
            num_pols_per_polp     , pollen_emis_scale_factor,                                 &
            tree_pollen_emis_scale_factor, grass_pollen_emis_scale_factor        ,            &
            weed_pollen_emis_scale_factor,                                                    &
+           anthro_emis_scale_factor, anthro_pt_emis_scale_factor,                            &
            bb_input_prevh        , rwc_emis_scale_factor, plumerise_opt_rwc     ,            &
            RWC_denominator       , RWC_annual_sum       ,                                    &
            RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse,                           &
@@ -280,7 +281,7 @@ contains
      logical,intent(in)               :: do_mpas_rwc
      character(len=*),intent(in)      :: config_extra_chemical_tracers
      logical,intent(in)               :: config_ultrafine, config_coarse
-     logical,intent(in)               :: config_anthro_pt_scheme
+     logical,intent(in)               :: do_mpas_anthro_pt
      logical,intent(in)               :: calc_bb_emis_online
      integer,intent(in)               :: hwp_method
      real(RKIND),intent(in)           :: hwp_alpha
@@ -292,6 +293,8 @@ contains
      real(kind=RKIND),intent(in)      :: plume_alpha
      real(kind=RKIND),intent(in)      :: bb_emis_scale_factor, bb_qv_scale_factor
      real(kind=RKIND),intent(in)      :: rwc_emis_scale_factor
+     real(kind=RKIND),intent(in)      :: anthro_emis_scale_factor
+     real(kind=RKIND),intent(in)      :: anthro_pt_emis_scale_factor
      integer,intent(in)               :: ebb_dcycle
      integer,intent(in)               :: drydep_opt
      integer,intent(in)               :: pm_settling
@@ -667,6 +670,7 @@ contains
        call mpas_smoke_anthro_emis_driver(dt,gmt,julday,kanthro,      &
             xlat,xlong, chem,num_chem,dz8w,t_phy,rho_phy,             &
             e_ant_in, e_ant_out, num_e_ant_in, num_e_ant_out,         &
+            anthro_emis_scale_factor,                                 &
             index_e_ant_in_unspc_ultrafine,                           &
             index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
             index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine,     &
@@ -683,20 +687,21 @@ contains
             ids,ide, jds,jde, kds,kde,                                &
             ims,ime, jms,jme, kms,kme,                                &
             its,ite, jts,jte, kts,kte                                 )
-       if ( config_anthro_pt_scheme .and. num_e_ant_pt_in .gt. 0 ) then
-       call mpas_log_write( ' Calling anthro point source emis driver')
-       call mpas_smoke_anthro_pt_emis_driver(dt,gmt,julday,ktau,                     &
-                           xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
-                           z_at_w,zmid,pblh,wind10m,                                 &
-                           e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,              &
-                           e_ant_stack_groups_in, num_e_ant_stack_groups_in,         &
-                           index_e_ant_pt_in_unspc_fine,                          &
-                           index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
-                           index_STKLT, index_STKLG,                                 &
-                           ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
-                           ids,ide, jds,jde, kds,kde,                                &
-                           ims,ime, jms,jme, kms,kme,                                &
-                           its,ite, jts,jte, kts,kte                                 )
+       if ( do_mpas_anthro_pt .and. num_e_ant_pt_in .gt. 0 ) then
+          call mpas_log_write( ' Calling anthro point source emis driver')
+          call mpas_smoke_anthro_pt_emis_driver(dt,gmt,julday,ktau,                     &
+                              xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
+                              z_at_w,zmid,pblh,wind10m,area,                            &
+                              e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,                &
+                              e_ant_stack_groups_in, num_e_ant_stack_groups_in,         &
+                              anthro_pt_emis_scale_factor,                              &
+                              index_e_ant_pt_in_unspc_fine,                             &
+                              index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
+                              index_STKLT, index_STKLG,                                 &
+                              ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
+                              ids,ide, jds,jde, kds,kde,                                &
+                              ims,ime, jms,jme, kms,kme,                                &
+                              its,ite, jts,jte, kts,kte                                 )
        endif
 
 
