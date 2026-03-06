@@ -38,7 +38,7 @@ contains
     subroutine mpas_smoke_driver(                                                            &
            num_chem              , chemistry_start             , chem           ,            &
            config_extra_chemical_tracers,                                                    &
-           kanthro    , kbio, kfire, kvol, krwc,                                             &
+           kanthro    , kbio, kfire, kvol,                                                   &
            config_ultrafine, config_coarse,                                                  &
            index_smoke_ultrafine , index_smoke_fine            , index_smoke_coarse,         &
            index_dust_ultrafine  , index_dust_fine             , index_dust_coarse,          &
@@ -152,7 +152,7 @@ contains
     integer,intent(in)::nblocks
 ! Dimensions and indexes
     integer,intent(in):: nsoil, nlcat, num_chem, chemistry_start
-    integer,intent(in):: kanthro, kbio, kfire, kvol, krwc
+    integer,intent(in):: kanthro, kbio, kfire, kvol
     integer,intent(in):: num_e_ant_in,  num_e_bb_in,  num_e_bio_in,  num_e_vol_in
     integer,intent(in):: num_e_ant_out, num_e_bb_out, num_e_bio_out, num_e_dust_out, num_e_ss_out, num_e_vol_out
     integer,intent(in):: num_e_ant_pt_in, num_anthro_pt, num_e_ant_stack_groups_in
@@ -182,10 +182,10 @@ contains
     real(RKIND),intent(in), dimension(ims:ims, jms:jme, nblocks),        &
                                                    optional      :: hwp_avg, fre_avg, frp_avg
 ! Residential Wood burning
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme),optional    :: RWC_denominator
-    real(RKIND),intent(in), dimension(ims:ims, 1:krwc,jms:jme),optional :: RWC_annual_sum,                        &
-                                                                           RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
-                                                                           RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
+    real(RKIND),intent(in), dimension(ims:ims, jms:jme),optional    :: RWC_denominator, &
+                                                                       RWC_annual_sum,                        &
+                                                                       RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
+                                                                       RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
 ! 3D Met input 
     real(RKIND),intent(in), dimension(ims:ime, kms:kme, jms:jme)   :: p8w,    dz8w,    z_at_w, cldfrac,   &
                                                                        p_phy,  t_phy,   u_phy,  v_phy,     &
@@ -710,7 +710,7 @@ contains
 
     if ( do_mpas_rwc ) then
        call mpas_log_write( ' Calling online residential wood combustion driver')
-       call mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,krwc,       &
+       call mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,            &
             xlat,xlong, xland, chem,num_chem,dz8w,t_phy,rho_phy,      &
             z_at_w,zmid,pblh,wind10m,rwc_emis_scale_factor,           &
             max_rwc_plume, plumerise_opt_rwc,                         &

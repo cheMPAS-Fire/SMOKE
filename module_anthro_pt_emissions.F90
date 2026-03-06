@@ -108,6 +108,7 @@ contains
 ! Start applyting the emissions, selecting the correct hour, h
       if (p_unspc_fine .gt. 0 .and. index_e_ant_pt_in_unspc_fine .gt. 0 ) then
          emis = conv_aer*e_ant_pt_in(h,ii,index_e_ant_pt_in_unspc_fine)
+         !print*,'pt,kemit,',kemit,' emis = ',emis
          chem(i,k,j,p_unspc_fine)   = chem(i,k,j,p_unspc_fine) + emis
          !e_ant_out(i,k,j,index_e_ant_out_unspc_fine) = e_ant_out(i,k,j,index_e_ant_out_unspc_fine) + emis
       endif
