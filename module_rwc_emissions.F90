@@ -18,7 +18,7 @@ module module_rwc_emissions
 contains
 
 
-  subroutine mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,krwc,                     &
+  subroutine mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,                          &
                            xlat,xlong,xland,chem,num_chem,dz8w,t_phy,rho_phy,        &
                            z_at_w,zmid,pblh,wind10m,rwc_emis_scale_factor,           &
                            max_rwc_plume,plumerise_opt_rwc,                          &
@@ -36,7 +36,7 @@ contains
 
    IMPLICIT NONE
 
-   INTEGER,      INTENT(IN   ) :: ktau,julday, num_chem, krwc,           &
+   INTEGER,      INTENT(IN   ) :: ktau,julday, num_chem,             &
                                   ids,ide, jds,jde, kds,kde,         &
                                   ims,ime, jms,jme, kms,kme,         &
                                   its,ite, jts,jte, kts,kte,         &
@@ -49,7 +49,7 @@ contains
    REAL(RKIND), INTENT(IN    ) :: dt,gmt,rwc_emis_scale_factor
 
    REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: xlat,xlong,xland,pblh
-   REAL(RKIND),DIMENSION(ims:ime,1:krwc,jms:jme),INTENT(IN) :: RWC_annual_sum_smoke_fine,RWC_annual_sum_smoke_coarse, &
+   REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: RWC_annual_sum_smoke_fine,RWC_annual_sum_smoke_coarse, &
                                                         RWC_annual_sum_unspc_fine,RWC_annual_sum_unspc_coarse, &
                                                         RWC_annual_sum
    REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: RWC_denominator,wind10m
@@ -117,7 +117,7 @@ contains
          endif
 
          if ( p_smoke_fine .gt. 0 ) then
-            emis = min(emis_max,rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_smoke_fine(i,1,j))
+            emis = min(emis_max,rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_smoke_fine(i,j))
             emis = 0._RKIND
             chem(i,kemit,j,p_smoke_fine) = chem(i,kemit,j,p_smoke_fine) + emis
             if ( index_e_ant_out_smoke_fine .gt. 0 ) then
@@ -125,7 +125,7 @@ contains
             endif
          endif
          if ( p_unspc_fine .gt. 0 ) then
-              emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_fine(i,1,j),emis_max)
+              emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_fine(i,j),emis_max)
               emis = 0._RKIND
               chem(i,kemit,j,p_unspc_fine) = chem(i,kemit,j,p_unspc_fine) + emis
               if ( index_e_ant_out_unspc_fine .gt. 0 ) then
@@ -133,7 +133,7 @@ contains
               endif
          endif
        ! Unspeciated coarse emissions can be added to multiple bins, depending on what is available
-         emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_coarse(i,1,j),emis_max)
+         emis = min(rwc_emis_scale_factor * conv_aer * frac * RWC_annual_sum_unspc_coarse(i,j),emis_max)
          if ( p_smoke_coarse .gt. 0 ) then
              chem(i,kemit,j,p_smoke_coarse) = chem(i,kemit,j,p_smoke_coarse) + emis
          elseif ( p_unspc_coarse .gt. 0 ) then
@@ -190,7 +190,7 @@ contains
         Hs = RWC_STACK_HT
         Ds = RWC_STACK_DIA
         Vs = RWC_STACK_VEL
-        Ts = RWC_STACK_TEMP
+        Ts = max(RWC_STACK_TEMP,T_1) ! Ensures non-zero temperatures
 
         z_1 = zmid(kts)
         z_2 = zmid(kts+1)

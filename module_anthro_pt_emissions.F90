@@ -8,6 +8,7 @@ module module_anthro_pt_emissions
 !
   use mpas_kind_types
   use mpas_smoke_init
+  use mpas_smoke_config, only : pi 
   use module_rwc_emissions, only : plume_rise_briggs_rwc 
 
   implicit none
@@ -21,10 +22,11 @@ contains
 
   subroutine mpas_smoke_anthro_pt_emis_driver(dt,gmt,julday,ktau,                    &
                            xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
-                           z_at_w,zmid,pblh,wind10m,                                 &
-                           e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,              & 
+                           z_at_w,zmid,pblh,wind10m,area,                            &
+                           e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,                & 
                            e_ant_stack_groups_in, num_e_ant_stack_groups_in,         & 
-                           index_e_ant_pt_in_unspc_fine,                          &
+                           anthro_pt_emis_scale_factor,                              &
+                           index_e_ant_pt_in_unspc_fine,                             &
                            index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
                            index_STKLT, index_STKLG,                                 &
                            ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
@@ -46,8 +48,9 @@ contains
                                   index_STKLT, index_STKLG
 
    REAL(RKIND), INTENT(IN    ) :: dt,gmt
+   REAL(RKIND), INTENT(IN    ) :: anthro_pt_emis_scale_factor
 
-   REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: xlat,xlong,wind10m,pblh,xland
+   REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: xlat,xlong,wind10m,pblh,xland,area
    REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme),INTENT(IN) :: dz8w,rho_phy,t_phy,zmid,z_at_w
    REAL(RKIND),DIMENSION(25,1:num_anthro_pt,1:num_e_ant_pt_in),INTENT(IN)        :: e_ant_pt_in
    REAL(RKIND),DIMENSION(1:num_anthro_pt,1:num_e_ant_stack_groups_in),INTENT(IN)        :: e_ant_stack_groups_in
@@ -62,8 +65,7 @@ contains
    REAL(RKIND) :: STACK_HT,STACK_DIA,STACK_VEL,STACK_TEMP,STACK_LAT,STACK_LON
    REAL(RKIND) :: T_1,T_2,wind_10m,EFF_H, PBL_H
    REAL(RKIND), DIMENSION(kts:kte) :: z_mid
-
-
+ 
 ! J-index is always 1
    j = 1
 ! Set the hour index to use
@@ -98,14 +100,15 @@ contains
                                         STACK_HT,STACK_DIA,STACK_VEL,STACK_TEMP )
 ! Set the calculated emission layer
       k = kemit
-!     Conversion factor for aerosol emissions (ug/m2/s) --> ug/kg
-      conv_aer = dt / (rho_phy(i,k,j) *  dz8w(i,k,j))
-!     Conversion factor for gas phase emissions (mol/m2/s) --> ppm/ppm
-      conv_gas = 60._RKIND * 1.E6_RKIND * 4.828E-4_RKIND * dt / ( rho_phy(i,k,j) * dz8w(i,k,j) )
+!     Conversion factor for aerosol emissions (g/s) --> ug/kg --> Need to divide by area
+      conv_aer = anthro_pt_emis_scale_factor * 1.e6_RKIND * dt / (rho_phy(i,k,j) *  dz8w(i,k,j) * area(i,j))
+!     Conversion factor for gas phase emissions (moles/s) --> ppm/ppm --> Need to divide by area
+      conv_gas = anthro_pt_emis_scale_factor * 60._RKIND * 1.E6_RKIND * 4.828E-4_RKIND * dt / ( rho_phy(i,k,j) * dz8w(i,k,j) * area(i,j) )
 !
 ! Start applyting the emissions, selecting the correct hour, h
       if (p_unspc_fine .gt. 0 .and. index_e_ant_pt_in_unspc_fine .gt. 0 ) then
          emis = conv_aer*e_ant_pt_in(h,ii,index_e_ant_pt_in_unspc_fine)
+         !print*,'pt,kemit,',kemit,' emis = ',emis
          chem(i,k,j,p_unspc_fine)   = chem(i,k,j,p_unspc_fine) + emis
          !e_ant_out(i,k,j,index_e_ant_out_unspc_fine) = e_ant_out(i,k,j,index_e_ant_out_unspc_fine) + emis
       endif
