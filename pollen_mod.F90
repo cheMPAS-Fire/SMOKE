@@ -177,71 +177,69 @@ contains
     do i = its, ite
    
       ! No emissions over water or at night
-    if ( xland(i,j) .lt. 1.5_RKIND .and. swdown(i,j) .gt. 0._RKIND ) then ! land
+    if ( ( xland(i,j) - 1.5_RKIND ) .ge. 0 .and. swdown(i,j) .le. 0._RKIND ) cycle
 
-     ! Compute the rainfall at the current time step (and convert to mm)
-       rain  = (rainc(i,j) + rainnc(i,j)) * 1.e3_RKIND
-     ! Determine the rainfall factor
-       if ( rain < 0.5_RKIND ) then
-          fr = 1._RKIND
-       else if ( rain > 1.0_RKIND) then
-          fr = 0._RKIND
-       else
-          fr = ( 1._RKIND - rain ) / ( 1._RKIND - 0.5_RKIND )
-       end if
+    ! Compute the rainfall at the current time step (and convert to mm)
+      rain  = (rainc(i,j) + rainnc(i,j)) * 1.e3_RKIND
+    ! Determine the rainfall factor
+      if ( rain < 0.5_RKIND ) then
+         fr = 1._RKIND
+      else if ( rain > 1.0_RKIND) then
+         fr = 0._RKIND
+      else
+         fr = ( 1._RKIND - rain ) / ( 1._RKIND - 0.5_RKIND )
+      end if
 
-     ! Compute the wind and wind factor
-       wind = ( sqrt( u10(i,j)**2._RKIND + v10(i,j)**2._RKIND ) )
-       fw = 1.5_RKIND * ( 1._RKIND -  exp( -1._RKIND * wind * 0.2_RKIND ))
+    ! Compute the wind and wind factor
+      wind = ( sqrt( u10(i,j)**2._RKIND + v10(i,j)**2._RKIND ) )
+      fw = 1.5_RKIND * ( 1._RKIND -  exp( -1._RKIND * wind * 0.2_RKIND ))
 
-     ! Compute the relative humidity factor
-       if ( (relhum(i,kts,j) * 100._RKIND) < rh_low ) then
-          fh = 1._RKIND
-       else if ( (relhum(i,kts,j) * 100._RKIND) > rh_high ) then
-          fh = 0.1_RKIND
-       else
-          fh = (rh_high - (relhum(i,kts,j) * 100._RKIND )) / (rh_high - rh_low)
-       end if
+    ! Compute the relative humidity factor
+      if ( (relhum(i,kts,j) * 100._RKIND) < rh_low ) then
+         fh = 1._RKIND
+      else if ( (relhum(i,kts,j) * 100._RKIND) > rh_high ) then
+         fh = 0.1_RKIND
+      else
+         fh = (rh_high - (relhum(i,kts,j) * 100._RKIND )) / (rh_high - rh_low)
+      end if
  
-     ! Combine the factors
-     ! Emissions are described / day, convert to /sec 
-       fa = fh * fw * fr * day_to_sec
+    ! Combine the factors
+    ! Emissions are described / day, convert to /sec 
+      fa = fh * fw * fr * day_to_sec
   
-     ! Compute the number emissions
-       ppemfact_numb_tree  = e_bio_in(i,1,j,index_e_bio_in_polp_tree)  * fa !, 0._RKIND)
-       ppemfact_numb_grass = e_bio_in(i,1,j,index_e_bio_in_polp_grass) * fa !, 0._RKIND)
-       ppemfact_numb_weed  = e_bio_in(i,1,j,index_e_bio_in_polp_weed)  * fa !, 0._RKIND)
+    ! Compute the number emissions
+      ppemfact_numb_tree  = e_bio_in(i,1,j,index_e_bio_in_polp_tree)  * fa !, 0._RKIND)
+      ppemfact_numb_grass = e_bio_in(i,1,j,index_e_bio_in_polp_grass) * fa !, 0._RKIND)
+      ppemfact_numb_weed  = e_bio_in(i,1,j,index_e_bio_in_polp_weed)  * fa !, 0._RKIND)
    
-     ! Convert number emissions to mass emissions 
-     ! fac[1-3] = # * pi/6 * dens * diam^3 * 1.e-9
-       ppemfact_mass_tree  = ppemfact_numb_tree  * fac1
-       ppemfact_mass_grass = ppemfact_numb_grass * fac2
-       ppemfact_mass_weed  = ppemfact_numb_weed  * fac3 
-       ! Calculate the conversion factor
-       factaa = dt / ( dz8w(i,kts,j) * rho(i,kts,j) )
+    ! Convert number emissions to mass emissions 
+    ! fac[1-3] = # * pi/6 * dens * diam^3 * 1.e-9
+      ppemfact_mass_tree  = ppemfact_numb_tree  * fac1
+      ppemfact_mass_grass = ppemfact_numb_grass * fac2
+      ppemfact_mass_weed  = ppemfact_numb_weed  * fac3 
+      ! Calculate the conversion factor
+      factaa = dt / ( dz8w(i,kts,j) * rho(i,kts,j) )
 
-     ! Compute the mass emissions, update the diagnostic and chemistry arrays
-       emis = tree_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_tree
-       e_bio_out(i,kts,j,index_e_bio_out_polp_tree)  = e_bio_out(i,kts,j,index_e_bio_out_polp_tree) + emis
-       if (p_polp_tree .gt. 0)   chem(i,kts,j,p_polp_tree)  = chem(i,kts,j,p_polp_tree) + emis
+    ! Compute the mass emissions, update the diagnostic and chemistry arrays
+      emis = tree_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_tree
+      e_bio_out(i,kts,j,index_e_bio_out_polp_tree)  = e_bio_out(i,kts,j,index_e_bio_out_polp_tree) + emis
+      if (p_polp_tree .gt. 0)   chem(i,kts,j,p_polp_tree)  = chem(i,kts,j,p_polp_tree) + emis
 
-       emis = grass_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_grass
-       e_bio_out(i,kts,j,index_e_bio_out_polp_grass)  = e_bio_out(i,kts,j,index_e_bio_out_polp_grass) + emis
-       if (p_polp_grass .gt. 0)  chem(i,kts,j,p_polp_grass)  = chem(i,kts,j,p_polp_grass) + emis
+      emis = grass_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_grass
+      e_bio_out(i,kts,j,index_e_bio_out_polp_grass)  = e_bio_out(i,kts,j,index_e_bio_out_polp_grass) + emis
+      if (p_polp_grass .gt. 0)  chem(i,kts,j,p_polp_grass)  = chem(i,kts,j,p_polp_grass) + emis
 
-       emis = weed_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_weed
-       e_bio_out(i,kts,j,index_e_bio_out_polp_weed)  = e_bio_out(i,kts,j,index_e_bio_out_polp_weed) + emis
-       if (p_polp_weed .gt. 0)  chem(i,kts,j,p_polp_weed)  = chem(i,kts,j,p_polp_weed) + emis
+      emis = weed_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_weed
+      e_bio_out(i,kts,j,index_e_bio_out_polp_weed)  = e_bio_out(i,kts,j,index_e_bio_out_polp_weed) + emis
+      if (p_polp_weed .gt. 0)  chem(i,kts,j,p_polp_weed)  = chem(i,kts,j,p_polp_weed) + emis
 
-       if (p_polp_all .gt. 0) then
-          emis = pollen_emis_scale_factor * factaa * &
-                (tree_pollen_emis_scale_factor * ppemfact_mass_tree + &
-                 grass_pollen_emis_scale_factor * ppemfact_mass_grass + &
-                 weed_pollen_emis_scale_factor * ppemfact_mass_weed) 
-          chem(i,kts,j,p_polp_all)   = chem(i,kts,j,p_polp_all)  + emis
-       endif
-
-     endif ! if land
+      if (p_polp_all .gt. 0) then
+         emis = pollen_emis_scale_factor * factaa * &
+               (tree_pollen_emis_scale_factor * ppemfact_mass_tree + &
+                grass_pollen_emis_scale_factor * ppemfact_mass_grass + &
+                weed_pollen_emis_scale_factor * ppemfact_mass_weed) 
+         chem(i,kts,j,p_polp_all)   = chem(i,kts,j,p_polp_all)  + emis
+      endif
 
    enddo
    enddo
