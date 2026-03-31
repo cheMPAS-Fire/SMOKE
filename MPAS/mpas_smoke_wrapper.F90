@@ -85,9 +85,7 @@ contains
            eco_id, efs_smold, efs_flam, efs_rsmold,fmc_avg,                                  &
            hfx_bb                , qfx_bb         ,  frac_grid_burned    ,                   &
            min_bb_plume          , max_bb_plume,  max_rwc_plume,                             &
-           sandfrac_in           , clayfrac_in           , uthres_in            ,            &
-           uthres_sg_in          , albedo_drag_in        , feff_in              ,            &
-           sep_in                ,                                                           &
+           sandfrac_in           , clayfrac_in    , uthres_in, rdrag_in, ssm_in,             &
            e_ant_in, e_bb_in, e_bio_in, e_vol_in,                                            &
            e_ant_out, e_bb_out, e_bio_out, e_dust_out, e_ss_out, e_vol_out,                  &
            num_e_ant_in, num_e_bb_in, num_e_bio_in, num_e_vol_in,                            &
@@ -245,7 +243,7 @@ contains
                                      index_e_ant_pt_in_unspc_fine
 ! 2D dust input arrays 
     real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional  :: sandfrac_in, clayfrac_in, uthres_in, &        ! dust (FENGSHA) input
-                                                                     uthres_sg_in, albedo_drag_in, feff_in, sep_in ! dust (FENGSHA) input
+                                                                     rdrag_in, ssm_in ! dust (FENGSHA) input
 ! 2D input/output arrays
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: frp_out, fre_out, EFs_map
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: hwp, coef_bb_dc
@@ -644,13 +642,12 @@ contains
     call mpas_log_write( ' Calling dust driver')
 !    if ( dust_opt .eq. 5 ) then
     !-- compute dust (FENGSHA)
-       call gocart_dust_fengsha_driver(dt,ktau,chem,rho_phy,               &
+       call gocart_dust_fengsha_driver(dt,ktau,chem,rho_phy,          &
             smois,tslb,p8w,                                           &
             isltyp,snowh,xland,area,g,                                &
             ust,znt,                                                  &
             clayfrac_in,sandfrac_in,                                  &
-            uthres_in, uthres_sg_in,                                  &
-            albedo_drag_in, feff_in, sep_in,                          &
+            uthres_in, rdrag_in, ssm_in,                              &
             e_dust_out, num_e_dust_out,                               &
             index_e_dust_out_dust_fine,                               &
             index_e_dust_out_dust_coarse,                             &
