@@ -27,6 +27,7 @@ OBJS = \
 	module_fire_emissions.o \
         pollen_mod.o \
         module_anthro_emissions.o \
+        module_anthro_pt_emissions.o \
         module_rwc_emissions.o \
         module_tactic_sna.o
    
@@ -96,6 +97,7 @@ mpas_smoke_wrapper.o:      \
         dust_fengsha_mod.o \
         pollen_mod.o \
         module_anthro_emissions.o \
+        module_anthro_pt_emissions.o \
         ssalt_mod.o \
         module_tactic_sna.o \
         module_smoke_diagnostics.o \
@@ -116,6 +118,10 @@ seas_ngac_mod.o:
 
 module_anthro_emissions.o: \
         mpas_smoke_init.o
+
+module_anthro_pt_emissions.o: \
+        mpas_smoke_init.o \
+        module_rwc_emissions.o
 
 module_rwc_emissions.o: \
         mpas_smoke_init.o

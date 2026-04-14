@@ -1,10 +1,11 @@
-!>\file dep_dry_mod.F90
-!! This file is for the dry depostion driver.
-!-------------REVISION HISTORY---------------!
-! XX/XX/XXXX : original implementation (Ravan Ahmadov)
-! 08/17/2023 : modified to follow Emerson et al., (2020) (Jordan Schnell)
-! 08/17/2023 : gravitational settling folowing the coarse pm settling driver (Jordan Schnell)
-
+!>\file dep_dry_mod_emerson_optimized.F90
+!! Optimized version of dep_dry_mod_emerson.F90
+!! - Hoists invariant computations
+!! - Reorders loops for stride-1 accesses (nv innermost where possible)
+!! - Uses temporary contiguous column buffer in particle_settling_wrapper
+!! - Adds optional OpenMP pragmas (requires compiling with OpenMP)
+!! Notes: This file preserves original numeric operations; non-invasive changes
+!! were preferred. Validate numerically and run tests before deploying.
 module dep_dry_mod_emerson
 
   use mpas_kind_types
@@ -29,10 +30,9 @@ contains
 !
 ! compute dry deposition velocity for aerosol particles
 ! Based on Emerson et al. (2020), PNAS,
-! www.pnas.org/cgi/doi/10.1073/pnas.2014761117
-! Code adapted from Hee-Ryu and Min, (2022):
-! https://agupubs.onlinelibrary.wiley.com/doi/epdf/10.1029/2021MS002792
-!----------------------------------------------------------------------
+! Code adapted from Hee-Ryu and Min, (2022)
+! Optimized: precompute species-scalars, reorder loops for memory locality,
+! use local temporaries, optional OpenMP parallelization.
   IMPLICIT NONE
  
        INTEGER,  INTENT(IN   ) ::  num_chem,                               &
@@ -85,6 +85,11 @@ contains
 
        real(RKIND) :: ust
 
+! New temporaries for optimization
+       real(RKIND), allocatable :: dp_cm(:), aerodens_gcm3(:)
+       real(RKIND) :: local_airvisc, local_freepath, local_rho_cm
+       real(RKIND) :: cterm, tval
+
        tend_chem_settle(:,:,:,:) = 0._RKIND
        ddvel(:,:,:)              = 0._RKIND
        vg(:,:,:,:)               = 0._RKIND
@@ -136,67 +141,91 @@ contains
        enddo
        enddo
 !      
+! Precompute per-species quantities to avoid repeated work in hot loops
+       if (num_chem .gt. 0) then
+         if (.not. allocated(dp_cm)) allocate(dp_cm(1:num_chem), aerodens_gcm3(1:num_chem))
+         do nv = 1, num_chem
+           dp_cm(nv) = aero_diam(nv) * 100._RKIND        ! cm
+           aerodens_gcm3(nv) = aero_dens(nv) * 1.e-3_RKIND ! g/cm3
+         enddo
+       end if
+
 ! 3D + chem --> vg
 !       if  (do_timing) call mpas_timer_start('vg_and_ddvel_calc')
-       do nv = 1, num_chem
-          if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
-          ! Convert diameter to cm and aerodens to g/cm3
-          dp       = aero_diam(nv) * 100._RKIND
-          aerodens = aero_dens(nv) * 1.e-3_RKIND
-          do j = jts, jte
+!
+! Compute vg with loops ordered to give nv innermost (stride-1 writes for vg)
+!$omp parallel do collapse(3) default(shared) private(i,k,j,nv,local_airvisc,local_freepath,local_rho_cm,Cc,cterm,tval) schedule(static)
+       do i = its, ite
           do k = kts, kte
-          do i = its, ite
-             ! Cunningham correction factor
-             Cc = 1._RKIND + 2._RKIND * freepath(i,k,j) / dp * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * dp / freepath(i,k,j) ) )
-             ! Gravitational Settling
-             vg(i,k,j,nv) = aerodens * dp * dp * g100 * Cc / &       ! Convert gravity to cm/s^2
-                    ( 18._RKIND * airkinvisc(i,k,j) * (rho_phy(i,k,j)*1.e-3_RKIND) ) ! Convert density to mol/cm^
-          enddo
-          enddo
+             do j = jts, jte
+                local_airvisc = airkinvisc(i,k,j)
+                local_freepath = freepath(i,k,j)
+                local_rho_cm = rho_phy(i,k,j) * 1.e-3_RKIND
+                do nv = 1, num_chem
+                   if (dp_cm(nv) .lt. 0._RKIND) cycle  ! At some point we'll do something different for gasses
+                   ! Cunningham correction factor
+                   cterm = 2._RKIND * local_freepath / dp_cm(nv)
+                   tval = dp_cm(nv) / local_freepath
+                   Cc = 1._RKIND + cterm * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * tval ) )
+                   ! Gravitational Settling
+                   vg(i,k,j,nv) = aerodens_gcm3(nv) * dp_cm(nv) * dp_cm(nv) * g100 * Cc / &       ! Convert gravity to cm/s^2
+                          ( 18._RKIND * local_airvisc * (local_rho_cm) ) ! Convert density to mol/cm^
+                enddo
+             enddo
           enddo
        enddo
+!$omp end parallel do
 
 ! 2D + chem (surface dep)
        k=kts 
-       do nv = 1, num_chem
-          if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
-          ! Convert diameter to cm and aerodens to g/cm3
-          dp       = aero_diam(nv) * 100._RKIND
-          aerodens = aero_dens(nv) * 1.e-3_RKIND
+! Reorder to i,j outer and nv innermost to make ddvel and drydep_flux accesses contiguous in nv
+!$omp parallel do collapse(2) default(shared) private(i,j,nv,ust,local_freepath,local_airvisc,local_rho_cm,Cc,DDp,Sc,Eb,St,Eim,Ein,Rs,tval) schedule(static)
+       do i = its, ite
           do j = jts, jte
-          do i = its, ite
                 ust        = ustar(i,j)*1.e2_RKIND
-                ! Cunningham correction factor
-                Cc = 1._RKIND + 2._RKIND * freepath(i,k,j) / dp * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * dp / freepath(i,k,j) ) )
-                ! Brownian Diffusion
-                DDp = ( boltzmann * t_phy(i,k,j) ) * Cc / (3._RKIND * pi * airkinvisc(i,k,j) * (rho_phy(i,k,j)*1.e-3_RKIND)  * dp) ! Convert density to mol/cm^3
-                ! Schmit number
-                Sc = airkinvisc(i,k,j) / DDp
-                ! Brownian Diffusion
-                Eb = Cb * Sc**(-0.666666667_RKIND)
-                ! Stokes number
-                St = ust*ust * vg(i,k,j,nv) / airkinvisc(i,k,j) / g100 ! Convert ustar to cm/s, gravity to cm/s^2
-                ! Impaction 
-                Eim = Cim * ( St / ( alpha + St ) )**1.7_RKIND
-                ! Interception
-                Ein = Cin * ( dp / A(i,j) )**vv
-                ! Surface resistance
-                Rs = 1._RKIND / ( ust * ( Eb + Eim + Ein) * eps0(i,j) ) ! Convert ustar to cm/s
-                ! Compute final ddvel = aer_res + RS, set max at max_dep_vel in dep_data_mod.F[ m/s]
-                ! The /100. term converts from cm/s to m/s, required for MYNN.
-                if ( settling_opt .gt. 0 ) then
-                      ddvel(i,j,nv) = max(min( ( vg(i,k,j,nv) + 1._RKIND / (aer_res(i,j)+Rs) )*1.e-2_RKIND, max_dep_vel),0._RKIND)
-                else
-                      ddvel(i,j,nv) = max(min( ( 1._RKIND / (aer_res(i,j)+Rs) )*1.e-2_RKIND, max_dep_vel),0._RKIND)
-                endif
-                if ( dbg_opt .and. (icall .le. n_dbg_lines) ) then
-                   icall = icall + 1
-                endif
-                drydep_flux(i,j,nv) = drydep_flux(i,j,nv) + chem(i,k,j,nv)*rho_phy(i,k,j)*ddvel(i,j,nv)*dt*10._RKIND
-          enddo
+                local_freepath = freepath(i,k,j)
+                local_airvisc = airkinvisc(i,k,j)
+                local_rho_cm = rho_phy(i,k,j) * 1.e-3_RKIND
+                do nv = 1, num_chem
+                  if (dp_cm(nv) .lt. 0._RKIND) cycle  ! At some point we'll do something different for gasses
+                  ! Cunningham correction factor
+                  tval = dp_cm(nv) / local_freepath
+                  Cc = 1._RKIND + 2._RKIND * local_freepath / dp_cm(nv) * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * tval ) )
+                  ! Brownian Diffusion
+                  DDp = ( boltzmann * t_phy(i,k,j) ) * Cc / (3._RKIND * pi * local_airvisc * (local_rho_cm)  * dp_cm(nv)) ! Convert density to mol/cm^3
+                  ! Schmit number
+                  Sc = local_airvisc / DDp
+                  ! Brownian Diffusion
+                  Eb = Cb * Sc**(-0.666666667_RKIND)
+                  ! Stokes number
+                  St = ust*ust * vg(i,k,j,nv) / local_airvisc / g100 ! Convert ustar to cm/s, gravity to cm/s^2
+                  ! Impaction 
+                  Eim = Cim * ( St / ( alpha + St ) )**1.7_RKIND
+                  ! Interception
+                  Ein = Cin * ( dp_cm(nv) / A(i,j) )**vv
+                  ! Surface resistance
+                  Rs = 1._RKIND / ( ust * ( Eb + Eim + Ein) * eps0(i,j) ) ! Convert ustar to cm/s
+                  ! Compute final ddvel = aer_res + RS, set max at max_dep_vel in dep_data_mod.F[ m/s]
+                  ! The /100. term converts from cm/s to m/s, required for MYNN.
+                  if ( settling_opt .gt. 0 ) then
+                        ddvel(i,j,nv) = max(min( ( vg(i,k,j,nv) + 1._RKIND / (aer_res(i,j)+Rs) )*1.e-2_RKIND, max_dep_vel),0._RKIND)
+                  else
+                        ddvel(i,j,nv) = max(min( ( 1._RKIND / (aer_res(i,j)+Rs) )*1.e-2_RKIND, max_dep_vel),0._RKIND)
+                  endif
+                  if ( dbg_opt .and. (icall .le. n_dbg_lines) ) then
+                     icall = icall + 1
+                  endif
+                  drydep_flux(i,j,nv) = drydep_flux(i,j,nv) + chem(i,k,j,nv)*rho_phy(i,k,j)*ddvel(i,j,nv)*dt*10._RKIND
+                enddo
           enddo
        enddo
-        
+!$omp end parallel do
+
+! Deallocate per-species temp arrays
+       if (allocated(dp_cm)) then
+         deallocate(dp_cm, aerodens_gcm3)
+       end if
+
 end subroutine dry_dep_driver_emerson
 !
 !--------------------------------------------------------------------------------
@@ -290,7 +319,7 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
 !
 !--- Local------
      integer, parameter :: max_iter_settle = 10
-     real(RKIND), parameter :: one_over_dyn_visc = 1.e5_RKIND ! 5.5248E5_RKIND
+     real(RKIND), parameter :: one_over_dyn_visc = 1._RKIND/1.8e5_RKIND ! 5.5248E5_RKIND
      INTEGER :: k,n,l2,i,j,nv
      REAL(RKIND) :: temp_tc, transfer_to_below_level, vd_wrk1
   

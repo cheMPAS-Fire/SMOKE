@@ -21,6 +21,7 @@ contains
   subroutine mpas_smoke_anthro_emis_driver(dt,gmt,julday,kemit,                      &
                            xlat,xlong, chem,num_chem,dz8w,t_phy,rho_phy,             &    
                            e_ant_in, e_ant_out, num_e_ant_in, num_e_ant_out,         &
+                           anthro_emis_scale_factor,                                 &
                            index_e_ant_in_unspc_ultrafine,                           &
                            index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
                            index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine,     &
@@ -61,6 +62,7 @@ contains
            index_e_ant_out_co
 
    REAL(RKIND), INTENT(IN    ) :: dt,gmt
+   REAL(RKIND), INTENT(IN    ) :: anthro_emis_scale_factor
 
    REAL(RKIND),DIMENSION(ims:ime,jms:jme),INTENT(IN) :: xlat,xlong
    REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme),INTENT(IN) :: dz8w,rho_phy,t_phy
@@ -74,15 +76,15 @@ contains
 
    REAL(RKIND), PARAMETER :: rwc_t_thresh = 283.15 ! [ 50 F]
 
-
+!
    do j = jts,jte
    do k = kts, kemit
    do i = its,ite
 !  
 !     Conversion factor for aerosol emissions (ug/m2/s) --> ug/kg
-      conv_aer = dt / (rho_phy(i,k,j) *  dz8w(i,k,j))
+      conv_aer = anthro_emis_scale_factor * dt / (rho_phy(i,k,j) *  dz8w(i,k,j))
 !     Conversion factor for gas phase emissions (mol/m2/s) --> ppm/ppm
-      conv_gas = 60._RKIND * 1.E6_RKIND * 4.828E-4_RKIND * dt / ( rho_phy(i,k,j) * dz8w(i,k,j) )
+      conv_gas = anthro_emis_scale_factor * 60._RKIND * 1.E6_RKIND * 4.828E-4_RKIND * dt / ( rho_phy(i,k,j) * dz8w(i,k,j) )
 !
       if (p_unspc_ultrafine .gt. 0 .and. index_e_ant_in_unspc_ultrafine .gt. 0 ) then
          emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_unspc_ultrafine)
