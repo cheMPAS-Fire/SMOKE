@@ -78,7 +78,7 @@ CONTAINS
        do k=kts,kfire_max
           if (ebu(i,k,j,index_e_bb_in_smoke_fine)<ebb_min) cycle
 
-           if (ebb_dcycle==1) then
+           if (ebb_dcycle==1 .or. ebb_dcycle==-1) then
             conv= dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
             conv_gas = dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
            elseif (ebb_dcycle==2) then
