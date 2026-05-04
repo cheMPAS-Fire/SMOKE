@@ -483,11 +483,11 @@ contains
     if ( add_fire_heat_flux ) then
      do j = jts,jte
      do i = its,ite
-       if ( coef_bb_dc(i,j)*frp_in(i,j) .ge. 1.E7_RKIND ) then
-          hfx_bb(i,j)           = min(max(0._RKIND,0.88_RKIND * coef_bb_dc(i,j)*frp_in(i,j) / &
+       if ( coef_bb_dc(i,j)*frp_in(i,j) .ge. 10._RKIND ) then
+          hfx_bb(i,j)           = min(max(0._RKIND,0.88_RKIND * 1.e6_RKIND * coef_bb_dc(i,j)*frp_in(i,j) / &
                                   0.55_RKIND / area(i,j)) ,5000._RKIND) ! W m-2 [0 - 10,000]
           frac_grid_burned(i,j) = min(max(0._RKIND, 1.3_RKIND * 0.0006_RKIND * &
-                                  coef_bb_dc(i,j)*frp_in(i,j)/area(i,j) ), &
+                                  coef_bb_dc(i,j)*1.e6_RKIND * frp_in(i,j)/area(i,j) ), &
                                   1._RKIND)
        else
           hfx_bb(i,j)           = 0._RKIND
@@ -500,7 +500,7 @@ contains
     if (add_fire_moist_flux) then
       do j = jts,jte
       do i = its,ite
-        if ( coef_bb_dc(i,j)*frp_in(i,j) .ge. 1.E7_RKIND ) then
+        if ( coef_bb_dc(i,j)*frp_in(i,j) .ge. 10._RKIND ) then
            qfx_bb(i,j)           = 0._RKIND
         else
            qfx_bb(i,j)           = 0._RKIND
@@ -529,9 +529,9 @@ contains
     do j=jts,jte
     do i=its,ite
       if ( fire_type(i,j) .eq. 4 ) then ! only apply scaling factor to wildfires
-         frp_out(i,j) = min(bb_emis_scale_factor*frp_in(i,j)*coef_bb_dc(i,j),frp_max)
+         frp_out(i,j) = 1.e6_RKIND * min(bb_emis_scale_factor*frp_in(i,j)*coef_bb_dc(i,j),frp_max)
       else
-         frp_out(i,j) = min(frp_in(i,j)*coef_bb_dc(i,j),frp_max)
+         frp_out(i,j) = 1.e6_RKIND * min(frp_in(i,j)*coef_bb_dc(i,j),frp_max)
       endif
     enddo
     enddo
@@ -786,13 +786,13 @@ contains
     
 
     if (do_mpas_smoke) then
-    ! UPP/MPASSIT expects FRP in MW
+    ! UPP expects FRP in MW
     do j=jts,jte
     do i=its,ite
        if ( fire_type(i,j) .eq. 4 ) then ! only apply scaling factor to wildfires
-          frp_out(i,j) = 1.e-6_RKIND * min(bb_emis_scale_factor*frp_in(i,j)*coef_bb_dc(i,j),frp_max)
+          frp_out(i,j) =  min(bb_emis_scale_factor*frp_in(i,j)*coef_bb_dc(i,j),frp_max)
        else
-          frp_out(i,j) = 1.e-6_RKIND * min(frp_in(i,j)*coef_bb_dc(i,j),frp_max)
+          frp_out(i,j) =  min(frp_in(i,j)*coef_bb_dc(i,j),frp_max)
        endif
     enddo
     enddo
