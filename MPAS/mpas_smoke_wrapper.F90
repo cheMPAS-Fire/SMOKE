@@ -547,7 +547,7 @@ contains
                               its,ite, jts,jte, kts,kte                )
     endif
 
-    ! Apply the diurnal cycle coefficient to frp_out ()
+    ! Apply the diurnal cycle coefficient to frp_out (), which is provided to plumerise [W]
     do j=jts,jte
     do i=its,ite
       if ( fire_type(i,j) .eq. 4 ) then ! only apply scaling factor to wildfires
