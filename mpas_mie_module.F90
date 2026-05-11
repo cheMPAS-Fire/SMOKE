@@ -15,7 +15,7 @@ CONTAINS
 ! For 2 size bins with 4 tracers
 ! Code has been further modernized/re-engineered by SPAG
 !---------------------------------------------------------------------------------------
-   SUBROUTINE optical_averaging(Id,Curr_secs,Dtstep,Nbin_o,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,      &
+   SUBROUTINE optical_averaging(Id,Curr_secs,Dtstep,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,      &
                               & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,&
                               & Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
  
@@ -23,7 +23,7 @@ CONTAINS
       USE mpas_kind_types
       USE mpas_smoke_init
  
-      INTEGER , INTENT(IN) :: Id , Nbin_o
+      INTEGER , INTENT(IN) :: Id 
       INTEGER , INTENT(IN) :: Num_chem
       INTEGER , INTENT(IN) :: Ids , Ide , Jds , Jde , Kds , Kde
       INTEGER , INTENT(IN) :: Ims , Ime , Jms , Jme , Kms , Kme
@@ -37,13 +37,13 @@ CONTAINS
       REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) , INTENT(INOUT) :: L2aer , L3aer , L4aer , L5aer , L6aer , L7aer
       REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NLWBANDS) , INTENT(INOUT) :: Tauaerlw , Extaerlw
  
-      REAL , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:Nbin_o) :: radius_wet , number_bin , radius_core
-      COMPLEX , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:Nbin_o,1:4) :: swrefindx
-      COMPLEX , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:Nbin_o,1:NLWBANDS) :: lwrefindx
+      REAL , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O) :: radius_wet , number_bin , radius_core
+      COMPLEX , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:4) :: swrefindx
+      COMPLEX , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:NLWBANDS) :: lwrefindx
  
-      REAL , DIMENSION(1:Nbin_o,Kts:Kte) :: radius_wet_col , number_bin_col
-      COMPLEX , DIMENSION(1:Nbin_o,Kts:Kte,1:4) :: swrefindx_col
-      COMPLEX , DIMENSION(1:Nbin_o,Kts:Kte,1:NLWBANDS) :: lwrefindx_col
+      REAL , DIMENSION(1:NBIN_O,Kts:Kte) :: radius_wet_col , number_bin_col
+      COMPLEX , DIMENSION(1:NBIN_O,Kts:Kte,1:4) :: swrefindx_col
+      COMPLEX , DIMENSION(1:NBIN_O,Kts:Kte,1:NLWBANDS) :: lwrefindx_col
       REAL , DIMENSION(Kts:Kte) :: dz
  
       REAL , DIMENSION(4,Kts:Kte) :: swsizeaer , swextaer , swwaer , swgaer , swtauaer , swbscoef
@@ -57,7 +57,7 @@ CONTAINS
       jj = Jts
       kk = Kts
  
-      CALL optical_prep_simple(Nbin_o,Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
+      CALL optical_prep_simple(NBIN_O,Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
                              & Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
  
       DO j = Jts , Jte
@@ -68,7 +68,7 @@ CONTAINS
             ENDDO
  
             DO k = Kts , Kte
-               DO isize = 1 , Nbin_o
+               DO isize = 1 , NBIN_O
                   number_bin_col(isize,k) = number_bin(i,k,j,isize)
                   radius_wet_col(isize,k) = radius_wet(i,k,j,isize)
                   swrefindx_col(isize,k,:) = swrefindx(i,k,j,isize,:)
@@ -76,7 +76,7 @@ CONTAINS
                ENDDO
             ENDDO
  
-            CALL mieaer(Id,i,j,Nbin_o,number_bin_col,radius_wet_col,swrefindx_col,lwrefindx_col,dz,Curr_secs,Kts,Kte,swsizeaer,    &
+            CALL mieaer(Id,i,j,NBIN_O,number_bin_col,radius_wet_col,swrefindx_col,lwrefindx_col,dz,Curr_secs,Kts,Kte,swsizeaer,    &
                       & swextaer,swwaer,swgaer,swtauaer,lwextaer,lwtauaer,l2,l3,l4,l5,l6,l7,swbscoef)
  
  
@@ -105,7 +105,7 @@ CONTAINS
       ENDDO
    END SUBROUTINE optical_averaging
  
-   SUBROUTINE optical_prep_simple(Nbin_o,Chem,Num_chem,Rho_phy,Relhum,Radius_core,Radius_wet,Number_bin,Swrefindx,Lwrefindx,Ids,   &
+   SUBROUTINE optical_prep_simple(NBIN_O,Chem,Num_chem,Rho_phy,Relhum,Radius_core,Radius_wet,Number_bin,Swrefindx,Lwrefindx,Ids,   &
                                 & Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
 !---------------------------------------------------------------------------------------
 ! Original Source Code for cheMPAS-Fire has been written by Minsu Choi CIRES/NOAA GSL
@@ -119,7 +119,7 @@ CONTAINS
       REAL , PARAMETER :: PI = 3.14159265358979324 , TINY = 1.0E-30 , KAPPA_SMOKE = 0.14 , KAPPA_DUST = 0.1, &
                           KAPPA_NH4SO4 = 0.5, KAPPA_NO3 = 0.5
 
-      INTEGER , INTENT(IN) :: Nbin_o
+      INTEGER , INTENT(IN) :: NBIN_O
       INTEGER , INTENT(IN) :: Num_chem
       INTEGER , INTENT(IN) :: Ims
       INTEGER , INTENT(IN) :: Ime
@@ -136,11 +136,11 @@ CONTAINS
       REAL , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,Num_chem) :: Chem
       REAL , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Rho_phy
       REAL , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Relhum
-      REAL , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:Nbin_o) :: Radius_core
-      REAL , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:Nbin_o) :: Radius_wet
-      REAL , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:Nbin_o) :: Number_bin
-      COMPLEX , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:Nbin_o,1:NSWBANDS) :: Swrefindx
-      COMPLEX , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:Nbin_o,1:NLWBANDS) :: Lwrefindx
+      REAL , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O) :: Radius_core
+      REAL , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O) :: Radius_wet
+      REAL , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O) :: Number_bin
+      COMPLEX , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:NSWBANDS) :: Swrefindx
+      COMPLEX , INTENT(OUT) , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:NLWBANDS) :: Lwrefindx
       INTEGER , INTENT(IN) :: Ids
       INTEGER , INTENT(IN) :: Ide
       INTEGER , INTENT(IN) :: Jds
@@ -160,7 +160,7 @@ CONTAINS
       COMPLEX :: ri_ave_a , ri_dum
       COMPLEX , DIMENSION(1:NSWBANDS) :: swref_index_dust , swref_index_h2o , swref_index_smoke, swref_index_unspc, &
                                          swref_index_no3, swref_index_nh4so4
-      REAL , DIMENSION(1:Nbin_o) :: xdia_cm , xdia_um , xmas_sectc , xmas_secti , xmas_sectj , xnum_sectc , xnum_secti , xnum_sectj
+      REAL , DIMENSION(1:NBIN_O) :: xdia_cm , xdia_um , xmas_sectc , xmas_secti , xmas_sectj , xnum_sectc , xnum_secti , xnum_sectj
 !
 ! End of declarations rewritten by SPAG
 !
@@ -189,12 +189,12 @@ CONTAINS
  
       dlo_tmp = dlo_um
  
-      DO isize = 1 , Nbin_o
+      DO isize = 1 , NBIN_O
          xdia_um(isize) = (dlo_tmp+dlo_tmp*2.0)/2.0
          dlo_tmp = dlo_tmp*2.0
       ENDDO
  
-      DO isize = 1 , Nbin_o
+      DO isize = 1 , NBIN_O
          xdia_cm(isize) = xdia_um(isize)*1.0E-4
       ENDDO
  
@@ -318,7 +318,7 @@ CONTAINS
                   ss2 = exp(ss1*ss1*36.0/8.0)
                   ss3 = (sixpi*vol_aj/(num_aj*ss2))**0.3333333
                   dgnum_um = max(dgmin_cm,ss3)*1.0E+04
-                  CALL sect02(dgnum_um,sginia,dens_smoke,iflag,duma,Nbin_o,dlo_um,dhi_um,xnum_sectj,xmas_sectj)
+                  CALL sect02(dgnum_um,sginia,dens_smoke,iflag,duma,NBIN_O,dlo_um,dhi_um,xnum_sectj,xmas_sectj)
                ELSE
                   xnum_sectj = 0.0
                   xmas_sectj = 0.0
@@ -329,13 +329,13 @@ CONTAINS
                   ss2 = exp(ss1*ss1*36.0/8.0)
                   ss3 = (sixpi*vol_ac/(num_ac*ss2))**0.3333333
                   dgnum_um = max(dgmin_cm,ss3)*1.0E+04
-                  CALL sect02(dgnum_um,sginic,dens_dust,iflag,duma,Nbin_o,dlo_um,dhi_um,xnum_sectc,xmas_sectc)
+                  CALL sect02(dgnum_um,sginic,dens_dust,iflag,duma,NBIN_O,dlo_um,dhi_um,xnum_sectc,xmas_sectc)
                ELSE
                   xnum_sectc = 0.0
                   xmas_sectc = 0.0
                ENDIF
  
-               DO isize = 1 , Nbin_o
+               DO isize = 1 , NBIN_O
  
                   mass_smoke = mass_smoke_f*xmas_sectj(isize) + mass_smoke_c*xmas_sectc(isize)
                   mass_dust = mass_dust_f*xmas_sectj(isize) + mass_dust_c*xmas_sectc(isize)

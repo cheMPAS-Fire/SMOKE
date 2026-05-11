@@ -50,6 +50,12 @@ MODULE module_data_rrtmgaeropt
    INTEGER , PARAMETER :: ID_NO3 = 5
    INTEGER , PARAMETER :: ID_UNSPC = 6
 
+   ! Option for Mie optics calculation
+   ! Should go to registry.chemistry.xml (nml) for future development
+   INTEGER , PARAMETER :: ID_MIE_SIMPLE = 1 
+   INTEGER , PARAMETER :: ID_MIE_CS = 2 !Core-Shell
+   INTEGER , PARAMETER :: ID_MIE = ID_MIE_SIMPLE 
+   INTEGER , PARAMETER :: NBIN_O = 2
  
    REAL , DIMENSION(NSWBANDS) , SAVE :: refrwsw , refiwsw
    REAL , DIMENSION(NLWBANDS) , SAVE :: refrwlw , refiwlw

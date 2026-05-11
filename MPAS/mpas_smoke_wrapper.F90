@@ -26,6 +26,7 @@ module mpas_smoke_wrapper
    use module_tactic_sna
    use ssalt_mod
    use module_smoke_diagnostics
+   use module_data_rrtmgaeropt, only : ID_MIE, NBIN_O
 
    implicit none
 
@@ -367,9 +368,6 @@ contains
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:4), intent(inout) :: ssaaer_sw_p
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:4), intent(inout) :: asyaer_sw_p
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:16), intent(inout) :: tauaer_lw_p
-    integer :: id_mie
-    integer :: nbin_o, i0,k0,j0,n0
-    real(RKIND) :: dtstep
     real(RKIND), allocatable :: &
          tauaersw(:,:,:,:), extaersw(:,:,:,:), gaersw(:,:,:,:), &
          waersw(:,:,:,:), bscoefsw(:,:,:,:)
@@ -547,7 +545,7 @@ contains
                               its,ite, jts,jte, kts,kte                )
     endif
 
-    ! Apply the diurnal cycle coefficient to frp_out (), which is provided to plumerise [W]
+    ! Apply the diurnal cycle coefficient to frp_out ()
     do j=jts,jte
     do i=its,ite
       if ( fire_type(i,j) .eq. 4 ) then ! only apply scaling factor to wildfires
@@ -805,10 +803,10 @@ contains
     if  (do_timing) call mpas_timer_stop('wetdep_ls')
     endif
 
-    id_mie = 1  ! For now this is hardcoded as 1 sice we don't have fast_Mie and Core-Shell
-    nbin_o = 2  ! Two size bin for now
-    dtstep = dt
-  
+    allocate(tauaersw(ims:ime,kms:kme,jms:jme,1:4))
+    allocate(gaersw  (ims:ime,kms:kme,jms:jme,1:4))
+    allocate(waersw  (ims:ime,kms:kme,jms:jme,1:4))
+    allocate(tauaerlw(ims:ime,kms:kme,jms:jme,1:16))
     allocate(extaersw(ims:ime,kms:kme,jms:jme,1:4))
     allocate(bscoefsw(ims:ime,kms:kme,jms:jme,1:4))
 
@@ -838,7 +836,7 @@ contains
     extaerlw = 0.0_RKIND
 
     call mpas_log_write( ' Calculating aerosol optical properties ')
-    call mpas_aod_diag( id_mie, curr_secs, dtstep, nbin_o,         &
+    call mpas_aod_diag( ID_MIE, curr_secs, dt, NBIN_O,         &
                     chem, aod3d, aod3d_simple, rho_phy, relhum, dz8w, num_chem,  &
                     tauaer_sw_p, extaersw, asyaer_sw_p, ssaaer_sw_p, bscoefsw, &
                     l2aer, l3aer, l4aer, l5aer, l6aer, l7aer,      &
@@ -847,6 +845,21 @@ contains
                     ims,ime, jms,jme, kms,kme,                     &
                     its,ite, jts,jte, kts,kte )
     call mpas_log_write( ' Calculating VIS ')
+
+    deallocate(tauaersw)
+    deallocate(extaersw)
+    deallocate(gaersw)
+    deallocate(waersw)
+    deallocate(bscoefsw)
+    deallocate(l2aer)
+    deallocate(l3aer)
+    deallocate(l4aer)
+    deallocate(l5aer)
+    deallocate(l6aer)
+    deallocate(l7aer)
+    deallocate(tauaerlw)
+    deallocate(extaerlw)
+
     call mpas_visibility_diag(    qc_vis,qr_vis,qi_vis,qs_vis,qg_vis,    &
                                   blcldw_vis,blcldi_vis,                 &
                                   rho_phy,wind10m,wind_phy,              &
@@ -1080,57 +1093,5 @@ contains
 
   end subroutine mpas_smoke_prep
 
-
-  subroutine build_two_bin_inputs( rho_air, q_smoke_fine, q_smoke_coarse, &
-                                 q_dust_fine, q_dust_coarse, n_fine_cm3, &
-                                 n_coarse_cm3, r_fine_cm, r_coarse_cm )
-  implicit none
-
-  real(RKIND), intent(in)  :: rho_air
-  real(RKIND), intent(in)  :: q_smoke_fine, q_smoke_coarse
-  real(RKIND), intent(in)  :: q_dust_fine,  q_dust_coarse
-  real(RKIND), intent(out) :: n_fine_cm3, n_coarse_cm3
-  real(RKIND), intent(out) :: r_fine_cm,  r_coarse_cm
-
-  real(RKIND) :: q_fine, q_coarse
-
-  real(RKIND), parameter :: rho_eff_fine   = 1600.0_RKIND
-  real(RKIND), parameter :: rho_eff_coarse = 2200.0_RKIND
-  real(RKIND), parameter :: dg_fine_m      = 0.2e-6_RKIND
-  real(RKIND), parameter :: dg_coarse_m    = 2.0e-6_RKIND
-  real(RKIND), parameter :: sigma_fine     = 2.0_RKIND
-  real(RKIND), parameter :: sigma_coarse   = 2.2_RKIND
-
-  q_fine   = max(0.0_RKIND, q_smoke_fine   + q_dust_fine)
-  q_coarse = max(0.0_RKIND, q_smoke_coarse + q_dust_coarse)
-
-  n_fine_cm3   = num_cm3_from_q(q_fine,   rho_air, rho_eff_fine,   dg_fine_m,   sigma_fine)
-  n_coarse_cm3 = num_cm3_from_q(q_coarse, rho_air, rho_eff_coarse, dg_coarse_m, sigma_coarse)
-
-  r_fine_cm   = 0.5_RKIND * dg_fine_m   * 100.0_RKIND
-  r_coarse_cm = 0.5_RKIND * dg_coarse_m * 100.0_RKIND
-
-  contains
-
-  pure real(RKIND) function num_cm3_from_q(q_kgkg, rho_air_in, rho_p, dg_m, sigma_g) result(n_cm3)
-  implicit none
-  real(RKIND), intent(in) :: q_kgkg, rho_air_in, rho_p, dg_m, sigma_g
-  real(RKIND), parameter  :: pi = 3.14159265358979324_RKIND
-  real(RKIND) :: m_kgm3, lnsg, vbar_m3, mp_kg, n_m3
-
-  m_kgm3 = max(0.0_RKIND, q_kgkg) * max(0.0_RKIND, rho_air_in)
-  lnsg    = log(max(1.01_RKIND, sigma_g))
-  vbar_m3 = (pi/6.0_RKIND) * (max(1.0e-9_RKIND, dg_m)**3) * exp(4.5_RKIND * lnsg*lnsg)
-  mp_kg = max(1.0e-30_RKIND, rho_p) * vbar_m3
-  if (mp_kg <= 1.0e-30_RKIND) then
-    n_cm3 = 0.0_RKIND
-  else
-    n_m3  = m_kgm3 / mp_kg
-    n_cm3 = n_m3 * 1.0e-6_RKIND
-  end if
-  end function num_cm3_from_q
-
-  end subroutine build_two_bin_inputs
- 
 !> @}
   end module mpas_smoke_wrapper

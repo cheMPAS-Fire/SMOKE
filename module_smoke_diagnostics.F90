@@ -17,7 +17,7 @@ MODULE module_smoke_diagnostics
 
 CONTAINS
 
-   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Dtstep,Nbin_o,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
+   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Dtstep,NBIN_O,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
                           & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,&
                           & Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
 
@@ -69,7 +69,7 @@ CONTAINS
       REAL(rkind) :: alpha , ext , tau400 , tau550 , tau600, y_factor
       INTEGER :: i , j , k , nv
 
-      CALL optical_averaging(Id,Curr_secs,Dtstep,Nbin_o,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
+      CALL optical_averaging(Id,Curr_secs,Dtstep,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
                            & L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,&
                            & Its,Ite,Jts,Jte,Kts,Kte)
 
