@@ -26,7 +26,7 @@ module mpas_smoke_wrapper
    use module_tactic_sna
    use ssalt_mod
    use module_smoke_diagnostics
-   use module_data_rrtmgaeropt, only : ID_MIE, NBIN_O
+   use module_data_rrtmgaeropt
 
    implicit none
 
@@ -144,7 +144,8 @@ contains
 ! intent arguments:
 ! array indexes
     TYPE(mpas_pool_type), INTENT(IN) :: configs
-    logical, pointer :: config_mie_aod_opt
+    integer, intent(in) :: config_mie_aod_opt
+!    integer, pointer :: config_mie_aod_opt
     integer,intent(in):: ids,ide,jds,jde,kds,kde,        &
                          ims,ime,jms,jme,kms,kme,        &
                          its,ite,jts,jte,kts,kte
@@ -834,17 +835,17 @@ contains
     l6aer    = 0.0_RKIND
     l7aer    = 0.0_RKIND
     extaerlw = 0.0_RKIND
+    
 
-    call mpas_log_write( ' Calculating aerosol optical properties ')
-    call mpas_aod_diag( ID_MIE, curr_secs, dt, NBIN_O,         &
-                    chem, aod3d, aod3d_simple, rho_phy, relhum, dz8w, num_chem,  &
-                    tauaer_sw_p, extaersw, asyaer_sw_p, ssaaer_sw_p, bscoefsw, &
-                    l2aer, l3aer, l4aer, l5aer, l6aer, l7aer,      &
-                    tauaer_lw_p, extaerlw,                         &
-                    ids,ide, jds,jde, kds,kde,                     &
-                    ims,ime, jms,jme, kms,kme,                     &
-                    its,ite, jts,jte, kts,kte )
-    call mpas_log_write( ' Calculating VIS ')
+    call mpas_log_write( ' Calling Aerosol Optical Properties Calculation')
+    call mpas_aod_diag( config_mie_aod_opt, curr_secs, dt,  &
+                  chem, aod3d, aod3d_simple, rho_phy, relhum, dz8w, num_chem,  &
+                  tauaer_sw_p, extaersw, asyaer_sw_p, ssaaer_sw_p, bscoefsw, &
+                  l2aer, l3aer, l4aer, l5aer, l6aer, l7aer,      &
+                  tauaer_lw_p, extaerlw,                         &
+                  ids,ide, jds,jde, kds,kde,                     &
+                  ims,ime, jms,jme, kms,kme,                     &
+                  its,ite, jts,jte, kts,kte )
 
     deallocate(tauaersw)
     deallocate(extaersw)
@@ -860,6 +861,8 @@ contains
     deallocate(tauaerlw)
     deallocate(extaerlw)
 
+
+    call mpas_log_write( ' Calculating VIS ')
     call mpas_visibility_diag(    qc_vis,qr_vis,qi_vis,qs_vis,qg_vis,    &
                                   blcldw_vis,blcldi_vis,                 &
                                   rho_phy,wind10m,wind_phy,              &
