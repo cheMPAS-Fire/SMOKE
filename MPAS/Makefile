@@ -71,10 +71,12 @@ dust_data_mod.o: \
 
 module_peg_util.o: \
         module_peg_util.o
+
 module_smoke_diagnostics.o: \
 	mpas_smoke_config.o \
 	mpas_smoke_init.o \
 	rad_data_mod.o \
+	module_peg_util.o \
 	module_data_rrtmgaeropt.o \
 	mpas_mie_module.o
 

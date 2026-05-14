@@ -1,3 +1,4 @@
+
 MODULE module_smoke_diagnostics
 !
 !  Jordan Schnell (NOAA GSL)
@@ -9,6 +10,7 @@ MODULE module_smoke_diagnostics
    USE rad_data_mod
    USE mpas_mie_module , only:optical_averaging
    USE module_data_rrtmgaeropt
+   USE module_peg_util, only : peg_error_fatal
    IMPLICIT NONE
 
    PRIVATE
@@ -17,7 +19,7 @@ MODULE module_smoke_diagnostics
 
 CONTAINS
 
-   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Dtstep,NBIN_O,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
+   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Dtstep,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
                           & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,&
                           & Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
 
@@ -31,7 +33,6 @@ CONTAINS
       INTEGER , INTENT(IN) :: Id
       REAL(rkind) , INTENT(IN) :: Curr_secs
       REAL(rkind) , INTENT(IN) :: Dtstep
-      INTEGER , INTENT(IN) :: Nbin_o
       REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:Num_chem) :: Chem
       REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d_Simple
       REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d
@@ -69,51 +70,64 @@ CONTAINS
       REAL(rkind) :: alpha , ext , tau400 , tau550 , tau600, y_factor
       INTEGER :: i , j , k , nv
 
-      CALL optical_averaging(Id,Curr_secs,Dtstep,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
-                           & L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,&
-                           & Its,Ite,Jts,Jte,Kts,Kte)
-
 ! New AOD implemented here, Minsu Choi CIRES/NOAA GSL
-      Aod3d(:,:,:) = 0._RKIND
+      Aod3d(:,:,:)        = 0._RKIND
       Aod3d_Simple(:,:,:) = 0._RKIND
+      
+      ! ---------------------------------------------------------
+      ! Method 1: simple AOD diagnostic
+      ! This does not require Mie calculation.
+      ! ---------------------------------------------------------
       DO nv = 1 , Num_chem
          IF ( nv==p_ch4 ) CYCLE
          ext = sc_eff(nv) + ab_eff(nv)
          DO j = Jts , Jte
-            DO k = Kts , Kte
-               DO i = Its , Ite
-                 ! ---------------------------------------------------------
-                 ! Method 1: Aod3d_Simple (Accumulated per species)
-                 ! Implements RH method, still reference missing  
-                 ! Unit here is very confusing, need to confirm during PR
-                 ! ---------------------------------------------------------
-                 IF ( Relhum(i,k,j) > 0.3_RKIND ) THEN
-                    y_factor = ((1.0_RKIND - 0.3_RKIND) / &
-                               (1.0_RKIND - MIN(0.99_RKIND, Relhum(i,k,j))))**0.18_RKIND
-                 ELSE
-                    y_factor = 1.0_RKIND
-                 ENDIF
-                 Aod3d_Simple(i,k,j) = Aod3d_Simple(i,k,j) + &
-                                       1.e-6_RKIND * (ext * y_factor) * &
-                                       chem(i,k,j,nv) * rho_phy(i,k,j) * dz8w(i,k,j)
-                 ! ---------------------------------------------------------
-                 ! Method 2: Aod3d (Mie Calculation)
-                 ! Implements Angstrom Exponent interpolation (400nm -> 550nm)
-                 ! ---------------------------------------------------------
-                 tau400 = Tauaersw(i,k,j,2)
-                 tau600 = Tauaersw(i,k,j,3)
-                 IF ( tau400 > 1.E-23_RKIND .AND. tau600 > 1.E-23_RKIND ) THEN
-                    alpha = LOG(tau400 / tau600) / LOG(600.0_RKIND / 400.0_RKIND)
-                    tau550 = tau400 * (400.0_RKIND / 550.0_RKIND)**alpha
-                 ELSE
-                    tau550 = 0.0_RKIND
-                 ENDIF
-                 Aod3d(i,k,j) = MAX(tau550, 0.0_RKIND)
-               ENDDO
-            ENDDO
+           DO k = Kts , Kte
+             DO i = Its , Ite
+               IF ( Relhum(i,k,j) > 0.3_RKIND ) THEN
+                  y_factor = ((1.0_RKIND - 0.3_RKIND) / &
+                             (1.0_RKIND - MIN(0.99_RKIND, Relhum(i,k,j))))**0.18_RKIND
+               ELSE
+                  y_factor = 1.0_RKIND
+               ENDIF
+               Aod3d_Simple(i,k,j) = Aod3d_Simple(i,k,j) + &
+                    1.e-6_RKIND * (ext * y_factor) * &
+                    Chem(i,k,j,nv) * Rho_phy(i,k,j) * Dz8w(i,k,j)
+             ENDDO
+           ENDDO
          ENDDO
       ENDDO
+      ! ---------------------------------------------------------
+      ! Method 2: Mie optical properties and Mie-derived AOD
+      ! This is controlled by config_mie_aod_opt passed as Id.
+      ! ---------------------------------------------------------
+      select case (Id)
+      case (ID_MIE_OFF)
 
+      case (ID_MIE_SIMPLE)
+        CALL optical_averaging(Id,Curr_secs,Dtstep,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
+                           & L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,&
+                           & Its,Ite,Jts,Jte,Kts,Kte)
+        DO j = Jts , Jte
+          DO k = Kts , Kte
+            DO i = Its , Ite
+              tau400 = Tauaersw(i,k,j,2)
+              tau600 = Tauaersw(i,k,j,3)
+              IF ( tau400 > 1.E-23_RKIND .AND. tau600 > 1.E-23_RKIND ) THEN
+                alpha = LOG(tau400 / tau600) / LOG(600.0_RKIND / 400.0_RKIND)
+                tau550 = tau400 * (400.0_RKIND / 550.0_RKIND)**alpha
+              ELSE
+                tau550 = 0.0_RKIND
+              ENDIF
+              Aod3d(i,k,j) = MAX(tau550, 0.0_RKIND)
+            ENDDO
+          ENDDO
+        ENDDO
+      case (ID_MIE_CS)
+        CALL peg_error_fatal(6,'config_mie_aod_opt=2 core-shell Mie is not implemented yet')
+      case default
+        CALL peg_error_fatal(6,'Invalid config_mie_aod_opt value in mpas_aod_diag')
+      end select
 
    END SUBROUTINE mpas_aod_diag
 

@@ -23,7 +23,7 @@ CONTAINS
       USE mpas_kind_types
       USE mpas_smoke_init
  
-      INTEGER , INTENT(IN) :: Id 
+      INTEGER , INTENT(IN) :: Id
       INTEGER , INTENT(IN) :: Num_chem
       INTEGER , INTENT(IN) :: Ids , Ide , Jds , Jde , Kds , Kde
       INTEGER , INTENT(IN) :: Ims , Ime , Jms , Jme , Kms , Kme
@@ -57,7 +57,7 @@ CONTAINS
       jj = Jts
       kk = Kts
  
-      CALL optical_prep_simple(NBIN_O,Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
+      CALL optical_prep_simple(Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
                              & Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
  
       DO j = Jts , Jte
@@ -105,7 +105,7 @@ CONTAINS
       ENDDO
    END SUBROUTINE optical_averaging
  
-   SUBROUTINE optical_prep_simple(NBIN_O,Chem,Num_chem,Rho_phy,Relhum,Radius_core,Radius_wet,Number_bin,Swrefindx,Lwrefindx,Ids,   &
+   SUBROUTINE optical_prep_simple(Chem,Num_chem,Rho_phy,Relhum,Radius_core,Radius_wet,Number_bin,Swrefindx,Lwrefindx,Ids,   &
                                 & Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
 !---------------------------------------------------------------------------------------
 ! Original Source Code for cheMPAS-Fire has been written by Minsu Choi CIRES/NOAA GSL
@@ -119,7 +119,6 @@ CONTAINS
       REAL , PARAMETER :: PI = 3.14159265358979324 , TINY = 1.0E-30 , KAPPA_SMOKE = 0.14 , KAPPA_DUST = 0.1, &
                           KAPPA_NH4SO4 = 0.5, KAPPA_NO3 = 0.5
 
-      INTEGER , INTENT(IN) :: NBIN_O
       INTEGER , INTENT(IN) :: Num_chem
       INTEGER , INTENT(IN) :: Ims
       INTEGER , INTENT(IN) :: Ime
