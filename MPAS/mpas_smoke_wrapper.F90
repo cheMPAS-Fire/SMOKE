@@ -145,7 +145,6 @@ contains
 ! array indexes
     TYPE(mpas_pool_type), INTENT(IN) :: configs
     integer, intent(in) :: config_mie_aod_opt
-!    integer, pointer :: config_mie_aod_opt
     integer,intent(in):: ids,ide,jds,jde,kds,kde,        &
                          ims,ime,jms,jme,kms,kme,        &
                          its,ite,jts,jte,kts,kte

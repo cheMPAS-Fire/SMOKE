@@ -1,3 +1,4 @@
+
 MODULE module_smoke_diagnostics
 !
 !  Jordan Schnell (NOAA GSL)
