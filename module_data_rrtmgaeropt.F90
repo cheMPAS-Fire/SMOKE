@@ -52,9 +52,10 @@ MODULE module_data_rrtmgaeropt
 
    ! Option for Mie optics calculation
    ! Should go to registry.chemistry.xml (nml) for future development
+   ! This is controlled by nml, config_mie_aod_opt
+   INTEGER , PARAMETER :: ID_MIE_OFF = 0 
    INTEGER , PARAMETER :: ID_MIE_SIMPLE = 1 
    INTEGER , PARAMETER :: ID_MIE_CS = 2 !Core-Shell
-   INTEGER , PARAMETER :: ID_MIE = ID_MIE_SIMPLE 
    INTEGER , PARAMETER :: NBIN_O = 2
  
    REAL , DIMENSION(NSWBANDS) , SAVE :: refrwsw , refiwsw
