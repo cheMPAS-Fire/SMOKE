@@ -270,7 +270,8 @@ contains
 ! 3D + chem output arrays
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem)                :: chem
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem),optional       :: tend_chem_settle
-    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme)                   :: aod3d_smoke, aod3d, aod3d_simple
+    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional                   :: aod3d_smoke
+    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme)                            :: aod3d, aod3d_simple
 !>-- Namelist options
      logical,intent(in)               :: do_mpas_smoke
      logical,intent(in)               :: do_mpas_dust
