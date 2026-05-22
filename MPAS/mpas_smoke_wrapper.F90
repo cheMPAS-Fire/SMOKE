@@ -177,15 +177,15 @@ contains
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: raincv, rainncv, mavail                    
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme)         :: rmol, ust
 ! 2D Fire Input
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
                                                                           efs_smold, efs_flam, efs_rsmold
     integer,intent(in), dimension(ims:ime,jms:jme),optional            :: eco_id
     real(RKIND),intent(in),dimension(ims:ime, jms:jme),optional        :: frp_in, fre_in      ! Fire input
 ! 2D + Time Fire Input
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme, nblocks),        &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme, nblocks),        &
                                                    optional      :: hwp_avg, fre_avg, frp_avg
 ! Residential Wood burning
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme),optional    :: RWC_denominator, &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: RWC_denominator, &
                                                                        RWC_annual_sum,                        &
                                                                        RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
                                                                        RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
