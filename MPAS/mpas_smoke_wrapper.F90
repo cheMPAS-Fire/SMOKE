@@ -27,6 +27,7 @@ module mpas_smoke_wrapper
    use ssalt_mod
    use module_smoke_diagnostics
    use module_data_rrtmgaeropt
+   use module_simple_soa, only : simple_soa, simple_soa_voc
 
    implicit none
 
@@ -42,6 +43,7 @@ contains
            kanthro    , kbio, kfire, kvol,                                                   &
            config_ultrafine, config_coarse,                                                  &
            index_smoke_ultrafine , index_smoke_fine            , index_smoke_coarse,         &
+           index_soa, index_bbsoa, index_antsoa, index_bbvoc, index_antvoc,  config_soa_scheme, &
            index_dust_ultrafine  , index_dust_fine             , index_dust_coarse,          &
            index_ssalt_fine      , index_ssalt_coarse          ,                             &
            index_polp_tree       , index_polp_grass            , index_polp_weed,            &
@@ -95,7 +97,7 @@ contains
            ddvel                 , wetdep_resolved       , tend_chem_settle      ,           &
            do_mpas_smoke         , do_mpas_dust          , do_mpas_pollen        ,           &
            do_mpas_anthro        , do_mpas_ssalt         , do_mpas_volc          ,           &
-           do_mpas_sna           , do_mpas_methane       , do_mpas_hab           ,           &
+           do_mpas_sna           , do_mpas_soa           , do_mpas_methane       , do_mpas_hab           ,           &
            do_mpas_rwc           , do_mpas_anthro_pt     ,                                   &
            calc_bb_emis_online   , bb_beta               ,                                   &
            hwp_method            , hwp_alpha             , wetdep_ls_opt        ,            &
@@ -145,6 +147,7 @@ contains
 ! array indexes
     TYPE(mpas_pool_type), INTENT(IN) :: configs
     integer, intent(in) :: config_mie_aod_opt
+    integer, intent(in) :: config_soa_scheme
     integer,intent(in):: ids,ide,jds,jde,kds,kde,        &
                          ims,ime,jms,jme,kms,kme,        &
                          its,ite,jts,jte,kts,kte
@@ -177,15 +180,15 @@ contains
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: raincv, rainncv, mavail                    
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme)         :: rmol, ust
 ! 2D Fire Input
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
+    real(RKIND),intent(in), dimension(ims:ims, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
                                                                           efs_smold, efs_flam, efs_rsmold
     integer,intent(in), dimension(ims:ime,jms:jme),optional            :: eco_id
     real(RKIND),intent(in),dimension(ims:ime, jms:jme),optional        :: frp_in, fre_in      ! Fire input
 ! 2D + Time Fire Input
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme, nblocks),        &
+    real(RKIND),intent(in), dimension(ims:ims, jms:jme, nblocks),        &
                                                    optional      :: hwp_avg, fre_avg, frp_avg
 ! Residential Wood burning
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: RWC_denominator, &
+    real(RKIND),intent(in), dimension(ims:ims, jms:jme),optional    :: RWC_denominator, &
                                                                        RWC_annual_sum,                        &
                                                                        RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
                                                                        RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
@@ -209,8 +212,9 @@ contains
     real(RKIND),intent(in), dimension(ims:ime,1:nlcat, jms:jme)  ,optional             :: landusef
 ! Chemistry indexes into MPAS scalar array
     integer, intent(in),optional :: &
-                           index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse,                    &
-                           index_dust_ultrafine, index_dust_fine,  index_dust_coarse,                     &
+                           index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse,&
+                           index_soa, index_bbsoa, index_antsoa, index_bbvoc, index_antvoc, &
+                           index_dust_ultrafine, index_dust_fine,  index_dust_coarse,               &
                            index_polp_tree,  index_polp_grass,   index_polp_weed,   &
                            index_pols_tree,  index_pols_grass,   index_pols_weed,   &
                            index_pols_all,   index_polp_all,                        &
@@ -280,6 +284,7 @@ contains
      logical,intent(in)               :: do_mpas_ssalt
      logical,intent(in)               :: do_mpas_volc
      logical,intent(in)               :: do_mpas_sna
+     logical,intent(in)               :: do_mpas_soa
      logical,intent(in)               :: do_mpas_methane
      logical,intent(in)               :: do_mpas_hab
      logical,intent(in)               :: do_mpas_rwc
@@ -388,6 +393,7 @@ contains
     if ( (.not. do_mpas_smoke) .and. (.not. do_mpas_pollen) .and. &
          (.not. do_mpas_dust ) .and. (.not. do_mpas_anthro) .and. &
          (.not. do_mpas_ssalt) .and. (.not. do_mpas_sna)    .and. &
+         (.not. do_mpas_soa  ) .and. &
          (.not. do_mpas_methane) .and. (.not. do_mpas_hab)  .and. &
          (.not. do_mpas_rwc) )  return
 ! 
@@ -395,6 +401,7 @@ contains
 !   Reorder chemistry indices
       call set_scalar_indices(chemistry_start,                                     &
                     index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse,   &
+                    index_soa, index_bbsoa, index_antsoa, index_bbvoc,index_antvoc,&
                     index_dust_ultrafine, index_dust_fine, index_dust_coarse,      &
                     index_polp_tree, index_polp_grass, index_polp_weed,            &
                     index_pols_tree, index_pols_grass, index_pols_weed,            &
@@ -895,6 +902,37 @@ contains
     enddo
     enddo
     enddo
+    endif
+
+    ! Simple SOA scheme, 1 = total SOA only, 2 = BB-SOA, Anthropogenic-SOA
+    !Minsu Choi CIRES/NOAA GSL
+    if (config_soa_scheme > 0) then
+       if (do_timing) call mpas_timer_start('soa_driver')
+       select case (config_soa_scheme)
+       case (1)
+         call mpas_log_write('Calling simple SOA driver: Total SOA only')
+         call simple_soa(dt, chem, num_chem, swdown, coszen, &
+              p_co, p_soa,                                  &
+              ids, ide, jds, jde, kds, kde,                 &
+              ims, ime, jms, jme, kms, kme,                 &
+              its, ite, jts, jte, kts, kte                  )
+       case (2)
+         call mpas_log_write('Calling simple SOA driver: BB-SOA, Ant-SOA')
+         call simple_soa_voc(dt, chem, num_chem, swdown, coszen, &
+              rho_phy, dz8w,                                      &
+              ebu(:,:,:,index_e_bb_in_co),                        &
+              e_ant_out(:,:,:,index_e_ant_out_co),                &               
+              p_bbvoc, p_antvoc,                                  &
+              p_bbsoa, p_antsoa,                                  &
+              ids, ide, jds, jde, kds, kde,                       &
+              ims, ime, jms, jme, kms, kme,                       &
+              its, ite, jts, jte, kts, kte                              )
+       case default
+          call mpas_log_write('WARNING: unknown config_soa_scheme. SOA driver skipped.', &
+                              messageType=MPAS_LOG_WARN)
+       end select
+       if (do_timing) call mpas_timer_stop('soa_driver')
+    
     endif
     
  end subroutine mpas_smoke_driver

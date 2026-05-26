@@ -16,6 +16,11 @@ module mpas_smoke_init
    p_unspc_ultrafine = -1, &
    p_smoke_fine   = -1, &
    p_smoke_coarse = -1, &
+   p_soa          = -1, &
+   p_bbsoa        = -1, &
+   p_antsoa       = -1, &
+   p_bbvoc        = -1, &
+   p_antvoc       = -1, &
    p_dust_fine    = -1, &
    p_dust_coarse  = -1, &
    p_polp_all     = -1, &
@@ -46,12 +51,13 @@ module mpas_smoke_init
    contains
 
   subroutine set_scalar_indices( chemistry_start,                                     &
-                                 index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse,                &
-                                 index_dust_ultrafine, index_dust_fine, index_dust_coarse,                  &                  
+                                 index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse,  &
+                                 index_soa, index_bbsoa, index_antsoa, index_bbvoc, index_antvoc, &
+                                 index_dust_ultrafine, index_dust_fine, index_dust_coarse,     &                  
                                  index_polp_tree, index_polp_grass, index_polp_weed,  &
                                  index_pols_tree, index_pols_grass, index_pols_weed,  &
                                  index_pols_all,  index_polp_all,                     &
-                                 index_unspc_ultrafine, index_unspc_fine, index_unspc_coarse,                &
+                                 index_unspc_ultrafine, index_unspc_fine, index_unspc_coarse,  &
                                  index_ssalt_fine, index_ssalt_coarse,                &
                                  index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
                                  index_so2, index_nh3, index_ch4, index_nox, index_co, &
@@ -60,12 +66,13 @@ module mpas_smoke_init
     implicit none
 
     integer, intent(in), optional :: chemistry_start,                           &
-                           index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse,                &
-                           index_dust_ultrafine, index_dust_fine, index_dust_coarse,                  &
+                           index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse, &
+                           index_soa, index_bbsoa,  index_antsoa, index_bbvoc, index_antvoc, &
+                           index_dust_ultrafine, index_dust_fine, index_dust_coarse,                 &
                            index_polp_tree, index_polp_grass, index_polp_weed,  &
                            index_pols_tree, index_pols_grass, index_pols_weed,  &
                            index_pols_all,  index_polp_all,                     & 
-                           index_unspc_ultrafine, index_unspc_fine, index_unspc_coarse,                &
+                           index_unspc_ultrafine, index_unspc_fine, index_unspc_coarse,              &
                            index_ssalt_fine, index_ssalt_coarse,                &
                            index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
                            index_so2, index_nh3, index_ch4, index_nox, index_co, &
@@ -76,6 +83,11 @@ module mpas_smoke_init
         if(present(index_unspc_ultrafine))  p_unspc_ultrafine  = index_unspc_ultrafine - chemistry_start + 1
         if(present(index_smoke_fine))       p_smoke_fine       = index_smoke_fine - chemistry_start + 1
         if(present(index_smoke_coarse))     p_smoke_coarse     = index_smoke_coarse - chemistry_start + 1
+        if(present(index_soa))              p_soa              = index_soa - chemistry_start + 1
+        if(present(index_bbsoa))            p_bbsoa            = index_bbsoa - chemistry_start + 1
+        if(present(index_antsoa))           p_antsoa           = index_antsoa - chemistry_start + 1
+        if(present(index_bbvoc))            p_bbvoc            = index_bbvoc - chemistry_start + 1
+        if(present(index_antvoc))           p_antvoc           = index_antvoc - chemistry_start + 1
         if(present(index_dust_fine))        p_dust_fine        = index_dust_fine - chemistry_start + 1
         if(present(index_dust_coarse))      p_dust_coarse      = index_dust_coarse - chemistry_start + 1
         if(present(index_polp_all))         p_polp_all         = index_polp_all - chemistry_start + 1
