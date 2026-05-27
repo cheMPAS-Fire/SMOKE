@@ -32,7 +32,8 @@ OBJS = \
         module_anthro_emissions.o \
         module_anthro_pt_emissions.o \
         module_rwc_emissions.o \
-        module_tactic_sna.o
+        module_tactic_sna.o \
+        dep_dry_mod_wesley.o
    
 
 MPAS_SMOKE: $(OBJS)
@@ -56,6 +57,11 @@ dep_dry_mod_emerson.o: \
 
 dep_data_mod.o: \
 	mpas_smoke_init.o
+
+dep_dry_mod_wesley.o: \
+	dep_data_mod.o \
+	mpas_smoke_init.o \
+	mpas_smoke_config.o
 
 rad_data_mod.o: \
 	mpas_smoke_init.o \
@@ -114,7 +120,8 @@ mpas_smoke_wrapper.o:      \
         dep_data_mod.o \
         rad_data_mod.o \
         module_data_rrtmgaeropt.o \
-        mpas_mie_module.o
+        mpas_mie_module.o \
+        dep_dry_mod_wesley.o
 
 module_zero_plumegen_coms.o: \
         mpas_smoke_config.o

@@ -15,6 +15,7 @@ module mpas_smoke_wrapper
    use module_add_emiss_burn, only : add_emis_burn
    use dep_dry_simple_mod,    only : dry_dep_driver_simple
    use dep_dry_mod_emerson,   only : dry_dep_driver_emerson, particle_settling_wrapper
+   use dep_dry_mod_wesley,    only : calc_gas_dep_vel
    use dep_data_mod,          only : aero_dry_dep_init, aero_wet_dep_init 
    use rad_data_mod,          only : aero_rad_init
    use module_wetdep_ls,      only : wetdep_ls
@@ -773,6 +774,16 @@ contains
         ids,ide, jds,jde, kds,kde,                                    &
         ims,ime, jms,jme, kms,kme,                                    &
         its,ite, jts,jte, kts,kte, curr_secs                          )
+    ! Check for gases - only a few now, will want to tie into namelist
+    if (index_so2 .gt. 0 .or. index_nh3 .gt. 0  .or. &
+        index_ch4 .gt. 0 .or. index_co .gt. 0 .or. &
+        index_nox .gt. 0) then
+        call calc_gas_dep_vel(                                         &
+           num_chem,                                                   &
+           ust, wind_phy, t_phy, p_phy, swdown, ivgtyp,                &
+           ddvel,                                                      &
+           ims, ime, jms, jme, its, ite, jts, jte                      )
+    endif
     if  (do_timing) call mpas_timer_stop('drydep_driver')
     if  (do_timing) call mpas_timer_start('settling')
     if (pm_settling .gt. 0 ) then
