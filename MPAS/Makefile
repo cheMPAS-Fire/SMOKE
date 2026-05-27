@@ -47,6 +47,9 @@ module_fire_emissions.o: \
 
 mpas_smoke_init.o:
 
+module_hab_emissions.o: \
+        mpas_smoke_init.o
+
 module_tactic_sna.o: \
         mpas_smoke_init.o
 
