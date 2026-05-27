@@ -27,6 +27,7 @@ module mpas_smoke_wrapper
    use ssalt_mod
    use module_smoke_diagnostics
    use module_data_rrtmgaeropt
+   use module_hab_emissions,  only : hab_bacteria_driver
 
    implicit none
 
@@ -108,6 +109,7 @@ contains
            num_pols_per_polp     , pollen_emis_scale_factor,                                 &
            tree_pollen_emis_scale_factor, grass_pollen_emis_scale_factor        ,            &
            weed_pollen_emis_scale_factor,                                                    &
+           bact_water_conc,                                                                  &   
            anthro_emis_scale_factor, anthro_pt_emis_scale_factor,                            &
            bb_input_prevh        , rwc_emis_scale_factor, plumerise_opt_rwc     ,            &
            RWC_denominator       , RWC_annual_sum       ,                                    &
@@ -119,7 +121,7 @@ contains
            aod3d_smoke, aod3d   , aod3d_simple,&
            tauaer_lw_p           , tauaer_sw_p           , ssaaer_sw_p          , asyaer_sw_p,&
            ktau                  , dt                    , dxcell               ,            &
-           area                  ,                                                           &
+           area                  , xice,                                                     &
            xland                 , u10                   , v10                  ,            &
            ust                   , xlat                  , xlong                ,            &
            tskin                 , pblh                  , t2m                  ,            &
@@ -163,7 +165,7 @@ contains
     integer,intent(in),dimension(1:num_anthro_pt),optional :: ant_pt_local_cell_idx, ant_pt_rank
     integer,intent(in) :: myrank
 ! 2D mesh arguments
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland   ! grid
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland, xice   ! grid
 ! 2D Met input
     integer,intent(in), dimension(ims:ime, jms:jme)                :: isltyp, ivgtyp ! domainant soil, vegetation type
     integer,intent(in), dimension(ims:ime, jms:jme)                :: kpbl          ! k-index of PBLH
@@ -182,10 +184,12 @@ contains
     integer,intent(in), dimension(ims:ime,jms:jme),optional            :: eco_id
     real(RKIND),intent(in),dimension(ims:ime, jms:jme),optional        :: frp_in, fre_in      ! Fire input
 ! 2D + Time Fire Input
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme, nblocks),        &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme, nblocks),        &
                                                    optional      :: hwp_avg, fre_avg, frp_avg
+! 2D HAB Input
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: bact_water_conc
 ! Residential Wood burning
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme),optional    :: RWC_denominator, &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: RWC_denominator, &
                                                                        RWC_annual_sum,                        &
                                                                        RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
                                                                        RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
@@ -642,7 +646,7 @@ contains
     endif
 
   ! -- add sea salt emissions
-  if (do_mpas_ssalt .or. do_mpas_hab) then
+  if (do_mpas_ssalt) then
     if  (do_timing) call mpas_timer_start('seasalt_driver')
      call gocart_seasalt_driver (                                     &
              dt,rri,t_phy,u_phy,v_phy,                                &
@@ -657,6 +661,22 @@ contains
              its,ite, jts,jte, kts,kte                                )
     if  (do_timing) call mpas_timer_stop('seasalt_driver')
     endif
+
+  ! -- add sea salt emissions
+  if (do_mpas_hab) then
+    if  (do_timing) call mpas_timer_start('hab_driver')
+       call hab_bacteria_driver(dt, rho_phy, dz8w, u10, v10, xland,    &
+                                   xice, tskin, t2m,               &
+                                   bact_water_conc,                &
+                                   chem,num_chem,                  &
+                                   index_bact_fine,                &
+                                   ids, ide, jds, jde, kds, kde,   &
+                                   ims, ime, jms, jme, kms, kme,   &
+                                   its, ite, jts, jte, kts, kte    )
+    if  (do_timing) call mpas_timer_stop('seasalt_driver')
+    endif
+    
+
 
     if ( do_mpas_dust ) then
     if  (do_timing) call mpas_timer_start('dust_driver')
