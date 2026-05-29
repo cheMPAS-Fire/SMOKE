@@ -32,7 +32,12 @@ OBJS = \
         module_anthro_emissions.o \
         module_anthro_pt_emissions.o \
         module_rwc_emissions.o \
-        module_tactic_sna.o
+        module_tactic_sna.o \
+        module_ltng_cpmpr92z.o \
+        module_ltng_crmpr92.o \
+        module_ltng_iccg.o \
+        module_ltng_lpi.o \
+        module_lightning_driver.o
    
 
 MPAS_SMOKE: $(OBJS)
@@ -114,7 +119,8 @@ mpas_smoke_wrapper.o:      \
         dep_data_mod.o \
         rad_data_mod.o \
         module_data_rrtmgaeropt.o \
-        mpas_mie_module.o
+        mpas_mie_module.o \
+        module_lightning_driver.o
 
 module_zero_plumegen_coms.o: \
         mpas_smoke_config.o
@@ -151,6 +157,23 @@ pollen_mod.o: \
         mpas_smoke_config.o \
         mpas_smoke_init.o \
         dep_data_mod.o
+
+module_ltng_cpmpr92z.o:
+
+module_ltng_crmpr92.o:
+
+module_ltng_iccg.o:
+
+module_ltng_lpi.o:
+
+module_lightning_driver.o: \
+        mpas_smoke_config.o \
+        mpas_smoke_init.o \
+        module_ltng_cpmpr92z.o \
+        module_ltng_crmpr92.o \
+        module_ltng_iccg.o \
+        module_ltng_lpi.o \
+	module_peg_util.o
 
 
 #module_smoke_plumerise.o: module_smoke_plumerise.F90

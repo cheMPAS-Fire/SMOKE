@@ -42,6 +42,8 @@ module mpas_smoke_init
    p_dms          = -1, &
    p_nox          = -1, &
    p_co           = -1
+!
+   REAL(RKIND), save :: lightning_activation_time
 
    contains
 
