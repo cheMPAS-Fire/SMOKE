@@ -60,9 +60,11 @@ module dep_data_mod
   ! MODIS Land-Use Lookup Tables (Midsummer/Active Vegetation mapping)
   ! ====================================================================
   INTEGER, PARAMETER :: max_modis = 21
-  REAL(KIND=RKIND), DIMENSION(max_modis) :: rs_min_tbl ! Min Stomatal Resistance (s/m)
-  REAL(KIND=RKIND), DIMENSION(max_modis) :: rcut_tbl   ! Base Cuticular Resistance (s/m)
-  REAL(KIND=RKIND), DIMENSION(max_modis) :: rgrnd_tbl  ! Base Ground/Soil Resistance (s/m)
+  INTEGER, PARAMETER :: max_season = 5
+  INTEGER            :: s
+  REAL(KIND=RKIND), DIMENSION(max_modis,max_season) :: rs_min_tbl ! Min Stomatal Resistance (s/m)
+  REAL(KIND=RKIND), DIMENSION(max_modis,max_season) :: rcut_tbl   ! Base Cuticular Resistance (s/m)
+  REAL(KIND=RKIND), DIMENSION(max_modis,max_season) :: rgrnd_tbl  ! Base Ground/Soil Resistance (s/m)
 
   contains
    subroutine aero_wet_dep_init
@@ -167,6 +169,9 @@ module dep_data_mod
    subroutine gas_dry_dep_init
 
       implicit none
+
+    
+
       henry_const(:) = -999._RKIND  ! Effective Henry's Law Constant (M/atm)
       reactivity(:) = -999._RKIND   ! Reactivity factor for Wesely Rc (f0)
       diff_ratio(:) = -999._RKIND   ! Ratio of molecular diffusivity to H2O
@@ -263,114 +268,245 @@ module dep_data_mod
     ! - Base mappings derived from Wesely (1989) Table 1 (Land-use categories 
     !   and seasonal categories) mapped to MODIS 21-category definitions 
     !   commonly used in standard WRF-Chem implementations.
-    ! - Values represent Midsummer/Active Growing Season (Category 1 in 
-    !   the original Wesely formulation).
+
+! ====================================================================
+    ! 2. Populate Seasonal MODIS Land-Use Parameters
+    ! PRIMARY REFERENCES: Wesely (1989) Table 1.
+    ! Seasons: 1=Summer, 2=Autumn, 3=Late Autumn, 4=Winter, 5=Spring
     ! ====================================================================
     
-    ! 1. Evergreen Needleleaf
-    rs_min_tbl(1) =  130.0_RKIND
-    rcut_tbl(1)   = 2000.0_RKIND
-    rgrnd_tbl(1)  =  200.0_RKIND
+    ! --------------------------------------------------------------------
+    ! SEASON 1: MIDSUMMER (Active, Lush Vegetation)
+    ! --------------------------------------------------------------------
+    ! Evergreen Needleleaf / Broadleaf
+    rs_min_tbl(1:2, 1) =  130.0_RKIND
+    rcut_tbl(1:2, 1)   = 2000.0_RKIND
+    rgrnd_tbl(1:2, 1)  =  200.0_RKIND
     
-    ! 2. Evergreen Broadleaf
-    rs_min_tbl(2) =  130.0_RKIND
-    rcut_tbl(2)   = 2000.0_RKIND
-    rgrnd_tbl(2)  =  200.0_RKIND
+    ! Deciduous Needleleaf / Broadleaf / Mixed Forest
+    rs_min_tbl(3:5, 1) =   70.0_RKIND
+    rcut_tbl(3:5, 1)   = 2000.0_RKIND
+    rgrnd_tbl(3:5, 1)  =  200.0_RKIND
     
-    ! 3. Deciduous Needleleaf
-    rs_min_tbl(3) =  100.0_RKIND
-    rcut_tbl(3)   = 2000.0_RKIND
-    rgrnd_tbl(3)  =  200.0_RKIND
+    ! Shrublands, Savannas, Grasslands
+    rs_min_tbl(6:10, 1) =  120.0_RKIND
+    rcut_tbl(6:10, 1)   = 2000.0_RKIND
+    rgrnd_tbl(6:10, 1)  =  200.0_RKIND
     
-    ! 4. Deciduous Broadleaf
-    rs_min_tbl(4) =   70.0_RKIND
-    rcut_tbl(4)   = 2000.0_RKIND
-    rgrnd_tbl(4)  =  200.0_RKIND
+    ! Wetlands
+    rs_min_tbl(11, 1) =   80.0_RKIND
+    rcut_tbl(11, 1)   = 2000.0_RKIND
+    rgrnd_tbl(11, 1)  =  100.0_RKIND
     
-    ! 5. Mixed Forest
-    rs_min_tbl(5) =  100.0_RKIND
-    rcut_tbl(5)   = 2000.0_RKIND
-    rgrnd_tbl(5)  =  200.0_RKIND
+    ! Croplands & Mosaics
+    rs_min_tbl(12, 1) =   70.0_RKIND
+    rs_min_tbl(14, 1) =   70.0_RKIND
+    rcut_tbl(12, 1)   = 2000.0_RKIND
+    rcut_tbl(14, 1)   = 2000.0_RKIND
+    rgrnd_tbl(12, 1)  =  150.0_RKIND
+    rgrnd_tbl(14, 1)  =  150.0_RKIND
     
-    ! 6. Closed Shrublands
-    rs_min_tbl(6) =  120.0_RKIND
-    rcut_tbl(6)   = 2000.0_RKIND
-    rgrnd_tbl(6)  =  200.0_RKIND
+    ! Tundra
+    rs_min_tbl(18:19, 1) =  150.0_RKIND
+    rcut_tbl(18:19, 1)   = 2000.0_RKIND
+    rgrnd_tbl(18:19, 1)  =  300.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! SEASON 2: AUTUMN (Unharvested, Senescence)
+    ! --------------------------------------------------------------------
+    ! Evergreen types maintain stomata
+    rs_min_tbl(1:2, 2) =  130.0_RKIND
+    rcut_tbl(1:2, 2)   = 2000.0_RKIND
+    rgrnd_tbl(1:2, 2)  =  200.0_RKIND
     
-    ! 7. Open Shrublands
-    rs_min_tbl(7) =  120.0_RKIND
-    rcut_tbl(7)   = 2000.0_RKIND
-    rgrnd_tbl(7)  =  300.0_RKIND
+    ! Deciduous & Mixed Forest (Leaves dying, resistance up)
+    rs_min_tbl(3:5, 2) =  120.0_RKIND
+    rcut_tbl(3:5, 2)   = 3000.0_RKIND
+    rgrnd_tbl(3:5, 2)  =  200.0_RKIND
     
-    ! 8. Woody Savannas
-    rs_min_tbl(8) =  120.0_RKIND
-    rcut_tbl(8)   = 2000.0_RKIND
-    rgrnd_tbl(8)  =  200.0_RKIND
+    ! Shrublands, Savannas, Grasslands
+    rs_min_tbl(6:10, 2) =  150.0_RKIND
+    rcut_tbl(6:10, 2)   = 3000.0_RKIND
+    rgrnd_tbl(6:10, 2)  =  300.0_RKIND
     
-    ! 9. Savannas
-    rs_min_tbl(9) =  120.0_RKIND
-    rcut_tbl(9)   = 2000.0_RKIND
-    rgrnd_tbl(9)  =  200.0_RKIND
+    ! Wetlands
+    rs_min_tbl(11, 2) =  120.0_RKIND
+    rcut_tbl(11, 2)   = 3000.0_RKIND
+    rgrnd_tbl(11, 2)  =  100.0_RKIND
     
-    ! 10. Grasslands
-    rs_min_tbl(10) =  120.0_RKIND
-    rcut_tbl(10)   = 2000.0_RKIND
-    rgrnd_tbl(10)  =  200.0_RKIND
+    ! Croplands & Mosaics
+    rs_min_tbl(12, 2) =  120.0_RKIND
+    rs_min_tbl(14, 2) =  120.0_RKIND
+    rcut_tbl(12, 2)   = 3000.0_RKIND
+    rcut_tbl(14, 2)   = 3000.0_RKIND
+    rgrnd_tbl(12, 2)  =  200.0_RKIND
+    rgrnd_tbl(14, 2)  =  200.0_RKIND
     
-    ! 11. Permanent Wetlands
-    rs_min_tbl(11) =   80.0_RKIND
-    rcut_tbl(11)   = 2000.0_RKIND
-    rgrnd_tbl(11)  =  100.0_RKIND
+    ! Tundra
+    rs_min_tbl(18:19, 2) =  200.0_RKIND
+    rcut_tbl(18:19, 2)   = 3000.0_RKIND
+    rgrnd_tbl(18:19, 2)  =  300.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! SEASON 3: LATE AUTUMN (Post-frost, dormant, no snow)
+    ! --------------------------------------------------------------------
+    ! Evergreen
+    rs_min_tbl(1:2, 3) =  130.0_RKIND
+    rcut_tbl(1:2, 3)   = 2000.0_RKIND
+    rgrnd_tbl(1:2, 3)  =  200.0_RKIND
     
-    ! 12. Croplands
-    rs_min_tbl(12) =   70.0_RKIND
-    rcut_tbl(12)   = 2000.0_RKIND
-    rgrnd_tbl(12)  =  150.0_RKIND
+    ! Deciduous (Leaves gone, stomatal resistance infinite)
+    rs_min_tbl(3:5, 3) = 9999.0_RKIND
+    rcut_tbl(3:5, 3)   = 4000.0_RKIND
+    rgrnd_tbl(3:5, 3)  =  200.0_RKIND
     
-    ! 13. Urban and Built-Up
-    rs_min_tbl(13) = 9999.0_RKIND
-    rcut_tbl(13)   = 9999.0_RKIND
-    rgrnd_tbl(13)  =  400.0_RKIND
+    ! Grass/Shrubs (Dormant)
+    rs_min_tbl(6:10, 3) = 9999.0_RKIND
+    rcut_tbl(6:10, 3)   = 4000.0_RKIND
+    rgrnd_tbl(6:10, 3)  =  300.0_RKIND
     
-    ! 14. Cropland/Natural Veg Mosaic
-    rs_min_tbl(14) =   70.0_RKIND
-    rcut_tbl(14)   = 2000.0_RKIND
-    rgrnd_tbl(14)  =  150.0_RKIND
+    ! Wetlands
+    rs_min_tbl(11, 3) = 9999.0_RKIND
+    rcut_tbl(11, 3)   = 4000.0_RKIND
+    rgrnd_tbl(11, 3)  =  100.0_RKIND
     
-    ! 15. Snow and Ice
-    rs_min_tbl(15) = 9999.0_RKIND
-    rcut_tbl(15)   = 9999.0_RKIND
-    rgrnd_tbl(15)  = 1000.0_RKIND
+    ! Croplands & Mosaics (Harvested)
+    rs_min_tbl(12, 3) = 9999.0_RKIND
+    rs_min_tbl(14, 3) = 9999.0_RKIND
+    rcut_tbl(12, 3)   = 4000.0_RKIND
+    rcut_tbl(14, 3)   = 4000.0_RKIND
+    rgrnd_tbl(12, 3)  =  300.0_RKIND
+    rgrnd_tbl(14, 3)  =  300.0_RKIND
     
-    ! 16. Barren or Sparsely Vegetated
-    rs_min_tbl(16) = 9999.0_RKIND
-    rcut_tbl(16)   = 9999.0_RKIND
-    rgrnd_tbl(16)  =  500.0_RKIND
+    ! Tundra
+    rs_min_tbl(18:19, 3) = 9999.0_RKIND
+    rcut_tbl(18:19, 3)   = 4000.0_RKIND
+    rgrnd_tbl(18:19, 3)  =  300.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! SEASON 4: WINTER (Snow on ground, subfreezing)
+    ! --------------------------------------------------------------------
+    ! Evergreen (Stomata severely restricted by cold, ground covered in snow)
+    rs_min_tbl(1:2, 4) =  250.0_RKIND
+    rcut_tbl(1:2, 4)   = 4000.0_RKIND
+    rgrnd_tbl(1:2, 4)  = 1000.0_RKIND
     
-    ! 17. Water (Oceans, Lakes)
-    rs_min_tbl(17) = 9999.0_RKIND
-    rcut_tbl(17)   = 9999.0_RKIND
-    rgrnd_tbl(17)  =   10.0_RKIND
+    ! Deciduous (No leaves, snow ground)
+    rs_min_tbl(3:5, 4) = 9999.0_RKIND
+    rcut_tbl(3:5, 4)   = 9999.0_RKIND
+    rgrnd_tbl(3:5, 4)  = 1000.0_RKIND
     
-    ! 18. Wooded Tundra
-    rs_min_tbl(18) =  150.0_RKIND
-    rcut_tbl(18)   = 2000.0_RKIND
-    rgrnd_tbl(18)  =  300.0_RKIND
+    ! Grass/Shrubs (Buried in snow)
+    rs_min_tbl(6:10, 4) = 9999.0_RKIND
+    rcut_tbl(6:10, 4)   = 9999.0_RKIND
+    rgrnd_tbl(6:10, 4)  = 1000.0_RKIND
     
-    ! 19. Mixed Tundra
-    rs_min_tbl(19) =  150.0_RKIND
-    rcut_tbl(19)   = 2000.0_RKIND
-    rgrnd_tbl(19)  =  300.0_RKIND
+    ! Wetlands (Frozen)
+    rs_min_tbl(11, 4) = 9999.0_RKIND
+    rcut_tbl(11, 4)   = 9999.0_RKIND
+    rgrnd_tbl(11, 4)  = 1000.0_RKIND
     
-    ! 20. Bare Ground Tundra
-    rs_min_tbl(20) = 9999.0_RKIND
-    rcut_tbl(20)   = 9999.0_RKIND
-    rgrnd_tbl(20)  =  400.0_RKIND
+    ! Croplands & Mosaics
+    rs_min_tbl(12, 4) = 9999.0_RKIND
+    rs_min_tbl(14, 4) = 9999.0_RKIND
+    rcut_tbl(12, 4)   = 9999.0_RKIND
+    rcut_tbl(14, 4)   = 9999.0_RKIND
+    rgrnd_tbl(12, 4)  = 1000.0_RKIND
+    rgrnd_tbl(14, 4)  = 1000.0_RKIND
     
-    ! 21. Unclassified/Missing
-    rs_min_tbl(21) = 9999.0_RKIND
-    rcut_tbl(21)   = 9999.0_RKIND
-    rgrnd_tbl(21)  =  400.0_RKIND
+    ! Tundra
+    rs_min_tbl(18:19, 4) = 9999.0_RKIND
+    rcut_tbl(18:19, 4)   = 9999.0_RKIND
+    rgrnd_tbl(18:19, 4)  = 1000.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! SEASON 5: TRANSITIONAL SPRING (Emerging vegetation)
+    ! --------------------------------------------------------------------
+    ! Evergreen 
+    rs_min_tbl(1:2, 5) =  130.0_RKIND
+    rcut_tbl(1:2, 5)   = 2000.0_RKIND
+    rgrnd_tbl(1:2, 5)  =  200.0_RKIND
+    
+    ! Deciduous (Buds opening)
+    rs_min_tbl(3:5, 5) =  120.0_RKIND
+    rcut_tbl(3:5, 5)   = 2000.0_RKIND
+    rgrnd_tbl(3:5, 5)  =  200.0_RKIND
+    
+    ! Shrublands, Savannas, Grasslands
+    rs_min_tbl(6:10, 5) =  150.0_RKIND
+    rcut_tbl(6:10, 5)   = 2000.0_RKIND
+    rgrnd_tbl(6:10, 5)  =  200.0_RKIND
+    
+    ! Wetlands
+    rs_min_tbl(11, 5) =  120.0_RKIND
+    rcut_tbl(11, 5)   = 2000.0_RKIND
+    rgrnd_tbl(11, 5)  =  100.0_RKIND
+    
+    ! Croplands & Mosaics
+    rs_min_tbl(12, 5) =  120.0_RKIND
+    rs_min_tbl(14, 5) =  120.0_RKIND
+    rcut_tbl(12, 5)   = 2000.0_RKIND
+    rcut_tbl(14, 5)   = 2000.0_RKIND
+    rgrnd_tbl(12, 5)  =  200.0_RKIND
+    rgrnd_tbl(14, 5)  =  200.0_RKIND
+    
+    ! Tundra
+    rs_min_tbl(18:19, 5) =  200.0_RKIND
+    rcut_tbl(18:19, 5)   = 2000.0_RKIND
+    rgrnd_tbl(18:19, 5)  =  300.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! NON-VEGETATED TYPES (Constant across all 5 Seasons)
+    ! --------------------------------------------------------------------
+    DO s = 1, max_season
+       ! Urban and Built-Up (13)
+       rs_min_tbl(13, s) = 9999.0_RKIND
+       rcut_tbl(13, s)   = 9999.0_RKIND
+       
+       ! Snow and Ice (15)
+       rs_min_tbl(15, s) = 9999.0_RKIND
+       rcut_tbl(15, s)   = 9999.0_RKIND
+       rgrnd_tbl(15, s)  = 1000.0_RKIND
+       
+       ! Barren or Sparsely Vegetated (16)
+       rs_min_tbl(16, s) = 9999.0_RKIND
+       rcut_tbl(16, s)   = 9999.0_RKIND
+       
+       ! Water (Oceans, Lakes) (17)
+       rs_min_tbl(17, s) = 9999.0_RKIND
+       rcut_tbl(17, s)   = 9999.0_RKIND
+       rgrnd_tbl(17, s)  =   10.0_RKIND
+       
+       ! Bare Ground Tundra (20)
+       rs_min_tbl(20, s) = 9999.0_RKIND
+       rcut_tbl(20, s)   = 9999.0_RKIND
+       
+       ! Unclassified/Missing (21)
+       rs_min_tbl(21, s) = 9999.0_RKIND
+       rcut_tbl(21, s)   = 9999.0_RKIND
+    END DO
+
+    ! Ground resistance specific adjustments for non-vegetated types in winter (S4)
+    rgrnd_tbl(13, 1:3) = 400.0_RKIND
+    rgrnd_tbl(13, 4)   = 1000.0_RKIND
+    rgrnd_tbl(13, 5)   = 400.0_RKIND
+    
+    rgrnd_tbl(16, 1:3) = 500.0_RKIND
+    rgrnd_tbl(16, 4)   = 1000.0_RKIND
+    rgrnd_tbl(16, 5)   = 500.0_RKIND
+    
+    rgrnd_tbl(20, 1:3) = 400.0_RKIND
+    rgrnd_tbl(20, 4)   = 1000.0_RKIND
+    rgrnd_tbl(20, 5)   = 400.0_RKIND
+    
+    rgrnd_tbl(21, 1:3) = 400.0_RKIND
+    rgrnd_tbl(21, 4)   = 1000.0_RKIND
+    rgrnd_tbl(21, 5)   = 400.0_RKIND
 
    end subroutine gas_dry_dep_init
 

@@ -779,7 +779,7 @@ contains
         index_ch4 .gt. 0 .or. index_co .gt. 0 .or. &
         index_nox .gt. 0) then
         call calc_gas_dep_vel(                                         &
-           num_chem,                                                   &
+           num_chem,julday,                                            &
            ust, wind_phy, t_phy, p_phy, swdown, ivgtyp,                &
            ddvel,                                                      &
            ims, ime, jms, jme, its, ite, jts, jte                      )

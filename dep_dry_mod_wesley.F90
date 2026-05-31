@@ -24,7 +24,7 @@ MODULE dep_dry_mod_wesley
 CONTAINS
 
   SUBROUTINE calc_gas_dep_vel(                   &
-       num_chem,                                 &
+       num_chem,julday,                          &
        ustar, wspd, temp, press, swdown, ivgtyp, &  
        ddvel,                                    &
        ims, ime, jms, jme, its, ite, jts, jte    )
@@ -33,7 +33,7 @@ CONTAINS
     ! --- WRF/MPAS Standard Indices ---
     INTEGER, INTENT(IN) :: ims, ime, jms, jme  
     INTEGER, INTENT(IN) :: its, ite, jts, jte  
-    INTEGER, INTENT(IN) :: num_chem            
+    INTEGER, INTENT(IN) :: num_chem, julday           
 
     ! --- Meteorological & Surface Inputs (2D Arrays) ---
     REAL(KIND=RKIND), DIMENSION(ims:ime, jms:jme), INTENT(IN) :: ustar  ! Friction velocity (m/s)
@@ -47,7 +47,7 @@ CONTAINS
     REAL(KIND=RKIND), DIMENSION(ims:ime, jms:jme, num_chem), INTENT(OUT) :: ddvel 
 
     ! --- Local Variables ---
-    INTEGER  :: i, j, nv, lu
+    INTEGER  :: i, j, nv, lu, iseason
     REAL(KIND=RKIND) :: ra_loc, rb, rc, r_total       
     REAL(KIND=RKIND) :: r_stomatal, r_mesophyll, r_cuticle, r_ground
     REAL(KIND=RKIND) :: par         
@@ -60,6 +60,23 @@ CONTAINS
     REAL(KIND=RKIND), PARAMETER :: r_min = 1.0e-4_RKIND 
     REAL(KIND=RKIND), PARAMETER :: swdown_thresh = 10.0_RKIND 
 
+! ====================================================================
+    ! Determine Wesely Season from Julian Day
+    ! (Assuming Northern Hemisphere typical mapping)
+    ! 1 = Summer, 2 = Autumn, 3 = Late Autumn, 4 = Winter, 5 = Spring
+    ! ====================================================================
+    IF (julday >= 60 .AND. julday <= 120) THEN
+       iseason = 5  ! Transitional Spring (March, April)
+    ELSE IF (julday >= 121 .AND. julday <= 243) THEN
+       iseason = 1  ! Midsummer (May, June, July, August)
+    ELSE IF (julday >= 244 .AND. julday <= 304) THEN
+       iseason = 2  ! Autumn (September, October)
+    ELSE IF (julday >= 305 .AND. julday <= 334) THEN
+       iseason = 3  ! Late Autumn (November)
+    ELSE
+       iseason = 4  ! Winter (Jan, Feb, Dec: JD 1-59 and 335-366)
+    END IF
+
     ! ====================================================================
     ! Main Calculation Loop
     ! ====================================================================
@@ -71,9 +88,9 @@ CONTAINS
           lu = MAX(1, MIN(21, ivgtyp(i,j)))
           
           ! Retrieve base resistances from the MODIS lookup tables
-          rs_min_base = rs_min_tbl(lu)
-          rcut_base   = rcut_tbl(lu)
-          rgrnd_base  = rgrnd_tbl(lu)
+          rs_min_base = rs_min_tbl(lu,iseason)
+          rcut_base   = rcut_tbl(lu,iseason)
+          rgrnd_base  = rgrnd_tbl(lu,iseason)
 
           ! Estimate PAR (~45% of incoming shortwave radiation)
           par = MAX(0.0_RKIND, swdown(i,j) * 0.45_RKIND)
