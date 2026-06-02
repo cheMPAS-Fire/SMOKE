@@ -177,15 +177,15 @@ contains
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: raincv, rainncv, mavail                    
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme)         :: rmol, ust
 ! 2D Fire Input
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
                                                                           efs_smold, efs_flam, efs_rsmold
     integer,intent(in), dimension(ims:ime,jms:jme),optional            :: eco_id
     real(RKIND),intent(in),dimension(ims:ime, jms:jme),optional        :: frp_in, fre_in      ! Fire input
 ! 2D + Time Fire Input
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme, nblocks),        &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme, nblocks),        &
                                                    optional      :: hwp_avg, fre_avg, frp_avg
 ! Residential Wood burning
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme),optional    :: RWC_denominator, &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: RWC_denominator, &
                                                                        RWC_annual_sum,                        &
                                                                        RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
                                                                        RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
@@ -270,7 +270,8 @@ contains
 ! 3D + chem output arrays
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem)                :: chem
     real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem),optional       :: tend_chem_settle
-    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme)                   :: aod3d_smoke, aod3d, aod3d_simple
+    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme),optional                   :: aod3d_smoke
+    real(RKIND),intent(inout), dimension(ims:ime, kms:kme, jms:jme)                            :: aod3d, aod3d_simple
 !>-- Namelist options
      logical,intent(in)               :: do_mpas_smoke
      logical,intent(in)               :: do_mpas_dust

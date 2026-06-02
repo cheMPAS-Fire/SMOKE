@@ -15,6 +15,14 @@ CONTAINS
 ! For 2 size bins with 4 tracers
 ! Code has been further modernized/re-engineered by SPAG
 !---------------------------------------------------------------------------------------
+
+   LOGICAL FUNCTION valid_chem_idx(idx, num_chem)
+      INTEGER, INTENT(IN) :: idx
+      INTEGER, INTENT(IN) :: num_chem
+
+      valid_chem_idx = (idx >= 1 .AND. idx <= num_chem)
+   END FUNCTION valid_chem_idx
+
    SUBROUTINE optical_averaging(Id,Curr_secs,Dtstep,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,      &
                               & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,&
                               & Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
@@ -197,18 +205,6 @@ CONTAINS
          xdia_cm(isize) = xdia_um(isize)*1.0E-4
       ENDDO
  
- 
-!  do ns = 1, nswbands
-!    swref_index_smoke(ns) = cmplx(refrsw_smoke(ns), refisw_smoke(ns))
-!    swref_index_dust(ns)  = cmplx(refrsw_dust(ns),  refisw_dust(ns))
-!    swref_index_h2o(ns)  = cmplx(refrwsw(ns),  refiwsw(ns))
-!  end do
-!  do ns = 1, nlwbands
-!    lwref_index_smoke(ns) = cmplx(refrlw_smoke(ns), refilw_smoke(ns))
-!    lwref_index_dust(ns)  = cmplx(refrlw_dust(ns),  refilw_dust(ns))
-!    lwref_index_h2o(ns)  = cmplx(refrwlw(ns),  refiwlw(ns))
-!  end do
- 
       DO ns = 1 , NSWBANDS
  
          swref_index_smoke(ns) = cmplx(Aer_optics(ID_SMOKE)%sw_real(ns),Aer_optics(ID_SMOKE)%sw_imag(ns))
@@ -230,11 +226,6 @@ CONTAINS
          lwref_index_h2o(ns) = cmplx(Aer_optics(ID_WATER)%lw_real(ns),Aer_optics(ID_WATER)%lw_imag(ns))
       ENDDO
 
-!      print *, 'UNSPC min/max = ', minval(Chem(:,:,:,p_unspc_fine)), maxval(Chem(:,:,:,p_unspc_fine))
-!      print *, 'NO3   min/max = ', minval(Chem(:,:,:,p_no3_a_fine)), maxval(Chem(:,:,:,p_no3_a_fine))
-!      print *, 'SO4   min/max = ', minval(Chem(:,:,:,p_so4_a_fine)), maxval(Chem(:,:,:,p_so4_a_fine))
-!      print *, 'NH4   min/max = ', minval(Chem(:,:,:,p_nh4_a_fine)), maxval(Chem(:,:,:,p_nh4_a_fine))
- 
 ! initialize - ms
       Swrefindx = cmplx(0.0,0.0)
       Lwrefindx = cmplx(0.0,0.0)
@@ -265,22 +256,33 @@ CONTAINS
                conv1a = Rho_phy(i,k,j)*1.0E-12
                                           ! unit is currently not clear of the rho_phy
  
-!               mass_unspc_f = Chem(i,k,j,p_unspc_fine)*conv1a
-!               mass_no3_f = Chem(i,k,j,p_no3_a_fine)*conv1a
-!               mass_nh4so4_f = (Chem(i,k,j,p_so4_a_fine)+Chem(i,k,j,p_nh4_a_fine))*conv1a
-!               mass_smoke_f = Chem(i,k,j,p_smoke_fine)*conv1a
-!               mass_dust_f = Chem(i,k,j,p_dust_fine)*conv1a
-!               mass_smoke_c = 0.0_RKIND
-!               mass_dust_c = Chem(i,k,j,p_dust_coarse)*conv1a
-               IF (p_unspc_fine .gt. 0) mass_unspc_f = max(0._RKIND, Chem(i,k,j,p_unspc_fine)) * conv1a
-               IF (p_no3_a_fine .gt. 0) mass_no3_f = max(0._RKIND, Chem(i,k,j,p_no3_a_fine)) * conv1a
-               IF (p_so4_a_fine .gt. 0 .and. p_nh4_a_fine .gt. 0) THEN
-                  mass_nh4so4_f = max(0._RKIND, Chem(i,k,j,p_so4_a_fine) + Chem(i,k,j,p_nh4_a_fine)) * conv1a
+               IF (valid_chem_idx(p_unspc_fine, Num_chem)) THEN
+                  mass_unspc_f = MAX(0._RKIND, Chem(i,k,j,p_unspc_fine)) * conv1a
                ENDIF
-               IF (p_smoke_fine .gt. 0) mass_smoke_f = max(0._RKIND, Chem(i,k,j,p_smoke_fine)) * conv1a
-               IF (p_dust_fine .gt. 0) mass_dust_f = max(0._RKIND, Chem(i,k,j,p_dust_fine)) * conv1a
+
+               IF (valid_chem_idx(p_no3_a_fine, Num_chem)) THEN
+                  mass_no3_f = MAX(0._RKIND, Chem(i,k,j,p_no3_a_fine)) * conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_so4_a_fine, Num_chem) .AND. &
+                   valid_chem_idx(p_nh4_a_fine, Num_chem)) THEN
+                  mass_nh4so4_f = MAX(0._RKIND, Chem(i,k,j,p_so4_a_fine) + &
+                                                 Chem(i,k,j,p_nh4_a_fine)) * conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_smoke_fine, Num_chem)) THEN
+                  mass_smoke_f = MAX(0._RKIND, Chem(i,k,j,p_smoke_fine)) * conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_dust_fine, Num_chem)) THEN
+                  mass_dust_f = MAX(0._RKIND, Chem(i,k,j,p_dust_fine)) * conv1a
+               ENDIF
+
                mass_smoke_c = 0.0_RKIND
-               IF (p_dust_coarse .gt. 0) mass_dust_c = max(0._RKIND, Chem(i,k,j,p_dust_coarse)) * conv1a
+
+               IF (valid_chem_idx(p_dust_coarse, Num_chem)) THEN
+                  mass_dust_c = MAX(0._RKIND, Chem(i,k,j,p_dust_coarse)) * conv1a
+               ENDIF
 
                vol_aj = (mass_smoke_f/dens_smoke) + (mass_dust_f/dens_dust) +     &
                         (mass_unspc_f/dens_unspc) + (mass_no3_f/dens_sna) + &
