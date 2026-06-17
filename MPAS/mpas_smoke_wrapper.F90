@@ -333,7 +333,7 @@ contains
     real(RKIND), dimension(ims:ime, jms:jme)          :: flam_frac,                               &
                                                          fire_hist, peak_hr,                      &
                                                          hwp_day_avg,                             &
-                                                         uspdavg2d, hpbl2d, wind10m
+                                                         uspdavg2d, hpbl2d, wind10m, windgustpot
     real(RKIND), dimension(ims:ime, jms:jme)          :: lu_nofire, lu_qfire, lu_sfire
     integer,     dimension(ims:ime, jms:jme)          :: fire_type
     integer,     dimension(ims:ime, jms:jme)          :: kpbl_thetav
@@ -414,6 +414,7 @@ contains
    endif
 !
     uspdavg2d   = 0._RKIND
+    windgustpot = 0._RKIND
     hpbl2d      = 0._RKIND
     peak_hr     = 0._RKIND
     flam_frac   = 0._RKIND
@@ -430,12 +431,14 @@ contains
         ktau, nlcat,cp,ebb_dcycle,ebb_min,                                  &
         xland,xlat,xlong,ivgtyp,isltyp,landusef,                            & ! JLS TODO LANDUSEF /= VEGFRA?
         snowh,u10,v10,wind10m,t2m,dpt2m,mavail,hwp,hwp_day_avg,             &
+        hwp_method, totprcp_prev24, swdown, hpbl2d, curr_secs,               & ! SRB: added for HWP calcs 
+        windgustpot, uspdavg2d,                                             & !SRB
         index_e_bb_in_smoke_fine,num_e_bb_in,kfire,e_bb_in,                 &
         t_phy,u_phy,v_phy,p_phy,pi_phy,z_at_w,                              &
         dz8w,dz8w_flip,                                                     &
         rho_phy,qv,relhum,rh2m,rri,                                         &
         total_flashrate,                                                    &
-        wind_phy,theta_phy,zmid,kpbl_thetav,                                &
+        wind_phy,theta_phy,zmid,kpbl,kpbl_thetav,                           &
         peak_hr,coef_bb_dc,fire_hist,                                       &
         lu_nofire, lu_qfire, lu_sfire, fire_type,                           &
         ids,ide, jds,jde, kds,kde,                                          &
@@ -904,12 +907,14 @@ contains
         ktau, nlcat,cp,ebb_dcycle,ebb_min,                                  &
         xland,xlat,xlong,ivgtyp,isltyp,vegfrac,                             &
         snowh,u10,v10,wind10m,t2m,dpt2m,wetness,hwp,hwp_day_avg,            &
+        hwp_method, totprcp_prev24, swdown, hpbl2d, curr_secs,               & ! SRB: added for HWP calcs
+        windgustpot, uspdavg2d,                                             & !SRB
         index_e_bb_in_smoke_fine,num_e_bb_in,kfire,e_bb_in,                 &
         t_phy,u_phy,v_phy,p_phy,pi_phy,z_at_w,                              &
         dz8w,dz8w_flip,                                                     &
         rho_phy,qv,relhum,rh2m,rri,                                         &
         total_flashrate,                                                    &
-        wind_phy,theta_phy,zmid,kpbl_thetav,                                &
+        wind_phy,theta_phy,zmid,kpbl,kpbl_thetav,                           &
         peak_hr,coef_bb_dc,fire_hist,                                       &
         lu_nofire, lu_qfire, lu_sfire, fire_type,                           &
         ids,ide, jds,jde, kds,kde,                                          &
@@ -930,24 +935,34 @@ contains
 
     real(RKIND),intent(in),   dimension(ims:ime, jms:jme) :: xland, xlat, xlong,                   &
                                         snowh, u10, v10, t2m, dpt2m, wetness
+    real(RKIND),intent(in),   dimension(ims:ime, jms:jme) :: swdown 
+    real(RKIND),intent(in),   dimension(ims:ime, jms:jme) :: totprcp_prev24 ! SRB: added for HWP calcs
+    integer,intent(in)                                    :: hwp_method
+    real(RKIND)                                           :: curr_secs 
     real(RKIND),intent(in),   dimension(ims:ime, kms:kme, jms:jme) :: qv, z_at_w,                  &
                                         p_phy, t_phy, u_phy, v_phy, pi_phy, rho_phy, dz8w
     real(RKIND),intent(out),  dimension(ims:ime, kms:kme, jms:jme) :: zmid, wind_phy,theta_phy,   &
                                        relhum, rri, dz8w_flip
     integer    ,intent(out),  dimension(ims:ime, jms:jme) :: fire_type, kpbl_thetav
+    integer    ,intent(in),   dimension(ims:ime, jms:jme) :: kpbl
     real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: lu_nofire, lu_qfire, lu_sfire
     real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: fire_hist, peak_hr, hwp_day_avg
     real(RKIND),intent(inout),dimension(ims:ime,jms:jme),optional :: hwp, coef_bb_dc
     real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: total_flashrate, wind10m, rh2m
     real(RKIND),intent(in),   dimension(ims:ime,1:kfire,jms:jme,1:num_e_bb_in),optional :: e_bb_in
+    real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: hpbl2d
 
     !local variables
     real(RKIND), parameter :: delta_theta4gust = 0.5
     real(RKIND) :: theta, wdgust, snoweq, term2, term3
+    real(RKIND) :: SFCWIND,WIND,DELWIND,DZ
 !    real(RKIND), dimension(ims:ime, jms:jme) :: 
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme) :: thetav
 
-    integer :: i, j, k, k1, nv
+    integer :: i, j, k, k1, nv, hour_int
+    real(RKIND) :: precip_factor, wet_fact
+    real(RKIND), dimension(ims:ime, jms:jme) ::  totprcp, ter ! SRB: placeholder for now
+    real(RKIND), intent(out), dimension(ims:ime, jms:jme) ::  windgustpot, uspdavg2d
 
     if ( do_mpas_smoke ) then
        if (ktau==1) then
@@ -1078,17 +1093,74 @@ contains
    
 
 ! TODO - JLS add HWP options 
-       !>-- HWP: Pre-release of RRFSv1 method - using wind gust calculated via UPP Method
+!---- Calculate wind gust potential and average boundary layer wind
+       do i = its,ite
+       do j = jts,jte
+          ter(i,j) = z_at_w(i,kts,j)  ! SRB: placeholder for now
+          SFCWIND          = sqrt(u10(i,j)**2+v10(i,j)**2)
+          windgustpot(i,j) = SFCWIND
+          uspdavg2d(i,j)   = SFCWIND
+           ! SRB - Adding safeguard for kpbl for first timestep
+           !if (ktau==1) then
+           !   kpbl(i,j) = kpbl_thetav(i,j)
+           !endif
+
+          if (kpbl(i,j)+1 .ge. kts+1 ) then
+             do k=kts+1,kpbl(i,j)+1   ! Use kpbl from MYNN
+                WIND = wind_phy(i,k,j) !sqrt(us3d(i,k,j)**2+vs3d(i,k,j)**2)
+                uspdavg2d(i,j) = uspdavg2d(i,j) + WIND
+                DELWIND = WIND - SFCWIND
+                DZ = zmid(i,k,j) - ter(i,j)
+                DELWIND = DELWIND*(1.0-MIN(0.5,DZ/2000.))
+                windgustpot(i,j) = max(windgustpot(i,j),SFCWIND+DELWIND)
+             enddo
+          endif
+          uspdavg2d(i,j)  =  uspdavg2d(i,j) / real(kpbl(i,j))
+          hpbl2d(i,j)     =  z_at_w(i,kpbl(i,j),j) - z_at_w(i,kts,j) ! From MYNN
+       enddo
+       enddo
+
+       hour_int = floor(curr_secs/3600._RKIND)
+       precip_factor  = 2.5_RKIND + real(hour_int, kind=RKIND)*2.5_RKIND/24._RKIND
+
        do i=its, ite
        do j=jts, jte
+           !totprcp_prev24 (i,j) = 0._RKIND
+           totprcp       (i,j) = 0._RKIND  ! SRB: placeholder for now
+       enddo
+       enddo
+
+       do i=its, ite
+       do j=jts, jte
+         if (xland(i,j) .eq. 0) then
+            wet_fact=vegfrac(i,17,j)
+         else
+            wet_fact=1._RKIND
+         endif
+
          wind10m(i,j) = sqrt(u10(i,j)**2.+v10(i,j)**2.)
-         wdgust  =max(wind10m(i,j),3._RKIND)
-         snoweq  =max((25._RKIND - snowh(i,j))/25._RKIND,0._RKIND)
+         wdgust  = max(wind10m(i,j),3._RKIND) ! SRB: =SFCIWND2 in RRFSv1
+
+         SELECT CASE (hwp_method)
+         CASE(1)
+           ! SRB: HWP calculation used in RRFSv1
+           hwp(i,j) =  0.022_RKIND*max(precip_factor-(totprcp(i,j)+totprcp_prev24(i,j))*1.e+3_RKIND,0._RKIND)/precip_factor * &
+                       ((1._RKIND-wetness(i,j)*wet_fact)**0.51_RKIND) *                                                      &
+                       (wdgust*hpbl2d(i,j))**0.57 *                                                                          &
+                       MIN(25.0_RKIND,MAX(15._RKIND,t2m(i,j)-dpt2m(i,j)))**0.74 *                                            &
+                       MIN(3._RKIND, 1._RKIND + swdown(i,j)/250._RKIND)**0.18
+         CASE(2)
+           
+           snoweq  =max((25._RKIND - snowh(i,j))/25._RKIND,0._RKIND)
 !         term2   = max(t2m(i,j)-dpt2m(i,j),15._RKIND)**1.03 ! TODO, floating point exception
-         term2   = 15._RKIND
-         term3   = (1._RKIND-wetness(i,j))**0.4
-         hwp(i,j)= 0.177_RKIND * wdgust**0.97 * term2 * ((1._RKIND-wetness(i,j))**0.4) * snoweq
+           term2   = 15._RKIND
+           term3   = (1._RKIND-wetness(i,j))**0.4
+           hwp(i,j)= 0.177_RKIND * wdgust**0.97 * term2 * ((1._RKIND-wetness(i,j))**0.4) * snoweq
+
+         CASE DEFAULT
+         END SELECT
          hwp_day_avg(i,j)=hwp(i,j)
+
        enddo
        enddo
     endif ! do_mpas_smoke
