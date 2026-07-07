@@ -25,7 +25,7 @@ module module_hab_emissions
     REAL(RKIND), parameter :: U10_THRESH    = 3.5     ! Minimum wind speed for whitecapping (m/s)
     REAL(RKIND), parameter :: EF_BASE       = 150.0   ! Maximum Enrichment Factor at calm conditions
     REAL(RKIND), parameter :: EF_DECAY      = 0.15    ! Decay rate of EF with increasing wind speed
-    REAL(RKIND), parameter :: FLUX_SCALAR   = 1.0E-8  ! Empirical scaling factor for bulk water flux to match GOCART totals
+    REAL(RKIND), parameter :: FLUX_SCALAR   = 1.0E-12  ! Empirical scaling factor for bulk water flux to match GOCART totals
     REAL(RKIND), parameter :: DT_SCALAR = 0.05_RKIND  ! Fractional flux enhancement per 1K of positive Delta T
 
 contains
@@ -42,7 +42,6 @@ contains
                                    xice, tsk, t2m,                 &
                                    bact_water_conc,                &
                                    chem,num_chem,                  &
-                                   index_bact_fine,                &
                                    ids, ide, jds, jde, kds, kde,   &
                                    ims, ime, jms, jme, kms, kme,   &
                                    its, ite, jts, jte, kts, kte)
@@ -51,7 +50,7 @@ contains
         integer, intent(in) :: ids,ide, jds,jde, kds,kde
         integer, intent(in) :: ims,ime, jms,jme, kms,kme
         integer, intent(in) :: its,ite, jts,jte, kts,kte
-        integer, intent(in) :: num_chem,index_bact_fine
+        integer, intent(in) :: num_chem
 
         ! --- Meteorological Inputs ---
         REAL(RKIND), intent(in) :: dt                              ! Time step (s)
@@ -83,6 +82,7 @@ contains
         ! --- Execution ---
         k = kts ! Emissions only applied to the lowest model layer
 
+        write(*,*) 'maxval of bact_water_conc = ',maxval(bact_water_conc)
         ! Loop over tiles (Outer loop J, Inner loop I for Fortran memory contiguity)
         do j = jts, jte
             do i = its, ite
@@ -98,9 +98,11 @@ contains
 
                     ! 2. Calculate Enrichment Factor for this grid cell
                     call calc_enrichment_factor(wspd10, ef)
+                    write(*,*) 'calculating enrichment factor',ef
 
                     ! 3. Calculate bulk volumetric water flux (m3/m2/s)
                     call calc_bulk_spray_flux(wspd10, w_flux)
+                    write(*,*) ' calculating water flux',w_flux
 
                     ! 4. Calculate Convective Enhancement Scalar
                     ! Using lowest model level (k=kts) for air temperature
@@ -111,15 +113,15 @@ contains
                         ! Stable or neutral conditions: no enhancement
                         convective_scalar = 1.0_RKIND
                     end if
-
+                    write(*,*) ' calculating convective scalar', convective_scalar
                     ! 5. Calculate total emitted bioaerosol flux
                     ! F = (Water_Flux) * (Bulk_Concentration) * EF
                     b_flux = w_flux * bact_water_conc(i,j) * ef * convective_scalar       ! * 1000 if map is in ug/L==mg/m3
-
+                    write(*,*) ' emitted bioaerosol/bacteria flux = ', b_flux
                     ! Tendency = Flux / (Air_Density * Layer_Depth)
                     ! Add to existing tendency
                     ! bact_tend(i,k,j) = bact_tend(i,k,j) + (b_flux / (air_rho * dz8w(i,k,j)))
-                    chem(i,k,j,index_bact_fine) = chem(i,k,j,index_bact_fine) + ((b_flux * dt) / (rho_phy(i,k,j) * dz8w(i,k,j)))
+                    chem(i,k,j,p_bact_fine) = chem(i,k,j,p_bact_fine) + ((b_flux * dt) / (rho_phy(i,k,j) * dz8w(i,k,j)))
 
                 end if
 
@@ -137,22 +139,18 @@ contains
     ! dilution of the sea surface microlayer (SML) due to turbulent 
     ! mixing at higher wind speeds.
     !-----------------------------------------------------------------------
+!-----------------------------------------------------------------------
+    ! SUBROUTINE: calc_enrichment_factor
+    !-----------------------------------------------------------------------
     subroutine calc_enrichment_factor(wspd, ef_out)
         REAL(RKIND), intent(in)  :: wspd
         REAL(RKIND), intent(out) :: ef_out
-        REAL(RKIND) :: excess_wind
         
-        if (wspd > U10_THRESH) then
-            excess_wind = wspd - U10_THRESH
-            ! Exponential decay of enrichment due to wave mixing
-            ef_out = EF_BASE * exp(-1.0 * EF_DECAY * excess_wind)
-            
-            ! Ensure EF doesn't drop below 1.0 (bulk water concentration)
-            if (ef_out < 1.0) ef_out = 1.0
-        else
-            ! Below whitecap threshold, microlayer is fully intact/enriched
-            ef_out = EF_BASE
-        end if
+        ! Continuous exponential decay of enrichment due to wind-driven mixing
+        ef_out = EF_BASE * exp(-1.0_RKIND * EF_DECAY * wspd)
+        
+        ! Ensure EF doesn't drop below 1.0 (bulk water concentration)
+        if (ef_out < 1.0_RKIND) ef_out = 1.0_RKIND
 
     end subroutine calc_enrichment_factor
 
@@ -167,14 +165,16 @@ contains
     subroutine calc_bulk_spray_flux(wspd, flux_out)
         REAL(RKIND), intent(in)  :: wspd
         REAL(RKIND), intent(out) :: flux_out
+
+        flux_out = FLUX_SCALAR * (wspd ** 3.41_RKIND)
         
-        if (wspd > U10_THRESH) then
-            ! Monahan whitecap coverage scales with U10^3.41
-            ! FLUX_SCALAR is used to convert this relationship into a bulk volume
-            flux_out = FLUX_SCALAR * (wspd ** 3.41)
-        else
-            flux_out = 0.0
-        end if
+       ! if (wspd > U10_THRESH) then
+       !     ! Monahan whitecap coverage scales with U10^3.41
+       !     ! FLUX_SCALAR is used to convert this relationship into a bulk volume
+       !     flux_out = FLUX_SCALAR * (wspd ** 3.41)
+       ! else
+       !     flux_out = 0.0
+       ! end if
 
     end subroutine calc_bulk_spray_flux
 

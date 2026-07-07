@@ -665,15 +665,15 @@ contains
   ! -- add sea salt emissions
   if (do_mpas_hab) then
     if  (do_timing) call mpas_timer_start('hab_driver')
+       call mpas_log_write( ' Calling hab driver')
        call hab_bacteria_driver(dt, rho_phy, dz8w, u10, v10, xland,    &
                                    xice, tskin, t2m,               &
                                    bact_water_conc,                &
                                    chem,num_chem,                  &
-                                   index_bact_fine,                &
                                    ids, ide, jds, jde, kds, kde,   &
                                    ims, ime, jms, jme, kms, kme,   &
                                    its, ite, jts, jte, kts, kte    )
-    if  (do_timing) call mpas_timer_stop('seasalt_driver')
+    if  (do_timing) call mpas_timer_stop('hab_driver')
     endif
     
 
