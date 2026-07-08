@@ -959,8 +959,8 @@ contains
 !    real(RKIND), dimension(ims:ime, jms:jme) :: 
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme) :: thetav
 
-    integer :: i, j, k, k1, nv, hour_int
-    real(RKIND) :: precip_factor, wet_fact
+    integer :: i, j, k, k1, nv, hour_int, kpbl2
+    real(RKIND) :: precip_factor, wet_fact, precip_tot
     real(RKIND), dimension(ims:ime, jms:jme) ::  totprcp, ter ! SRB: placeholder for now
     real(RKIND), intent(out), dimension(ims:ime, jms:jme) ::  windgustpot, uspdavg2d
 
@@ -1101,12 +1101,14 @@ contains
           windgustpot(i,j) = SFCWIND
           uspdavg2d(i,j)   = SFCWIND
            ! SRB - Adding safeguard for kpbl for first timestep
-           !if (ktau==1) then
-           !   kpbl(i,j) = kpbl_thetav(i,j)
-           !endif
+           if (ktau==1) then
+              kpbl2(i,j) = kpbl_thetav(i,j)
+           else 
+              kpbl2(i,j) = kbpl(i,j)
+           endif
 
-          if (kpbl(i,j)+1 .ge. kts+1 ) then
-             do k=kts+1,kpbl(i,j)+1   ! Use kpbl from MYNN
+          if (kpbl2+1 .ge. kts+1 ) then
+             do k=kts+1,kpbl2+1   ! Use kpbl from MYNN
                 WIND = wind_phy(i,k,j) !sqrt(us3d(i,k,j)**2+vs3d(i,k,j)**2)
                 uspdavg2d(i,j) = uspdavg2d(i,j) + WIND
                 DELWIND = WIND - SFCWIND
@@ -1115,20 +1117,20 @@ contains
                 windgustpot(i,j) = max(windgustpot(i,j),SFCWIND+DELWIND)
              enddo
           endif
-          uspdavg2d(i,j)  =  uspdavg2d(i,j) / real(kpbl(i,j))
-          hpbl2d(i,j)     =  z_at_w(i,kpbl(i,j),j) - z_at_w(i,kts,j) ! From MYNN
+          uspdavg2d(i,j)  =  uspdavg2d(i,j) / real(kpbl2)
+          hpbl2d(i,j)     =  z_at_w(i,kpbl2,j) - z_at_w(i,kts,j) ! From MYNN
        enddo
        enddo
 
        hour_int = floor(curr_secs/3600._RKIND)
        precip_factor  = 2.5_RKIND + real(hour_int, kind=RKIND)*2.5_RKIND/24._RKIND
 
-       do i=its, ite
-       do j=jts, jte
+       !do i=its, ite
+       !do j=jts, jte
            !totprcp_prev24 (i,j) = 0._RKIND
-           totprcp       (i,j) = 0._RKIND  ! SRB: placeholder for now
-       enddo
-       enddo
+       totprcp = 0._RKIND  ! SRB: placeholder for now
+       !enddo
+       !enddo
 
        do i=its, ite
        do j=jts, jte
@@ -1144,7 +1146,12 @@ contains
          SELECT CASE (hwp_method)
          CASE(1)
            ! SRB: HWP calculation used in RRFSv1
-           hwp(i,j) =  0.022_RKIND*max(precip_factor-(totprcp(i,j)+totprcp_prev24(i,j))*1.e+3_RKIND,0._RKIND)/precip_factor * &
+           if (ebb_dcycle .eq. 2) then
+              precip_tot = totprcp(i,j)+totprcp_prev24(i,j)
+           else
+              precip_tot = totprcp(i,j)
+           endif
+           hwp(i,j) =  0.022_RKIND*max(precip_factor-(precip_tot*1.e+3_RKIND),0._RKIND)/precip_factor * &
                        ((1._RKIND-wetness(i,j)*wet_fact)**0.51_RKIND) *                                                      &
                        (wdgust*hpbl2d(i,j))**0.57 *                                                                          &
                        MIN(25.0_RKIND,MAX(15._RKIND,t2m(i,j)-dpt2m(i,j)))**0.74 *                                            &
