@@ -33,6 +33,7 @@ OBJS = \
         module_anthro_pt_emissions.o \
         module_rwc_emissions.o \
         module_tactic_sna.o \
+        module_hab_emissions.o \
         module_ltng_cpmpr92z.o \
         module_ltng_crmpr92.o \
         module_ltng_iccg.o \
@@ -51,6 +52,9 @@ module_fire_emissions.o: \
 	mpas_smoke_init.o
 
 mpas_smoke_init.o:
+
+module_hab_emissions.o: \
+        mpas_smoke_init.o
 
 module_tactic_sna.o: \
         mpas_smoke_init.o
@@ -121,6 +125,7 @@ mpas_smoke_wrapper.o:      \
         rad_data_mod.o \
         module_data_rrtmgaeropt.o \
         mpas_mie_module.o \
+        module_hab_emissions.o \
         module_lightning_driver.o \
 	      module_simple_soa.o
 
