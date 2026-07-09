@@ -86,6 +86,14 @@ module dep_data_mod
       if (p_pols_tree>0)         ls_frac(p_pols_tree)        = 0.5_RKIND
       if (p_pols_grass>0)        ls_frac(p_pols_grass)       = 0.5_RKIND
       if (p_pols_weed>0)         ls_frac(p_pols_weed)        = 0.5_RKIND
+!
+      if (p_soa>0)               ls_frac(p_soa)              = 0.5_RKIND
+      if (p_antsoa>0)            ls_frac(p_antsoa)           = 0.5_RKIND
+      if (p_bbsoa>0)             ls_frac(p_bbsoa)            = 0.5_RKIND
+!
+      if (p_bc>0)                ls_frac(p_bc)       = 0.5_RKIND
+      if (p_oc>0)                ls_frac(p_oc)       = 0.5_RKIND
+      if (p_brc>0)               ls_frac(p_brc)      = 0.5_RKIND
 
    end subroutine aero_wet_dep_init
 
@@ -123,6 +131,14 @@ module dep_data_mod
       if (p_pols_tree>0)         aero_dens(p_pols_tree)        = 1.425E3_RKIND
       if (p_pols_grass>0)        aero_dens(p_pols_grass)       = 1.425E3_RKIND
       if (p_pols_weed>0)         aero_dens(p_pols_weed)        = 1.425E3_RKIND
+
+      if (p_soa>0)               aero_dens(p_soa)              = 1.3E3_RKIND
+      if (p_antsoa>0)            aero_dens(p_antsoa)           = 1.3E3_RKIND
+      if (p_bbsoa>0)             aero_dens(p_bbsoa)            = 1.3E3_RKIND
+!
+      if (p_bc>0)                aero_dens(p_bc)               = 1.4E3_RKIND
+      if (p_oc>0)                aero_dens(p_oc)               = 1.4E3_RKIND
+      if (p_brc>0)               aero_dens(p_brc)              = 1.4E3_RKIND
     ! Aerosol diameters (m)
       if (p_smoke_ultrafine>0)   aero_diam(p_smoke_ultrafine)   = 4E-9_RKIND    ! JLS, check
       if (p_smoke_fine>0)        aero_diam(p_smoke_fine)        = 4E-8_RKIND    ! JLS, check
@@ -140,7 +156,6 @@ module dep_data_mod
       if (p_ssalt_coarse>0)      aero_diam(p_ssalt_coarse)      = 5.632E-6_RKIND
 !
       if (p_bact_fine>0)         aero_diam(p_bact_fine)         = 5.E-6_RKIND
-
 !
       if (p_polp_all>0)          aero_diam(p_polp_all)          = 30E-6_RKIND
       if (p_polp_tree>0)         aero_diam(p_polp_tree)         = 35E-6_RKIND
@@ -151,6 +166,14 @@ module dep_data_mod
       if (p_pols_tree>0)         aero_diam(p_pols_tree)         = 1.5E-7_RKIND
       if (p_pols_grass>0)        aero_diam(p_pols_grass)        = 1.5E-7_RKIND
       if (p_pols_weed>0)         aero_diam(p_pols_weed)         = 1.5E-7_RKIND
+! 
+      if (p_soa>0)               aero_diam(p_soa)               = 1.E-8_RKIND
+      if (p_antsoa>0)            aero_diam(p_antsoa)            = 1.E-8_RKIND
+      if (p_bbsoa>0)             aero_diam(p_bbsoa)             = 1.E-8_RKIND
+!
+      if (p_bc>0)                aero_diam(p_bc)                = 4E-8_RKIND
+      if (p_oc>0)                aero_diam(p_oc)                = 4E-8_RKIND
+      if (p_brc>0)               aero_diam(p_brc)               = 4E-8_RKIND
 
    end subroutine aero_dry_dep_init
 
