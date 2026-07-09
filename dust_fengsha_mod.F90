@@ -22,13 +22,14 @@ module dust_fengsha_mod
 
 contains
 
-  subroutine gocart_dust_fengsha_driver(dt,ktau,              &
+  subroutine gocart_dust_fengsha_driver(dt,ktau,         &
        chem,rho_phy,smois,stemp,p8w,                     &
        isltyp,snowh,xland,area,g,                        &
-       ust,znt,clay,sand,uthr,uthr_sg,                   &
-       albedo_drag,feff,sep,                             & 
-       e_dust_out, num_e_dust_out, &
-       index_e_dust_out_dust_fine, index_e_dust_out_dust_coarse,   &
+       ust,znt,clay,sand,uthr,                           &
+       rdrag,ssm,                                        &   
+       e_dust_out, num_e_dust_out,                       &
+       index_e_dust_out_dust_fine,                       & 
+       index_e_dust_out_dust_coarse,                     &
        num_emis_dust,num_chem,num_soil_layers,           &
        dust_alpha, dust_gamma, dust_drylimit_factor,     &
        dust_moist_correction,                            &
@@ -46,7 +47,7 @@ contains
          num_e_dust_out, index_e_dust_out_dust_fine, index_e_dust_out_dust_coarse,ktau
 
     ! 2d input variables
-    REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: sep     ! Sediment supply map
+    REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: ssm     ! Sediment supply map
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: snowh   ! snow height (m)
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: xland   ! dominant land use type
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: area    ! area of grid cell [m2]
@@ -54,10 +55,8 @@ contains
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: znt     ! Surface Roughness length (m)
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: clay    ! Clay Fraction (-)
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: sand    ! Sand Fraction (-)
-    REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: albedo_drag   ! Drag Partition (-)
-    REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: feff          ! (New) Drag Partition
+    REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: rdrag   ! Drag Partition (-)
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: uthr    ! Dry Threshold Velocity (m/s)
-    REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: uthr_sg ! (sg) Dry Threshold Velocity (m/s)
     REAL(RKIND), INTENT(IN) :: dust_alpha, dust_gamma, dust_drylimit_factor, dust_moist_correction
 
     INTEGER,         DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: isltyp  ! soil type
@@ -137,7 +136,7 @@ contains
 
              ! Total erodibility.
              
-             erodtot = sep(i,j) ! SUM(erod(i,j,:))
+             erodtot = ssm(i,j) ! SUM(erod(i,j,:))
              
              ! Don't allow roughness lengths greater than 20 cm to be lofted.
              ! This kludge accounts for land use types like urban areas and
@@ -189,8 +188,8 @@ contains
                 ! use the precalculated version derived from ASCAT; Prigent et al. (2012,2015)
                 ! doi:10.1109/TGRS.2014.2338913 & doi:10.5194/amt-5-2703-2012
                 ! pick only valid values
-                if (feff(i,j) > 1.E-10_RKIND) then
-                  R = real(feff(i,j), kind=RKIND)
+                if (rdrag(i,j) > 1.E-10_RKIND) then
+                  R = real(rdrag(i,j), kind=RKIND)
                 else
                   reason_nodust = 6._RKIND
                   cycle
@@ -427,7 +426,7 @@ contains
   end subroutine fengsha_drag
 
   subroutine DustEmissionFENGSHA(slc, clay, sand, silt,  &
-                                  sep, feff, airdens, ustar, uthrs, alpha, gamma, &
+                                  ssm, feff, airdens, ustar, uthrs, alpha, gamma, &
                                   kvhmax, grav, rhop, emissions,reason,dust_drylimit_factor)
     
     ! !USES:
@@ -438,7 +437,7 @@ contains
     REAL(RKIND), intent(in) :: clay     ! fractional clay content [1]
     REAL(RKIND), intent(in) :: sand     ! fractional sand content [1]
     REAL(RKIND), intent(in) :: silt     ! fractional silt content [1]
-    REAL(RKIND), intent(in) :: sep      ! erosion map [1]
+    REAL(RKIND), intent(in) :: ssm      ! erosion map [1]
     REAL(RKIND), intent(in) :: feff    ! drag partition [1/m]
     REAL(RKIND), intent(in) :: airdens  ! air density at lowest level [kg/m^3]
     REAL(RKIND), intent(in) :: ustar    ! friction velocity [m/sec]
@@ -493,7 +492,7 @@ contains
 
    ! Compute total emissions
    ! -----------------------
-   emissions = alpha_grav * (sep ** gamma) * airdens * kvh
+   emissions = alpha_grav * (ssm ** gamma) * airdens * kvh
 
    !  Compute threshold wind friction velocity using drag partition
    !  -------------------------------------------------------------

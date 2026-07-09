@@ -23,8 +23,9 @@ contains
        num_chem, chem,                                           &
        dt, u10, v10, rho, dz8w, t, z_at_w, ktop2d,               &
        xland, rainc, rainnc, relhum,                             &
-       swdown, total_flashrate, cldfrac,                         &
+       swdown, ic_flashrate, cg_flashrate, cldfrac,              &
        num_pols_per_polp, pollen_emis_scale_factor,              &
+       do_pollen_lightning_rupture, do_pollen_rh_rupture,        &
        tree_pollen_emis_scale_factor,                            &
        grass_pollen_emis_scale_factor,                           &
        weed_pollen_emis_scale_factor,                            &
@@ -82,7 +83,7 @@ contains
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ),               &
            INTENT(IN) :: swdown      ! Shortwave radiation at the surface (W/m2)
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ),              &
-           INTENT(IN) :: total_flashrate ! lightning flash rate (s-1)
+           INTENT(IN) :: ic_flashrate, cg_flashrate ! lightning flash rate (s-1)
     REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme ),      &
            INTENT(IN) :: cldfrac
     REAL(RKIND), DIMENSION( ims:ime , 1:kbio, jms:jme, 1:num_e_bio_in ),              & 
@@ -94,6 +95,8 @@ contains
                                tree_pollen_emis_scale_factor,                  &
                                grass_pollen_emis_scale_factor,                 &
                                weed_pollen_emis_scale_factor
+    LOGICAL, INTENT(IN) :: do_pollen_lightning_rupture
+    LOGICAL, INTENT(IN) :: do_pollen_rh_rupture
 
 ! local variables
     INTEGER     :: i, j, k, l, l_oc,ibin                                     
@@ -105,7 +108,6 @@ contains
     REAL(RKIND) :: flashrate_for_rupture
     INTEGER     :: kfreeze 
     REAL(RKIND) :: depth, ratio, cgfrac
-    REAL(RKIND), DIMENSION( its:ite , jts:jte ) :: ic_flashrate, cg_flashrate
     INTEGER     :: ierr
     REAL(RKIND) :: diam_polp_tree, diam_polp_grass, diam_polp_weed
     REAL(RKIND) :: rho_polp_tree, rho_polp_grass, rho_polp_weed
@@ -137,8 +139,6 @@ contains
     REAL(RKIND), PARAMETER :: coef_E = 63.09_RKIND
     REAL(RKIND), PARAMETER :: cldtop_adjustment = 0._RKIND
 
-    LOGICAL, PARAMETER :: do_pollen_lightning_rupture = .false.
-    LOGICAL, PARAMETER :: do_pollen_rh_rupture = .true.
 
     day_to_sec = 1._RKIND / hpd / sph
     piover6    = pi / 6._RKIND
@@ -177,71 +177,69 @@ contains
     do i = its, ite
    
       ! No emissions over water or at night
-    if ( xland(i,j) .lt. 1.5_RKIND .and. swdown(i,j) .gt. 0._RKIND ) then ! land
+    if ( ( xland(i,j) - 1.5_RKIND ) .ge. 0 .and. swdown(i,j) .le. 0._RKIND ) cycle
 
-     ! Compute the rainfall at the current time step (and convert to mm)
-       rain  = (rainc(i,j) + rainnc(i,j)) * 1.e3_RKIND
-     ! Determine the rainfall factor
-       if ( rain < 0.5_RKIND ) then
-          fr = 1._RKIND
-       else if ( rain > 1.0_RKIND) then
-          fr = 0._RKIND
-       else
-          fr = ( 1._RKIND - rain ) / ( 1._RKIND - 0.5_RKIND )
-       end if
+    ! Compute the rainfall at the current time step (and convert to mm)
+      rain  = (rainc(i,j) + rainnc(i,j)) * 1.e3_RKIND
+    ! Determine the rainfall factor
+      if ( rain < 0.5_RKIND ) then
+         fr = 1._RKIND
+      else if ( rain > 1.0_RKIND) then
+         fr = 0._RKIND
+      else
+         fr = ( 1._RKIND - rain ) / ( 1._RKIND - 0.5_RKIND )
+      end if
 
-     ! Compute the wind and wind factor
-       wind = ( sqrt( u10(i,j)**2._RKIND + v10(i,j)**2._RKIND ) )
-       fw = 1.5_RKIND * ( 1._RKIND -  exp( -1._RKIND * wind * 0.2_RKIND ))
+    ! Compute the wind and wind factor
+      wind = ( sqrt( u10(i,j)**2._RKIND + v10(i,j)**2._RKIND ) )
+      fw = 1.5_RKIND * ( 1._RKIND -  exp( -1._RKIND * wind * 0.2_RKIND ))
 
-     ! Compute the relative humidity factor
-       if ( (relhum(i,kts,j) * 100._RKIND) < rh_low ) then
-          fh = 1._RKIND
-       else if ( (relhum(i,kts,j) * 100._RKIND) > rh_high ) then
-          fh = 0.1_RKIND
-       else
-          fh = (rh_high - (relhum(i,kts,j) * 100._RKIND )) / (rh_high - rh_low)
-       end if
+    ! Compute the relative humidity factor
+      if ( (relhum(i,kts,j) * 100._RKIND) < rh_low ) then
+         fh = 1._RKIND
+      else if ( (relhum(i,kts,j) * 100._RKIND) > rh_high ) then
+         fh = 0.1_RKIND
+      else
+         fh = (rh_high - (relhum(i,kts,j) * 100._RKIND )) / (rh_high - rh_low)
+      end if
  
-     ! Combine the factors
-     ! Emissions are described / day, convert to /sec 
-       fa = fh * fw * fr * day_to_sec
+    ! Combine the factors
+    ! Emissions are described / day, convert to /sec 
+      fa = fh * fw * fr * day_to_sec
   
-     ! Compute the number emissions
-       ppemfact_numb_tree  = e_bio_in(i,1,j,index_e_bio_in_polp_tree)  * fa !, 0._RKIND)
-       ppemfact_numb_grass = e_bio_in(i,1,j,index_e_bio_in_polp_grass) * fa !, 0._RKIND)
-       ppemfact_numb_weed  = e_bio_in(i,1,j,index_e_bio_in_polp_weed)  * fa !, 0._RKIND)
+    ! Compute the number emissions
+      ppemfact_numb_tree  = e_bio_in(i,1,j,index_e_bio_in_polp_tree)  * fa !, 0._RKIND)
+      ppemfact_numb_grass = e_bio_in(i,1,j,index_e_bio_in_polp_grass) * fa !, 0._RKIND)
+      ppemfact_numb_weed  = e_bio_in(i,1,j,index_e_bio_in_polp_weed)  * fa !, 0._RKIND)
    
-     ! Convert number emissions to mass emissions 
-     ! fac[1-3] = # * pi/6 * dens * diam^3 * 1.e-9
-       ppemfact_mass_tree  = ppemfact_numb_tree  * fac1
-       ppemfact_mass_grass = ppemfact_numb_grass * fac2
-       ppemfact_mass_weed  = ppemfact_numb_weed  * fac3 
-       ! Calculate the conversion factor
-       factaa = dt / ( dz8w(i,kts,j) * rho(i,kts,j) )
+    ! Convert number emissions to mass emissions 
+    ! fac[1-3] = # * pi/6 * dens * diam^3 * 1.e-9
+      ppemfact_mass_tree  = ppemfact_numb_tree  * fac1
+      ppemfact_mass_grass = ppemfact_numb_grass * fac2
+      ppemfact_mass_weed  = ppemfact_numb_weed  * fac3 
+      ! Calculate the conversion factor
+      factaa = dt / ( dz8w(i,kts,j) * rho(i,kts,j) )
 
-     ! Compute the mass emissions, update the diagnostic and chemistry arrays
-       emis = tree_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_tree
-       e_bio_out(i,kts,j,index_e_bio_out_polp_tree)  = e_bio_out(i,kts,j,index_e_bio_out_polp_tree) + emis
-       if (p_polp_tree .gt. 0)   chem(i,kts,j,p_polp_tree)  = chem(i,kts,j,p_polp_tree) + emis
+    ! Compute the mass emissions, update the diagnostic and chemistry arrays
+      emis = tree_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_tree
+      e_bio_out(i,kts,j,index_e_bio_out_polp_tree)  = e_bio_out(i,kts,j,index_e_bio_out_polp_tree) + emis
+      if (p_polp_tree .gt. 0)   chem(i,kts,j,p_polp_tree)  = chem(i,kts,j,p_polp_tree) + emis
 
-       emis = grass_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_grass
-       e_bio_out(i,kts,j,index_e_bio_out_polp_grass)  = e_bio_out(i,kts,j,index_e_bio_out_polp_grass) + emis
-       if (p_polp_grass .gt. 0)  chem(i,kts,j,p_polp_grass)  = chem(i,kts,j,p_polp_grass) + emis
+      emis = grass_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_grass
+      e_bio_out(i,kts,j,index_e_bio_out_polp_grass)  = e_bio_out(i,kts,j,index_e_bio_out_polp_grass) + emis
+      if (p_polp_grass .gt. 0)  chem(i,kts,j,p_polp_grass)  = chem(i,kts,j,p_polp_grass) + emis
 
-       emis = weed_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_weed
-       e_bio_out(i,kts,j,index_e_bio_out_polp_weed)  = e_bio_out(i,kts,j,index_e_bio_out_polp_weed) + emis
-       if (p_polp_weed .gt. 0)  chem(i,kts,j,p_polp_weed)  = chem(i,kts,j,p_polp_weed) + emis
+      emis = weed_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_weed
+      e_bio_out(i,kts,j,index_e_bio_out_polp_weed)  = e_bio_out(i,kts,j,index_e_bio_out_polp_weed) + emis
+      if (p_polp_weed .gt. 0)  chem(i,kts,j,p_polp_weed)  = chem(i,kts,j,p_polp_weed) + emis
 
-       if (p_polp_all .gt. 0) then
-          emis = pollen_emis_scale_factor * factaa * &
-                (tree_pollen_emis_scale_factor * ppemfact_mass_tree + &
-                 grass_pollen_emis_scale_factor * ppemfact_mass_grass + &
-                 weed_pollen_emis_scale_factor * ppemfact_mass_weed) 
-          chem(i,kts,j,p_polp_all)   = chem(i,kts,j,p_polp_all)  + emis
-       endif
-
-     endif ! if land
+      if (p_polp_all .gt. 0) then
+         emis = pollen_emis_scale_factor * factaa * &
+               (tree_pollen_emis_scale_factor * ppemfact_mass_tree + &
+                grass_pollen_emis_scale_factor * ppemfact_mass_grass + &
+                weed_pollen_emis_scale_factor * ppemfact_mass_weed) 
+         chem(i,kts,j,p_polp_all)   = chem(i,kts,j,p_polp_all)  + emis
+      endif
 
    enddo
    enddo
@@ -295,46 +293,6 @@ contains
    endif ! do_pollen_rh_rupture
 
    if (do_pollen_lightning_rupture) then
-! Compute the lightning flash rates, first intitialize
-    do j=jts,jte
-    do i=its,ite
-       ic_flashrate(i,j) = 0._RKIND
-       cg_flashrate(i,j) = 0._RKIND
-    enddo
-    enddo
-! ----------
-    do j=jts,jte
-    do i=its,ite
-    if ( total_flashrate(i,j) .gt. 0.) then
-      ! Look for freezing level
-        kfreeze = ktop2d(i,j)
-        do while ( t(i,kfreeze,j) .lt. 273.15 .and. kfreeze .gt. 1 )
-            kfreeze = kfreeze - 1
-        enddo
-      ! Calculate the depth between ktop and kfreeze (km)
-        depth = ( z_at_w(i,ktop2d(i,j),j) - z_at_w(i,kfreeze,j) ) * 1.E-3_RKIND + cldtop_adjustment
-        if (depth .le. 0.) continue
-        depth = max( dH_min, min( dH_max, depth ))
-
-        ratio = (((coef_A*depth+coef_B )*depth+coef_C)*depth+coef_D)*depth+coef_E
-        cgfrac = 1._RKIND / (ratio+1._RKIND)
-
-        cg_flashrate(i,j) = total_flashrate(i,j) * cgfrac
-        ic_flashrate(i,j) = total_flashrate(i,j) - cg_flashrate(i,j)
-    endif
-    enddo
-    enddo
-
-    fac9  =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp       * &
-             ((diam_pols)**3._RKIND)/((diam_polp)**3._RKIND) * flashrate_for_rupture
-    fac10 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_tree  * &
-             ((diam_pols)**3._RKIND)/((diam_polp_tree)**3._RKIND) * flashrate_for_rupture
-    fac11 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_grass * &
-             ((diam_pols)**3._RKIND)/((diam_polp_grass)**3._RKIND) * flashrate_for_rupture
-    fac12 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_weed  * &
-             ((diam_pols)**3._RKIND)/((diam_polp_weed)**3._RKIND) * flashrate_for_rupture
-    fac13 =  1._RKIND - (pols_to_polp_frac_lt * flashrate_for_rupture)
-
   ! Loop over the grid cells to simulate pollen rupture due to lightning, polp --> pols
     do j = jte, jte
     do k = kte, kts, -1
@@ -344,6 +302,15 @@ contains
        else
           flashrate_for_rupture = cg_flashrate(i,j)
        endif
+       fac9  =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp       * &
+                ((diam_pols)**3._RKIND)/((diam_polp)**3._RKIND) * flashrate_for_rupture
+       fac10 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_tree  * &
+                ((diam_pols)**3._RKIND)/((diam_polp_tree)**3._RKIND) * flashrate_for_rupture
+       fac11 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_grass * &
+                ((diam_pols)**3._RKIND)/((diam_polp_grass)**3._RKIND) * flashrate_for_rupture
+       fac12 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_weed  * &
+                ((diam_pols)**3._RKIND)/((diam_polp_weed)**3._RKIND) * flashrate_for_rupture
+       fac13 =  1._RKIND - (pols_to_polp_frac_lt * flashrate_for_rupture)
      ! Convert polp->pols due to lightning
        if ( p_pols_all .gt. 0 ) then
          if (p_polp_all .gt. 0 ) then

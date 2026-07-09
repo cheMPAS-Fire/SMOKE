@@ -10,6 +10,9 @@ OBJS = \
 	dep_dry_simple_mod.o \
 	dep_dry_mod_emerson.o \
 	dep_data_mod.o \
+        module_data_rrtmgaeropt.o \
+	module_peg_util.o \
+        mpas_mie_module.o \
 	rad_data_mod.o \
 	module_wetdep_ls.o \
 	module_zero_plumegen_coms.o \
@@ -27,8 +30,17 @@ OBJS = \
 	module_fire_emissions.o \
         pollen_mod.o \
         module_anthro_emissions.o \
+        module_anthro_pt_emissions.o \
         module_rwc_emissions.o \
-        module_tactic_sna.o
+        module_tactic_sna.o \
+        dep_dry_mod_wesley.o \
+        module_hab_emissions.o \
+        module_ltng_cpmpr92z.o \
+        module_ltng_crmpr92.o \
+        module_ltng_iccg.o \
+        module_ltng_lpi.o \
+        module_lightning_driver.o \
+	      module_simple_soa.o
    
 
 MPAS_SMOKE: $(OBJS)
@@ -42,6 +54,9 @@ module_fire_emissions.o: \
 
 mpas_smoke_init.o:
 
+module_hab_emissions.o: \
+        mpas_smoke_init.o
+
 module_tactic_sna.o: \
         mpas_smoke_init.o
 
@@ -53,8 +68,14 @@ dep_dry_mod_emerson.o: \
 dep_data_mod.o: \
 	mpas_smoke_init.o
 
+dep_dry_mod_wesley.o: \
+	dep_data_mod.o \
+	mpas_smoke_init.o \
+	mpas_smoke_config.o
+
 rad_data_mod.o: \
-	mpas_smoke_init.o
+	mpas_smoke_init.o \
+	mpas_mie_module.o
 
 dust_fengsha_mod.o: \
 	mpas_smoke_config.o \
@@ -64,10 +85,16 @@ dust_fengsha_mod.o: \
 dust_data_mod.o: \
 	mpas_smoke_init.o
 
+module_peg_util.o: \
+        module_peg_util.o
+
 module_smoke_diagnostics.o: \
 	mpas_smoke_config.o \
 	mpas_smoke_init.o \
-	rad_data_mod.o
+	rad_data_mod.o \
+	module_peg_util.o \
+	module_data_rrtmgaeropt.o \
+	mpas_mie_module.o
 
 module_wetdep_ls.o: \
 	mpas_smoke_config.o \
@@ -96,14 +123,30 @@ mpas_smoke_wrapper.o:      \
         dust_fengsha_mod.o \
         pollen_mod.o \
         module_anthro_emissions.o \
+        module_anthro_pt_emissions.o \
         ssalt_mod.o \
         module_tactic_sna.o \
         module_smoke_diagnostics.o \
         dep_data_mod.o \
-        rad_data_mod.o
+        rad_data_mod.o \
+        module_data_rrtmgaeropt.o \
+        mpas_mie_module.o \
+        dep_dry_mod_wesley.o \
+        module_hab_emissions.o \
+        module_lightning_driver.o \
+	      module_simple_soa.o
 
 module_zero_plumegen_coms.o: \
         mpas_smoke_config.o
+
+module_data_rrtmgaeropt.o: \
+        mpas_smoke_init.o \
+	module_peg_util.o
+
+mpas_mie_module.o: \
+        mpas_smoke_init.o \
+	module_data_rrtmgaeropt.o \
+	module_peg_util.o
 
 ssalt_mod.o: \
 	seas_ngac_mod.o \
@@ -117,6 +160,10 @@ seas_ngac_mod.o:
 module_anthro_emissions.o: \
         mpas_smoke_init.o
 
+module_anthro_pt_emissions.o: \
+        mpas_smoke_init.o \
+        module_rwc_emissions.o
+
 module_rwc_emissions.o: \
         mpas_smoke_init.o
 
@@ -124,6 +171,27 @@ pollen_mod.o: \
         mpas_smoke_config.o \
         mpas_smoke_init.o \
         dep_data_mod.o
+
+module_ltng_cpmpr92z.o:
+
+module_ltng_crmpr92.o:
+
+module_ltng_iccg.o:
+
+module_ltng_lpi.o:
+
+module_lightning_driver.o: \
+        mpas_smoke_config.o \
+        mpas_smoke_init.o \
+        module_ltng_cpmpr92z.o \
+        module_ltng_crmpr92.o \
+        module_ltng_iccg.o \
+        module_ltng_lpi.o \
+	      module_peg_util.o
+
+module_simple_soa.o: \
+	mpas_smoke_config.o \
+	mpas_smoke_init.o
 
 
 #module_smoke_plumerise.o: module_smoke_plumerise.F90
