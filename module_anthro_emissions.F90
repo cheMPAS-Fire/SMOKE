@@ -28,6 +28,7 @@ contains
                            index_e_ant_in_nh4_a_fine,                                &
                            index_e_ant_in_so2, index_e_ant_in_nh3,                   &
                            index_e_ant_in_ch4, index_e_ant_in_nox, index_e_ant_in_co,&
+                           index_e_ant_in_voc,                                       &
                            index_e_ant_out_unspc_ultrafine,                          &
                            index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
                            index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine,   &
@@ -35,6 +36,7 @@ contains
                            index_e_ant_out_so2, index_e_ant_out_nh3,                 &
                            index_e_ant_out_ch4, index_e_ant_out_nox,                 &
                            index_e_ant_out_co,                                       &
+                           index_e_ant_out_voc,                                      &
                            ids,ide, jds,jde, kds,kde,                                &
                            ims,ime, jms,jme, kms,kme,                                &
                            its,ite, jts,jte, kts,kte                                 )
@@ -53,13 +55,15 @@ contains
            index_e_ant_in_so2, index_e_ant_in_nh3,                   &
            index_e_ant_in_ch4,                                       &
            index_e_ant_in_nox, index_e_ant_in_co,                    &
+           index_e_ant_in_voc,                                       &
                                   index_e_ant_out_unspc_ultrafine,   &
            index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
            index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine,   &
            index_e_ant_out_nh4_a_fine,                               &
            index_e_ant_out_so2, index_e_ant_out_nh3,                 &
            index_e_ant_out_ch4, index_e_ant_out_nox,                 &
-           index_e_ant_out_co
+           index_e_ant_out_co,                                       &
+           index_e_ant_out_voc                  
 
    REAL(RKIND), INTENT(IN    ) :: dt,gmt
    REAL(RKIND), INTENT(IN    ) :: anthro_emis_scale_factor
@@ -125,6 +129,11 @@ contains
         emis = conv_gas*e_ant_in(i,k,j,index_e_ant_in_nh3)
         chem(i,k,j,p_nh3) = chem(i,k,j,p_nh3) + emis
         e_ant_out(i,k,j,index_e_ant_out_nh3) = e_ant_out(i,k,j,index_e_ant_out_nh3) + emis
+      endif
+      if (p_antvoc .gt. 0 .and. index_e_ant_in_voc .gt. 0 ) then
+        emis = conv_gas*e_ant_in(i,k,j,index_e_ant_in_voc)
+        chem(i,k,j,p_antvoc) = chem(i,k,j,p_antvoc) + emis
+        e_ant_out(i,k,j,index_e_ant_out_voc) = e_ant_out(i,k,j,index_e_ant_out_voc) + emis
       endif
 
       if (p_no3_a_fine   .gt. 0) chem(i,k,j,p_no3_a_fine)   = chem(i,k,j,p_no3_a_fine)   + conv_aer*e_ant_in(i,k,j,index_e_ant_in_no3_a_fine)
