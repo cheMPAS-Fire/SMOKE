@@ -26,7 +26,13 @@ contains
                            e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,                & 
                            e_ant_stack_groups_in, num_e_ant_stack_groups_in,         & 
                            anthro_pt_emis_scale_factor,                              &
-                           index_e_ant_pt_in_unspc_fine,                             &
+                           index_e_ant_pt_in_unspc_ultrafine,                           &
+                           index_e_ant_pt_in_unspc_fine, index_e_ant_pt_in_unspc_coarse,   &
+                           index_e_ant_pt_in_no3_a_fine, index_e_ant_pt_in_so4_a_fine,     &
+                           index_e_ant_pt_in_nh4_a_fine,                                &
+                           index_e_ant_pt_in_so2, index_e_ant_pt_in_nh3,index_e_ant_pt_in_ch4,&
+                           index_e_ant_pt_in_nox, index_e_ant_pt_in_co,                    &
+                           index_e_ant_pt_in_voc,                                       &
                            index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
                            index_STKLT, index_STKLG,                                 &
                            ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
@@ -40,9 +46,15 @@ contains
                                   ids,ide, jds,jde, kds,kde,         &
                                   ims,ime, jms,jme, kms,kme,         &
                                   its,ite, jts,jte, kts,kte,         &
+                                  index_e_ant_pt_in_unspc_ultrafine,                           &
+                                  index_e_ant_pt_in_unspc_fine, index_e_ant_pt_in_unspc_coarse,   &
+                                  index_e_ant_pt_in_no3_a_fine, index_e_ant_pt_in_so4_a_fine,     &
+                                  index_e_ant_pt_in_nh4_a_fine,                                &
+                                  index_e_ant_pt_in_so2, index_e_ant_pt_in_nh3,index_e_ant_pt_in_ch4,&
+                                  index_e_ant_pt_in_nox, index_e_ant_pt_in_co,                    &
+                                  index_e_ant_pt_in_voc,                                       &
                                   num_e_ant_pt_in, num_anthro_pt,     &
                                   num_e_ant_stack_groups_in,         &
-                                  index_e_ant_pt_in_unspc_fine,   &
                                   index_STKHT, index_STKDM,          &
                                   index_STKTK, index_STKVE,          &
                                   index_STKLT, index_STKLG
