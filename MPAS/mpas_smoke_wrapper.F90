@@ -1104,7 +1104,7 @@ contains
            if (ktau==1) then
               kpbl2(i,j) = kpbl_thetav(i,j)
            else 
-              kpbl2(i,j) = kbpl(i,j)
+              kpbl2(i,j) = kpbl(i,j)
            endif
 
           if (kpbl2+1 .ge. kts+1 ) then
