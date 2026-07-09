@@ -149,7 +149,7 @@ contains
            aod3d_smoke, aod3d   , aod3d_simple,&
            tauaer_lw_p           , tauaer_sw_p           , ssaaer_sw_p          , asyaer_sw_p,&
            ktau                  , dt                    , dxcell               ,            &
-           area                  , ter                   , xice                              &
+           area                  , ter                   , xice                 ,            &
            xland                 , u10                   , v10                  ,            &
            ust                   , xlat                  , xlong                ,            &
            tskin                 , pblh                  , t2m                  ,            &
@@ -525,7 +525,6 @@ contains
         t_phy,u_phy,v_phy,p_phy,pi_phy,z_at_w,                              &
         dz8w,dz8w_flip,                                                     &
         rho_phy,qv,relhum,rh2m,rri,                                         &
-        total_flashrate,                                                    &
         wind_phy,theta_phy,zmid,kpbl,kpbl_thetav,                           &
         peak_hr,coef_bb_dc,fire_hist,                                       &
         lu_nofire, lu_qfire, lu_sfire, fire_type,                           &
@@ -1090,7 +1089,6 @@ contains
         t_phy,u_phy,v_phy,p_phy,pi_phy,z_at_w,                              &
         dz8w,dz8w_flip,                                                     &
         rho_phy,qv,relhum,rh2m,rri,                                         &
-        total_flashrate,                                                    &
         wind_phy,theta_phy,zmid,kpbl,kpbl_thetav,                           &
         peak_hr,coef_bb_dc,fire_hist,                                       &
         lu_nofire, lu_qfire, lu_sfire, fire_type,                           &
@@ -1278,9 +1276,9 @@ contains
           uspdavg2d(i,j)   = SFCWIND
            ! SRB - Adding safeguard for kpbl for first timestep
            if (ktau==1) then
-              kpbl2(i,j) = kpbl_thetav(i,j)
+              kpbl2 = kpbl_thetav(i,j)
            else 
-              kpbl2(i,j) = kpbl(i,j)
+              kpbl2 = kpbl(i,j)
            endif
 
           if (kpbl2+1 .ge. kts+1 ) then
