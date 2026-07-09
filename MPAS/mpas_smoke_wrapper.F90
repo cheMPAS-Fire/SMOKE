@@ -27,6 +27,7 @@ module mpas_smoke_wrapper
    use ssalt_mod
    use module_smoke_diagnostics
    use module_data_rrtmgaeropt
+   use module_lightning_driver
    use module_simple_soa, only : simple_soa, simple_soa_voc
 
    implicit none
@@ -119,9 +120,21 @@ contains
            add_fire_moist_flux   , plumerisefire_frq     , bb_qv_scale_factor   ,            &
            dust_alpha            , dust_gamma            , dust_drylimit_factor ,            &
            dust_moist_correction ,                                                           &
+           ic_flashcount, ic_flashrate, cg_flashcount, cg_flashrate, lpi,                    &
            num_pols_per_polp     , pollen_emis_scale_factor,                                 &
            tree_pollen_emis_scale_factor, grass_pollen_emis_scale_factor        ,            &
            weed_pollen_emis_scale_factor,                                                    &
+           config_convection_scheme, config_microp_scheme,                                   &
+           do_pollen_lightning_rupture, do_pollen_rh_rupture,                                &
+           config_lightning_option, &
+           lightning_dt, &
+           lightning_start_seconds, &
+           flashrate_factor, &
+           iccg_method, &
+           iccg_prescribed_num, &
+           iccg_prescribed_den, &
+           lightning_cellcount_method, &
+           lightning_cldtop_adjustment, &
            anthro_emis_scale_factor, anthro_pt_emis_scale_factor,                            &
            bb_input_prevh        , rwc_emis_scale_factor, plumerise_opt_rwc     ,            &
            RWC_denominator       , RWC_annual_sum       ,                                    &
@@ -133,7 +146,7 @@ contains
            aod3d_smoke, aod3d   , aod3d_simple,&
            tauaer_lw_p           , tauaer_sw_p           , ssaaer_sw_p          , asyaer_sw_p,&
            ktau                  , dt                    , dxcell               ,            &
-           area                  ,                                                           &
+           area                  , ter                   ,                                   &
            xland                 , u10                   , v10                  ,            &
            ust                   , xlat                  , xlong                ,            &
            tskin                 , pblh                  , t2m                  ,            &
@@ -148,6 +161,7 @@ contains
            rainncv               , dpt2m                 , znt                  ,            &
            mavail                , g                     , vegfra               ,            &
            landusef              , cldfrac               , ktop_deep            ,            &
+           refl10cm              ,                                                           &
            cp                    , rd                    , gmt                  ,            &
            ids       , ide       , jds       , jde       , kds       , kde      ,            &
            ims       , ime       , jms       , jme       , kms       , kme      ,            &
@@ -178,7 +192,7 @@ contains
     integer,intent(in),dimension(1:num_anthro_pt),optional :: ant_pt_local_cell_idx, ant_pt_rank
     integer,intent(in) :: myrank
 ! 2D mesh arguments
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland   ! grid
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland, ter   ! grid
 ! 2D Met input
     integer,intent(in), dimension(ims:ime, jms:jme)                :: isltyp, ivgtyp ! domainant soil, vegetation type
     integer,intent(in), dimension(ims:ime, jms:jme)                :: kpbl          ! k-index of PBLH
@@ -289,6 +303,8 @@ contains
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: hwp, coef_bb_dc
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: hfx_bb, qfx_bb, frac_grid_burned
     integer,intent(inout),dimension(ims:ime,jms:jme),optional      :: min_bb_plume, max_bb_plume, max_rwc_plume
+    real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: ic_flashcount, ic_flashrate, cg_flashcount, cg_flashrate, lpi
+    real(RKIND),intent(inout),dimension(ims:ime, kms:kme, jms:jme),optional :: refl10cm
 ! 2D + chem output arrays
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme, 1:num_chem),optional :: wetdep_resolved
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme, 1:num_chem),optional :: drydep_flux
@@ -350,6 +366,18 @@ contains
      real(RKIND),intent(in),optional  :: tree_pollen_emis_scale_factor, &
                                          grass_pollen_emis_scale_factor, &
                                          weed_pollen_emis_scale_factor
+     logical, intent(in)                :: do_pollen_lightning_rupture
+     logical, intent(in)                :: do_pollen_rh_rupture
+     character(len=*), intent(in)       :: config_lightning_option
+     real(kind=RKIND), intent(in)       :: lightning_dt
+     real(kind=RKIND), intent(in)       :: lightning_start_seconds
+     real(kind=RKIND), intent(in)       :: flashrate_factor
+     integer, intent(in)                :: iccg_method
+     real(kind=RKIND), intent(in)       :: iccg_prescribed_num
+     real(kind=RKIND), intent(in)       :: iccg_prescribed_den
+     integer, intent(in)                :: lightning_cellcount_method
+     real(kind=RKIND), intent(in)       :: lightning_cldtop_adjustment
+     character(len=*), intent(in)       :: config_convection_scheme, config_microp_scheme 
 
 !----------------------------------
 !>-- Local Variables
@@ -361,8 +389,6 @@ contains
     integer :: julday
 !>- dust & chemistry variables
     real(RKIND), dimension(ims:ime, 1:nlcat, jms:jme) :: vegfrac
-    ! JLS, temporary, need to read in like SMOKE_RRFS/MPAS
-    real(RKIND), dimension(ims:ime, jms:jme) :: total_flashrate
 !>- plume variables
     ! -- buffers
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, num_e_bb_in) :: ebu
@@ -449,6 +475,25 @@ contains
       call aero_wet_dep_init()
       call mpas_log_write( ' Initializing radiation feedback parameterss ')
       call aero_rad_init()
+      if ( config_lightning_option .ne. 'off' ) then
+         call lightning_init( &
+                              dt,   &
+                            ! Namelist control options
+                             config_convection_scheme,config_microp_scheme,      &
+                             config_lightning_option, lightning_dt,           &
+                             lightning_start_seconds,                  &
+                             lightning_activation_time,                              &
+                             iccg_prescribed_num, iccg_prescribed_den, &
+                             lightning_cellcount_method,                        &
+                            ! Order dependent args for domain, mem, and tile dims
+                             ids, ide, jds, jde, kds, kde,             &
+                             ims, ime, jms, jme, kms, kme,             &
+                             its, ite, jts, jte, kts, kte,             &
+                            ! IC and CG flash rates and accumulated flash count
+                             ic_flashcount, ic_flashrate,              &
+                             cg_flashcount, cg_flashrate              &
+                            )
+     endif
    endif
 !
     uspdavg2d   = 0._RKIND
@@ -483,6 +528,45 @@ contains
         ims,ime, jms,jme, kms,kme,                                          &
         its,ite, jts,jte, kts,kte)
    if  (do_timing) call mpas_timer_stop('smoke_prep')
+
+   
+   if ( config_lightning_option .ne. 'off' ) then
+       call lightning_driver ( &
+                          ! Frequently used prognostics
+                            curr_secs, dt, area,                  &
+                            xlat, xlong, xland, ter,               &
+                            t_phy, p_phy, rho_phy,                &
+                            u_phy, v_phy, vvel,                   &
+                            theta_phy, pi_phy,dz8w,                  &
+                            zmid,                                 &
+                            qv,qc_vis,qr_vis,qi_vis,qs_vis,qg_vis,   &
+                          ! Scheme specific prognostics
+                            ktop_deep,                            &
+                            refl10cm,                             &
+                          ! Mandatory namelist inputs
+                            config_lightning_option,                     &
+                            lightning_dt,                         &
+                            lightning_start_seconds,              &
+                            lightning_activation_time,                          &
+                            flashrate_factor,                     &
+                          ! IC:CG namelist settings
+                            iccg_method,                          &
+                            iccg_prescribed_num,                  &
+                            iccg_prescribed_den,                  &
+                          ! Scheme specific namelist inputs
+                            lightning_cellcount_method,                     &
+                            lightning_cldtop_adjustment,                    &
+                          ! Order dependent args for domain, mem, and tile dims
+                            ids, ide, jds, jde, kds, kde,         &
+                            ims, ime, jms, jme, kms, kme,         &
+                            its, ite, jts, jte, kts, kte,         &
+                          ! Mandatory outputs for all quantitative schemes
+                            ic_flashcount, ic_flashrate,          &
+                            cg_flashcount, cg_flashrate,           &
+                            lpi                                   &
+                            )
+
+   endif
 
         
    if ( do_mpas_smoke ) then
@@ -663,9 +747,11 @@ contains
     call  pollen_driver       (                                       &
        num_chem, chem,                                                &
        dt, u10, v10, rho_phy, dz8w, t_phy, z_at_w, ktop_deep,         &
-       xland, raincv, rainncv, relhum, swdown, total_flashrate,       &
+       xland, raincv, rainncv, relhum, swdown,                        & 
+       ic_flashrate, cg_flashrate,                                    & 
        cldfrac,                                                       &
        num_pols_per_polp,pollen_emis_scale_factor,                    &
+       do_pollen_lightning_rupture, do_pollen_rh_rupture,              &
        tree_pollen_emis_scale_factor,                                 &
        grass_pollen_emis_scale_factor,                                &
        weed_pollen_emis_scale_factor,                                 &
@@ -1008,7 +1094,7 @@ contains
     real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: lu_nofire, lu_qfire, lu_sfire
     real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: fire_hist, peak_hr, hwp_day_avg
     real(RKIND),intent(inout),dimension(ims:ime,jms:jme),optional :: hwp, coef_bb_dc
-    real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: total_flashrate, wind10m, rh2m
+    real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: wind10m, rh2m
     real(RKIND),intent(in),   dimension(ims:ime,1:kfire,jms:jme,1:num_e_bb_in),optional :: e_bb_in
     real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: hpbl2d
 
@@ -1080,7 +1166,6 @@ contains
     ! JLS, TODO, lightning flashrate
     do j=jts,jte
     do i=its,ite
-       total_flashrate(i,j) = 0._RKIND
        rh2m(i,j) = relhum(i,1,j)
 ! TODO, JLS, check
 !       rh2m(i,j) = EXP((17.625_RKIND*(dpt2m(i,j)+273.15_RKIND))/(243.04_RKIND+(dpt2m(i,j)+273.15_RKIND))) / &
