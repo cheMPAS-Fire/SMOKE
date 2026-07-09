@@ -157,7 +157,6 @@ contains
        if ( settling_opt .eq. 1 ) then
 ! Compute vg with loops ordered to give nv innermost (stride-1 writes for vg)
 !$omp parallel do collapse(3) default(shared) private(i,k,j,nv,local_airvisc,local_freepath,local_rho_cm,Cc,cterm,tval) schedule(static)
-!$omp end parallel do
           do i = its, ite
              do k = kts, kte
                 do j = jts, jte
@@ -177,6 +176,7 @@ contains
                 enddo
              enddo
           enddo
+!$omp end parallel do
 !          do nv = 1, num_chem
 !             if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
 !             ! Convert diameter to cm and aerodens to g/cm3
