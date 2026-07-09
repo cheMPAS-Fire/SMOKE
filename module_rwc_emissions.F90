@@ -175,7 +175,11 @@ contains
         REAL(RKIND) :: dTemp_dz, dTheta_dz ! Temperature gradients
         REAL(RKIND) :: plumerise 
         REAL(RKIND) :: z_1, z_2            ! Midpoint height of Levels 1 and 2 [m]
+<<<<<<< Updated upstream
         INTEGER     :: kmin, k
+=======
+        INTEGER     :: k,kmin
+>>>>>>> Stashed changes
 
         ! Constants
         REAL(RKIND), PARAMETER :: GRAV           = 9.81    ! gravity [m/s^2]
