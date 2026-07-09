@@ -7,7 +7,7 @@ module dep_data_mod
 
   implicit none
 
-  public :: aero_dry_dep_init, aero_wet_dep_init, gas_dry_dep_init
+  public :: aero_dry_dep_init, aero_wet_dep_init, gas_dry_dep_init, ialpha_read_LUT
 
   real(RKIND), parameter :: max_dep_vel = 0.005                   ! m/s (may need to set per species)
   real(RKIND), parameter :: dep_ref_hgt = 2.0                     ! Meters 
@@ -53,6 +53,10 @@ module dep_data_mod
 
 ! Arrays to hold density and diameters of aerosols
   real(RKIND), dimension(1000), save :: aero_dens, aero_diam, ls_frac
+! For AERSETT Settling
+  real(RKIND), dimension(:), allocatable, save :: alpha_ar, ialpha_ar
+  real(RKIND), SAVE :: alpha_min, alpha_max, alpha_step
+  real(RKIND), PARAMETER :: Re_0 = 0.0232_RKIND
   REAL(KIND=RKIND), DIMENSION(1000), save :: henry_const  ! Effective Henry's Law Constant (M/atm)
   REAL(KIND=RKIND), DIMENSION(1000), save :: reactivity   ! Reactivity factor for Wesely Rc (f0)
   REAL(KIND=RKIND), DIMENSION(1000), save :: diff_ratio   ! Ratio of molecular diffusivity to H2O
@@ -67,6 +71,7 @@ module dep_data_mod
   REAL(KIND=RKIND), DIMENSION(max_modis,max_season) :: rgrnd_tbl  ! Base Ground/Soil Resistance (s/m)
 
   contains
+
    subroutine aero_wet_dep_init
 
       implicit none
@@ -188,6 +193,52 @@ module dep_data_mod
       if (p_brc>0)               aero_diam(p_brc)               = 4E-8_RKIND
 
    end subroutine aero_dry_dep_init
+
+
+   subroutine ialpha_read_LUT
+    ! read the values of I(alpha) in ialpha.txt. Function I(alpha) is described in MaMa25
+    integer :: unit, n_alpha_values, i
+    real(RKIND) :: alpha, ialpha
+    real(RKIND) :: alpha_min, alpha_max, alpha_step
+
+    character(len=128), parameter :: aersett_data_path = "/scratch4/BMC/acomp/cheMPAS-Fire/input/aux/aersett/"
+
+    unit = 20
+
+    ! First count lines
+    open(unit, file=trim(aersett_data_path)//"/ialpha.txt",status="old",action="read")
+    read(unit,*)
+    read(unit,*)
+    read(unit,*)
+    n_alpha_values=0
+    do
+       read(unit,*,end=1) alpha, ialpha
+       n_alpha_values=n_alpha_values+1
+    end do
+1   close(unit)
+
+    ! Allocate arrays
+    allocate(alpha_ar(n_alpha_values))
+    allocate(ialpha_ar(n_alpha_values))
+
+    ! read again and store values
+    open(unit, file=trim(aersett_data_path)//"/ialpha.txt",status="old",action="read")
+    read(unit,*)
+    read(unit,*)
+    read(unit,*)
+    do i=1, n_alpha_values
+       read(unit,*) alpha_ar(i), ialpha_ar(i)
+    end do
+    close(unit)
+
+    ! Calculate the min value and the step for the alpha array
+    alpha_min = alpha_ar(1)
+    alpha_max = alpha_ar(n_alpha_values)
+    alpha_step = (alpha_max - alpha_min) / (n_alpha_values - 1)
+    print*, 'First alpha value in LUT:', alpha_min
+    print*, 'Last alpha value in LUT:', alpha_max
+    print*, 'Step of ialpha LUT:', alpha_step
+ end subroutine ialpha_read_LUT
 
    subroutine gas_dry_dep_init
 
