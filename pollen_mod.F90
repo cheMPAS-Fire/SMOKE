@@ -23,8 +23,9 @@ contains
        num_chem, chem,                                           &
        dt, u10, v10, rho, dz8w, t, z_at_w, ktop2d,               &
        xland, rainc, rainnc, relhum,                             &
-       swdown, total_flashrate, cldfrac,                         &
+       swdown, ic_flashrate, cg_flashrate, cldfrac,              &
        num_pols_per_polp, pollen_emis_scale_factor,              &
+       do_pollen_lightning_rupture, do_pollen_rh_rupture,        &
        tree_pollen_emis_scale_factor,                            &
        grass_pollen_emis_scale_factor,                           &
        weed_pollen_emis_scale_factor,                            &
@@ -82,7 +83,7 @@ contains
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ),               &
            INTENT(IN) :: swdown      ! Shortwave radiation at the surface (W/m2)
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ),              &
-           INTENT(IN) :: total_flashrate ! lightning flash rate (s-1)
+           INTENT(IN) :: ic_flashrate, cg_flashrate ! lightning flash rate (s-1)
     REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme ),      &
            INTENT(IN) :: cldfrac
     REAL(RKIND), DIMENSION( ims:ime , 1:kbio, jms:jme, 1:num_e_bio_in ),              & 
@@ -94,6 +95,8 @@ contains
                                tree_pollen_emis_scale_factor,                  &
                                grass_pollen_emis_scale_factor,                 &
                                weed_pollen_emis_scale_factor
+    LOGICAL, INTENT(IN) :: do_pollen_lightning_rupture
+    LOGICAL, INTENT(IN) :: do_pollen_rh_rupture
 
 ! local variables
     INTEGER     :: i, j, k, l, l_oc,ibin                                     
@@ -105,7 +108,6 @@ contains
     REAL(RKIND) :: flashrate_for_rupture
     INTEGER     :: kfreeze 
     REAL(RKIND) :: depth, ratio, cgfrac
-    REAL(RKIND), DIMENSION( its:ite , jts:jte ) :: ic_flashrate, cg_flashrate
     INTEGER     :: ierr
     REAL(RKIND) :: diam_polp_tree, diam_polp_grass, diam_polp_weed
     REAL(RKIND) :: rho_polp_tree, rho_polp_grass, rho_polp_weed
@@ -137,8 +139,6 @@ contains
     REAL(RKIND), PARAMETER :: coef_E = 63.09_RKIND
     REAL(RKIND), PARAMETER :: cldtop_adjustment = 0._RKIND
 
-    LOGICAL, PARAMETER :: do_pollen_lightning_rupture = .false.
-    LOGICAL, PARAMETER :: do_pollen_rh_rupture = .true.
 
     day_to_sec = 1._RKIND / hpd / sph
     piover6    = pi / 6._RKIND
@@ -293,46 +293,6 @@ contains
    endif ! do_pollen_rh_rupture
 
    if (do_pollen_lightning_rupture) then
-! Compute the lightning flash rates, first intitialize
-    do j=jts,jte
-    do i=its,ite
-       ic_flashrate(i,j) = 0._RKIND
-       cg_flashrate(i,j) = 0._RKIND
-    enddo
-    enddo
-! ----------
-    do j=jts,jte
-    do i=its,ite
-    if ( total_flashrate(i,j) .gt. 0.) then
-      ! Look for freezing level
-        kfreeze = ktop2d(i,j)
-        do while ( t(i,kfreeze,j) .lt. 273.15 .and. kfreeze .gt. 1 )
-            kfreeze = kfreeze - 1
-        enddo
-      ! Calculate the depth between ktop and kfreeze (km)
-        depth = ( z_at_w(i,ktop2d(i,j),j) - z_at_w(i,kfreeze,j) ) * 1.E-3_RKIND + cldtop_adjustment
-        if (depth .le. 0.) continue
-        depth = max( dH_min, min( dH_max, depth ))
-
-        ratio = (((coef_A*depth+coef_B )*depth+coef_C)*depth+coef_D)*depth+coef_E
-        cgfrac = 1._RKIND / (ratio+1._RKIND)
-
-        cg_flashrate(i,j) = total_flashrate(i,j) * cgfrac
-        ic_flashrate(i,j) = total_flashrate(i,j) - cg_flashrate(i,j)
-    endif
-    enddo
-    enddo
-
-    fac9  =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp       * &
-             ((diam_pols)**3._RKIND)/((diam_polp)**3._RKIND) * flashrate_for_rupture
-    fac10 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_tree  * &
-             ((diam_pols)**3._RKIND)/((diam_polp_tree)**3._RKIND) * flashrate_for_rupture
-    fac11 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_grass * &
-             ((diam_pols)**3._RKIND)/((diam_polp_grass)**3._RKIND) * flashrate_for_rupture
-    fac12 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_weed  * &
-             ((diam_pols)**3._RKIND)/((diam_polp_weed)**3._RKIND) * flashrate_for_rupture
-    fac13 =  1._RKIND - (pols_to_polp_frac_lt * flashrate_for_rupture)
-
   ! Loop over the grid cells to simulate pollen rupture due to lightning, polp --> pols
     do j = jte, jte
     do k = kte, kts, -1
@@ -342,6 +302,15 @@ contains
        else
           flashrate_for_rupture = cg_flashrate(i,j)
        endif
+       fac9  =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp       * &
+                ((diam_pols)**3._RKIND)/((diam_polp)**3._RKIND) * flashrate_for_rupture
+       fac10 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_tree  * &
+                ((diam_pols)**3._RKIND)/((diam_polp_tree)**3._RKIND) * flashrate_for_rupture
+       fac11 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_grass * &
+                ((diam_pols)**3._RKIND)/((diam_polp_grass)**3._RKIND) * flashrate_for_rupture
+       fac12 =  pols_to_polp_frac_lt * num_pols_per_polp * rho_pols/rho_polp_weed  * &
+                ((diam_pols)**3._RKIND)/((diam_polp_weed)**3._RKIND) * flashrate_for_rupture
+       fac13 =  1._RKIND - (pols_to_polp_frac_lt * flashrate_for_rupture)
      ! Convert polp->pols due to lightning
        if ( p_pols_all .gt. 0 ) then
          if (p_polp_all .gt. 0 ) then
