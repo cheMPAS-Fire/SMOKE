@@ -1,4 +1,10 @@
 MODULE module_ltng_lpi
+  use mpas_kind_types
+  implicit none
+
+  private
+
+  public :: calclpi 
 !Yair, Y., B. Lynn, C. Price, V. Kotroni, K. Lagouvardos, E. Morin,
 !A. Magnai, and M. del Carmen Llasat (2010), Predicting the potential for
 !lightning activity in Mediterranean storms based on the Weather
@@ -28,7 +34,7 @@ CONTAINS
   INTEGER,      INTENT(IN   )    ::   ids,ide, jds,jde, kds,kde , &
                                       ims,ime, jms,jme, kms,kme , &
                                       its,ite, jts,jte, kts,kte
-  REAL, DIMENSION( ims:ime , kms:kme , jms:jme ),                 &
+  REAL(RKIND), DIMENSION( ims:ime , kms:kme , jms:jme ),                 &
         INTENT(IN) ::                                          &
                                                               qv, &
                                                               qc, &
@@ -37,23 +43,23 @@ CONTAINS
                                                               qs, &
                                                               qg,qh
 
-      REAL, DIMENSION( ims:ime, kms:kme, jms:jme ),                  &
+      REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme ),                  &
          INTENT(IN ) ::  w, z
-      REAL, INTENT(IN),     DIMENSION(ims:ime, kms:kme, jms:jme)::      &
+      REAL(RKIND), INTENT(IN),     DIMENSION(ims:ime, kms:kme, jms:jme)::      &
      &                      dz8w,pi_phy,p_phy,rho_phy
-      REAL, INTENT(IN),  DIMENSION(ims:ime, kms:kme, jms:jme)::      &
+      REAL(RKIND), INTENT(IN),  DIMENSION(ims:ime, kms:kme, jms:jme)::      &
      &                      th_phy
-      REAL, INTENT(INOUT),  DIMENSION(ims:ime,jms:jme)::      &
+      REAL(RKIND), INTENT(INOUT),  DIMENSION(ims:ime,jms:jme)::      &
      &                      LPI
 
 
 
 
-      REAL, DIMENSION(kms:kme)::    tempk,rh
-      REAL, DIMENSION(kms:kme):: qv1d,p1d,rho1d,qti1d
-      REAL, DIMENSION(kms:kme):: temp,qc1d,ql1d,qi1d,qs1d,qg1d,lpi1d
-      REAL, DIMENSION(0:kme):: w1d,height
-      REAL, DIMENSION(kms:kme):: e1d,height_t,w1d_t
+      REAL(RKIND), DIMENSION(kms:kme)::    tempk,rh
+      REAL(RKIND), DIMENSION(kms:kme):: qv1d,p1d,rho1d,qti1d
+      REAL(RKIND), DIMENSION(kms:kme):: temp,qc1d,ql1d,qi1d,qs1d,qg1d,lpi1d
+      REAL(RKIND), DIMENSION(0:kme):: w1d,height
+      REAL(RKIND), DIMENSION(kms:kme):: e1d,height_t,w1d_t
       REAL z_full,qrs,teten,RELHUM,LOC,Td_850,Td_700,PC_DWPT
       INTEGER level
       REAL :: dt_lpi,t_base,t_top

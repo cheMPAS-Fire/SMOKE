@@ -16,7 +16,7 @@ module mpas_smoke_wrapper
    use dep_dry_simple_mod,    only : dry_dep_driver_simple
    use dep_dry_mod_emerson,   only : dry_dep_driver_emerson, particle_settling_wrapper
    use dep_dry_mod_wesley,    only : calc_gas_dep_vel
-   use dep_data_mod,          only : aero_dry_dep_init, aero_wet_dep_init 
+   use dep_data_mod,          only : aero_dry_dep_init, aero_wet_dep_init, gas_dry_dep_init
    use rad_data_mod,          only : aero_rad_init
    use module_wetdep_ls,      only : wetdep_ls
    use dust_fengsha_mod,      only : gocart_dust_fengsha_driver
@@ -476,6 +476,7 @@ contains
                                                                           
       call mpas_log_write( ' Initializing dry deposition parameterss ')
       call aero_dry_dep_init()
+      call gas_dry_dep_init()
       call mpas_log_write( ' Initializing wet deposition parameterss ')
       call aero_wet_dep_init()
       call mpas_log_write( ' Initializing radiation feedback parameterss ')
@@ -859,7 +860,7 @@ contains
           call mpas_log_write( ' Calling anthro point source emis driver')
           call mpas_smoke_anthro_pt_emis_driver(dt,gmt,julday,ktau,                     &
                               xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
-                              z_at_w,zmid,pblh,wind10m,area,                            &
+                              z_at_w,zmid,hpbl2d,wind10m,area,                            &
                               e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,                &
                               e_ant_stack_groups_in, num_e_ant_stack_groups_in,         &
                               anthro_pt_emis_scale_factor,                              &
@@ -884,7 +885,7 @@ contains
        call mpas_log_write( ' Calling online residential wood combustion driver')
        call mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,            &
             xlat,xlong, xland, chem,num_chem,dz8w,t_phy,rho_phy,      &
-            z_at_w,zmid,pblh,wind10m,rwc_emis_scale_factor,           &
+            z_at_w,zmid,hpbl2d,wind10m,rwc_emis_scale_factor,           &
             max_rwc_plume, plumerise_opt_rwc,                         &
             RWC_denominator, RWC_annual_sum,                          &
             RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse,   &

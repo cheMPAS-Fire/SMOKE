@@ -254,9 +254,27 @@ module dep_data_mod
     
     ! SO2
     ! Ref: Wesely (1989) Table 1 & 2; Sander (2015) for H*
-    henry_const(p_so2) = 1.0e5_RKIND
-    reactivity(p_so2)  = 1.0_RKIND
-    diff_ratio(p_so2)  = 0.53_RKIND
+    if ( p_so2 > 0) then
+       henry_const(p_so2) = 1.0e5_RKIND
+       reactivity(p_so2)  = 1.0_RKIND
+       diff_ratio(p_so2)  = 0.53_RKIND
+    endif
+
+    ! CO
+    ! Ref: Massman (1998) for diffusivity; Sander (2015) for low H*
+    if ( p_co > 0 ) then
+       henry_const(p_co)  = 1.0e-3_RKIND
+       reactivity(p_co)   = 0.0_RKIND
+       diff_ratio(p_co)   = 0.80_RKIND
+    endif
+ 
+    ! NH3
+    ! Ref: Zhang et al. (2003) for NH3 specific parameterizations; Sander (2015)
+    if ( p_nh3 > 0 ) then
+       henry_const(p_nh3) = 7.4e1_RKIND
+       reactivity(p_nh3)  = 1.0_RKIND
+       diff_ratio(p_nh3)  = 0.90_RKIND
+    endif
 
     ! NO
     ! Ref: Wesely (1989) Table 2; Sander (2015)
@@ -272,9 +290,11 @@ module dep_data_mod
 
     ! NOX Tracer
     ! Ref: Treating identically to NO2 for bulk modeling purposes
-    henry_const(p_nox) = 1.0e-2_RKIND
-    reactivity(p_nox)  = 0.1_RKIND
-    diff_ratio(p_nox)  = 0.60_RKIND
+    if ( p_nox > 0 ) then 
+       henry_const(p_nox) = 1.0e-2_RKIND
+       reactivity(p_nox)  = 0.1_RKIND
+       diff_ratio(p_nox)  = 0.60_RKIND
+    endif
 
     ! HNO3
     ! Ref: Wesely (1989) Table 2; Sander (2015) - effectively infinite H*
@@ -286,54 +306,26 @@ module dep_data_mod
     ! Ref: Wesely (1989) Table 2; Sander (2015)
     !henry_const(p_h2o2)= 1.0e5_RKIND
     !reactivity(p_h2o2) = 1.0_RKIND
-    !diff_ratio(p_h2o2) = 0.70_RKIND
-
-    ! CO
-    ! Ref: Massman (1998) for diffusivity; Sander (2015) for low H*
-    henry_const(p_co)  = 1.0e-3_RKIND
-    reactivity(p_co)   = 0.0_RKIND
-    diff_ratio(p_co)   = 0.80_RKIND
-
-    ! NH3
-    ! Ref: Zhang et al. (2003) for NH3 specific parameterizations; Sander (2015)
-    henry_const(p_nh3) = 7.4e1_RKIND
-    reactivity(p_nh3)  = 1.0_RKIND
-    diff_ratio(p_nh3)  = 0.90_RKIND
-
-! --- Custom Bulk Proxies ---
     
-    ! Bulk SOA (Bulk, Anthropogenic, Biomass Burning)
-    ! Ref: Ahmadov et al. (2012) WRF-Chem SOA treatments. 
-    ! Treated as highly sticky/condensable, slow diffusing due to MW.
-! TODO - once SOA code is merged
-
-!    henry_const(p_soa)    = 1.0e5_RKIND
-!    reactivity(p_soa)     = 0.1_RKIND
-!    diff_ratio(p_soa)     = 0.20_RKIND
-!
-!    henry_const(p_antsoa) = 1.0e5_RKIND
-!    reactivity(p_antsoa)  = 0.1_RKIND
-!    diff_ratio(p_antsoa)  = 0.20_RKIND
-!
-!    henry_const(p_bbsoa)  = 1.0e5_RKIND
-!    reactivity(p_bbsoa)   = 0.1_RKIND
-!    diff_ratio(p_bbsoa)   = 0.20_RKIND
 
 ! Bulk VOCs (Bulk, Anthropogenic, Biomass Burning)
     ! Ref: Generic CTM approximations for unspeciated non-methane hydrocarbons (NMHCs).
     ! Representative of a mix of oxygenated and non-oxygenated heavier species.
-    !henry_const(p_voc)    = 1.0_RKIND
-    !reactivity(p_voc)     = 0.5_RKIND
-    !diff_ratio(p_voc)     = 0.40_RKIND
-
-! TODO - once SOA code is merged
-!    henry_const(p_antvoc) = 1.0_RKIND
-!    reactivity(p_antvoc)  = 0.5_RKIND
-!    diff_ratio(p_antvoc)  = 0.40_RKIND
-!
-!    henry_const(p_bbvoc)  = 1.0_RKIND
-!    reactivity(p_bbvoc)   = 0.5_RKIND
-!    diff_ratio(p_bbvoc)   = 0.40_RKIND
+    !if (p_voc > 0 ) then
+    !   henry_const(p_voc)    = 1.0_RKIND
+    !   reactivity(p_voc)     = 0.5_RKIND
+    !   diff_ratio(p_voc)     = 0.40_RKIND
+    !endif
+    if ( p_antvoc > 0 ) then
+       henry_const(p_antvoc) = 1.0_RKIND
+       reactivity(p_antvoc)  = 0.5_RKIND
+       diff_ratio(p_antvoc)  = 0.40_RKIND
+    endif
+    if ( p_bbvoc > 0 ) then
+       henry_const(p_bbvoc)  = 1.0_RKIND
+       reactivity(p_bbvoc)   = 0.5_RKIND
+       diff_ratio(p_bbvoc)   = 0.40_RKIND
+    endif
 
 ! ====================================================================
     ! 3. Populate MODIS Land-Use Parameters

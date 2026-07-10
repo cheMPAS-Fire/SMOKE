@@ -14,6 +14,12 @@
 !**********************************************************************
 
  MODULE module_ltng_cpmpr92z
+  use mpas_kind_types
+  implicit none
+
+  private
+
+  public :: ltng_cpmpr92z 
  CONTAINS
 
  SUBROUTINE ltng_cpmpr92z ( &
@@ -37,16 +43,16 @@
 !-----------------------------------------------------------------
 
 ! Frequently used prognostics
- REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   )    :: area
+ REAL(RKIND),    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   )    :: area
 
- REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) :: xland, ht
- REAL,    DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(IN   ) :: z, t
+ REAL(RKIND),    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) :: xland, ht
+ REAL(RKIND),    DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(IN   ) :: z, t
 
 ! Scheme specific prognostics
  INTEGER, DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) :: kLNB     ! model LNB from cu_physics
 
 ! Scheme specific namelist inputs
- REAL,    INTENT(IN   )    ::       cldtop_adjustment
+ REAL(RKIND),    INTENT(IN   )    ::       cldtop_adjustment
 
 ! Order dependent args for domain, mem, and tile dims
  INTEGER, INTENT(IN   )    ::       ids,ide, jds,jde, kds,kde
@@ -54,13 +60,13 @@
  INTEGER, INTENT(IN   )    ::       ips,ipe, jps,jpe, kps,kpe
 
 ! Mandatory outputs for all quantitative schemes
- REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(  OUT) :: total_flashrate
+ REAL(RKIND),    DIMENSION( ims:ime,          jms:jme ), INTENT(  OUT) :: total_flashrate
 
 ! Local variables
  REAL :: dA              ! grid area dx*dy in km2
  REAL :: zkm             ! AGL z in km
 
- REAL, PARAMETER:: baseArea=1296. ! base-case area, dx = 36 km
+ REAL(RKIND), PARAMETER:: baseArea=1296. ! base-case area, dx = 36 km
 
  INTEGER :: i,k,j
 

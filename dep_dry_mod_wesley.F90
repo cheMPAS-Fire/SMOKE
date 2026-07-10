@@ -106,7 +106,8 @@ CONTAINS
 
           ! Loop over chemical species
           DO nv = 1, num_chem
-
+             ! Skip if constants aren't defined (e.g., is an aerosol)
+             if ( henry_const(nv) < 0 .or. diff_ratio(nv) < 0 .or. reactivity(nv) < 0 ) cycle
              ! -----------------------------------------------------------
              ! 2. Quasi-Laminar Boundary Layer Resistance (Rb)
              ! -----------------------------------------------------------
@@ -138,7 +139,11 @@ CONTAINS
 
              r_ground  = rgrnd_base / ( (1.0e-5_RKIND * henry_const(nv)) + &
                                        reactivity(nv) + 1.0e-9_RKIND )
-
+!             if ( j .eq. jts .and. i .eq. its ) then
+!               write(*,*) 'JLS, nv,  henry_const(nv), diff_ratio(nv), reactivity(nv)',nv,  henry_const(nv), diff_ratio(nv), reactivity(nv)
+!               write(*,*) 'JLS, rcut_base, rgrnd_base, rs_min_base, rb, ra_loc',rcut_base, rgrnd_base, rs_min_base, rb, ra_loc
+!               write(*,*) 'JLS, r_mesophyll, r_cuticle, r_ground, r_stomatal',r_mesophyll, r_cuticle, r_ground,r_stomatal
+!             endif
              ! Combine parallel pathways for total Rc
              rc = 1.0_RKIND / ( (1.0_RKIND / (r_stomatal + r_mesophyll)) + &
                                 (1.0_RKIND / r_cuticle) + &
