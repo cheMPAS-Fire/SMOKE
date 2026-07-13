@@ -14,6 +14,12 @@
 
 
  MODULE module_ltng_iccg
+  use mpas_kind_types
+  implicit none
+
+  private
+
+  public :: iccg_user_prescribed, iccg_boccippio, iccg_pr93, iccg_crm_pr93 
  CONTAINS
 
 !**********************************************************************
@@ -37,7 +43,7 @@
 !-----------------------------------------------------------------
 
 ! IC:CG namelist settings
- REAL,    INTENT(IN   )    ::       iccg_prescribed_num, iccg_prescribed_den
+ REAL(RKIND),    INTENT(IN   )    ::       iccg_prescribed_num, iccg_prescribed_den
 
 ! Order dependent args for domain, mem, and tile dims
  INTEGER, INTENT(IN   )    ::       ids,ide, jds,jde, kds,kde
@@ -45,8 +51,8 @@
  INTEGER, INTENT(IN   )    ::       ips,ipe, jps,jpe, kps,kpe
 
 ! Primary inputs and outpus
- REAL, DIMENSION( ims:ime, jms:jme ), INTENT(IN   ) :: total_flashrate   
- REAL, DIMENSION( ims:ime, jms:jme ), INTENT(  OUT) :: ic_flashrate, cg_flashrate
+ REAL(RKIND), DIMENSION( ims:ime, jms:jme ), INTENT(IN   ) :: total_flashrate   
+ REAL(RKIND), DIMENSION( ims:ime, jms:jme ), INTENT(  OUT) :: ic_flashrate, cg_flashrate
 
 ! Local variables
  REAL :: ratio
@@ -106,8 +112,8 @@
  IMPLICIT NONE
 !-----------------------------------------------------------------
 ! Inputs
- REAL, DIMENSION( ims:ime, jms:jme ), INTENT(IN   ) :: xlat, xlon
- REAL,                                INTENT(IN   ) :: iccg_prescribed_num, iccg_prescribed_den
+ REAL(RKIND), DIMENSION( ims:ime, jms:jme ), INTENT(IN   ) :: xlat, xlon
+ REAL(RKIND),                                INTENT(IN   ) :: iccg_prescribed_num, iccg_prescribed_den
 
 ! Order dependent args for domain, mem, and tile dims
  INTEGER, INTENT(IN   )    ::       ids,ide, jds,jde, kds,kde
@@ -115,21 +121,21 @@
  INTEGER, INTENT(IN   )    ::       ips,ipe, jps,jpe, kps,kpe
 
 ! Primary inputs and outpus
- REAL, DIMENSION( ims:ime, jms:jme ), INTENT(IN   ) :: total_flashrate   
- REAL, DIMENSION( ims:ime, jms:jme ), INTENT(  OUT) :: ic_flashrate, cg_flashrate
+ REAL(RKIND), DIMENSION( ims:ime, jms:jme ), INTENT(IN   ) :: total_flashrate   
+ REAL(RKIND), DIMENSION( ims:ime, jms:jme ), INTENT(  OUT) :: ic_flashrate, cg_flashrate
 
 ! Local variables
  REAL :: prescribed_ratio
  INTEGER :: i,j
 ! CONUS and tornado alley boundaries
- REAL, PARAMETER :: conus_lat_min = 25.
- REAL, PARAMETER :: conus_lat_max = 55.
- REAL, PARAMETER :: conus_lon_min = -120.
- REAL, PARAMETER :: conus_lon_max = -70.
- REAL, PARAMETER :: lon_cut_min   = -105.
- REAL, PARAMETER :: lon_cut_max   = -90.
- REAL, PARAMETER :: alley_cgfrac  = .22  ! tornado alley CG fraction
- REAL, PARAMETER :: else_cgfrac   = .4
+ REAL(RKIND), PARAMETER :: conus_lat_min = 25.
+ REAL(RKIND), PARAMETER :: conus_lat_max = 55.
+ REAL(RKIND), PARAMETER :: conus_lon_min = -120.
+ REAL(RKIND), PARAMETER :: conus_lon_max = -70.
+ REAL(RKIND), PARAMETER :: lon_cut_min   = -105.
+ REAL(RKIND), PARAMETER :: lon_cut_max   = -90.
+ REAL(RKIND), PARAMETER :: alley_cgfrac  = .22  ! tornado alley CG fraction
+ REAL(RKIND), PARAMETER :: else_cgfrac   = .4
 !-----------------------------------------------------------------
  prescribed_ratio = iccg_prescribed_num/iccg_prescribed_den
 
@@ -193,8 +199,8 @@
 !-----------------------------------------------------------------
 ! Inputs
  INTEGER, DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) :: kLNB
- REAL,                                            INTENT(IN   ) :: cldtop_adjustment
- REAL,    DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(IN   ) :: t, z
+ REAL(RKIND),                                            INTENT(IN   ) :: cldtop_adjustment
+ REAL(RKIND),    DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(IN   ) :: t, z
 
 ! Order dependent args for domain, mem, and tile dims
  INTEGER, INTENT(IN   )    ::       ids,ide, jds,jde, kds,kde
@@ -202,8 +208,8 @@
  INTEGER, INTENT(IN   )    ::       ips,ipe, jps,jpe, kps,kpe
 
 ! Primary inputs and outpus
- REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) :: total_flashrate   
- REAL,    DIMENSION( ims:ime,          jms:jme ), INTENT(  OUT) :: ic_flashrate, cg_flashrate
+ REAL(RKIND),    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) :: total_flashrate   
+ REAL(RKIND),    DIMENSION( ims:ime,          jms:jme ), INTENT(  OUT) :: ic_flashrate, cg_flashrate
 
 ! Local variables
  INTEGER :: kfreeze
@@ -211,14 +217,14 @@
  INTEGER :: i,j,k
  REAL    :: ratio, cgfrac, depth
 
- REAL, PARAMETER :: dH_min = 5.5
- REAL, PARAMETER :: dH_max = 14.
+ REAL(RKIND), PARAMETER :: dH_min = 5.5
+ REAL(RKIND), PARAMETER :: dH_max = 14.
 
- REAL, PARAMETER :: coef_A = 0.021
- REAL, PARAMETER :: coef_B = -0.648
- REAL, PARAMETER :: coef_C = 7.493
- REAL, PARAMETER :: coef_D = -36.54
- REAL, PARAMETER :: coef_E = 63.09
+ REAL(RKIND), PARAMETER :: coef_A = 0.021
+ REAL(RKIND), PARAMETER :: coef_B = -0.648
+ REAL(RKIND), PARAMETER :: coef_C = 7.493
+ REAL(RKIND), PARAMETER :: coef_D = -36.54
+ REAL(RKIND), PARAMETER :: coef_E = 63.09
 !-----------------------------------------------------------------
 
  ic_flashrate(ips:ipe,jps:jpe) = 0.
@@ -248,6 +254,90 @@
  ENDDO jloop
 
  END SUBROUTINE iccg_pr93
+!**********************************************************************
+!
+! Price and Rind 1993 base on cold cloud depth (CCD)
+!
+! Price, C. and D. Rind (1993), What determines the cloud-to-ground lightning
+! fraction in thunderstorms?, Geophys. Res. Lett., 20(6), 463-466, doi:10.1029/93GL00226.
+!
+! Valid range of CCD is set to 5.5-14 km. Beyond this range CCD is assumed
+! to be 5.5 or 14 for continuity.
+!
+!**********************************************************************
+ SUBROUTINE iccg_crm_pr93( &
+                            refl, reflthreshold, t, z,                 &
+                          ! Order dependent args for domain, mem, and tile dims
+                            ids, ide, jds, jde, kds, kde,              &
+                            ims, ime, jms, jme, kms, kme,              &
+                            ips, ipe, jps, jpe, kps, kpe,              &
+                          ! Input
+                            total_flashrate,                           &
+                          ! Output
+                            ic_flashrate, cg_flashrate                 &
+                        )
+!-----------------------------------------------------------------
+ IMPLICIT NONE
+!-----------------------------------------------------------------
+! Inputs
+ REAL(RKIND),    DIMENSION( ims:ims, kms:kme, jms:jme ), INTENT(IN   ) :: refl, t, z
+ REAL(RKIND),                                            INTENT(IN   ) :: reflthreshold
+
+! Order dependent args for domain, mem, and tile dims
+ INTEGER, INTENT(IN   )    ::       ids,ide, jds,jde, kds,kde
+ INTEGER, INTENT(IN   )    ::       ims,ime, jms,jme, kms,kme
+ INTEGER, INTENT(IN   )    ::       ips,ipe, jps,jpe, kps,kpe
+
+! Primary inputs and outpus
+ REAL(RKIND),    DIMENSION( ims:ime,          jms:jme ), INTENT(IN   ) :: total_flashrate   
+ REAL(RKIND),    DIMENSION( ims:ime,          jms:jme ), INTENT(  OUT) :: ic_flashrate, cg_flashrate
+
+! Local variables
+ INTEGER :: kfreeze, ktop
+
+ INTEGER :: i,j,k
+ REAL    :: ratio, cgfrac, depth
+
+ REAL(RKIND), PARAMETER :: dH_min = 5.5
+ REAL(RKIND), PARAMETER :: dH_max = 14.
+
+ REAL(RKIND), PARAMETER :: coef_A = 0.021
+ REAL(RKIND), PARAMETER :: coef_B = -0.648
+ REAL(RKIND), PARAMETER :: coef_C = 7.493
+ REAL(RKIND), PARAMETER :: coef_D = -36.54
+ REAL(RKIND), PARAMETER :: coef_E = 63.09
+!-----------------------------------------------------------------
+
+ ic_flashrate(ips:ipe,jps:jpe) = 0.
+ cg_flashrate(ips:ipe,jps:jpe) = 0.
+
+ jloop: DO j=jps,jpe
+    iloop: DO i=ips,ipe
+    IF ( total_flashrate(i,j) .gt. 0.) THEN
+        ktop = kpe
+        do while ( refl(i,ktop,j) .lt. reflthreshold .and. ktop .gt. kps)
+          ktop = ktop-1
+        enddo
+
+        kfreeze = ktop
+        DO WHILE ( t(i,kfreeze,j) .lt. 273.15 .and. ktop .gt. kps )
+            kfreeze = kfreeze - 1
+        ENDDO
+
+        depth = ( z(i,ktop,j) - z(i,kfreeze,j) ) * 1E-3
+        IF (depth .le. 0.) CONTINUE
+        depth = max( dH_min, min( dH_max, depth ))
+
+        ratio = (((coef_A*depth+coef_B )*depth+coef_C)*depth+coef_D)*depth+coef_E
+        cgfrac = 1./(ratio+1.)
+
+        cg_flashrate(i,j) = total_flashrate(i,j) * cgfrac
+        ic_flashrate(i,j) = total_flashrate(i,j) - cg_flashrate(i,j)
+    ENDIF
+    ENDDO iloop
+ ENDDO jloop
+
+ END SUBROUTINE iccg_crm_pr93
 
 
  END MODULE module_ltng_iccg

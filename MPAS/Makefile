@@ -40,7 +40,7 @@ OBJS = \
         module_ltng_iccg.o \
         module_ltng_lpi.o \
         module_lightning_driver.o \
-	      module_simple_soa.o
+	module_simple_soa.o
    
 
 MPAS_SMOKE: $(OBJS)
@@ -134,7 +134,7 @@ mpas_smoke_wrapper.o:      \
         dep_dry_mod_wesley.o \
         module_hab_emissions.o \
         module_lightning_driver.o \
-	      module_simple_soa.o
+	module_simple_soa.o
 
 module_zero_plumegen_coms.o: \
         mpas_smoke_config.o
@@ -187,7 +187,7 @@ module_lightning_driver.o: \
         module_ltng_crmpr92.o \
         module_ltng_iccg.o \
         module_ltng_lpi.o \
-	      module_peg_util.o
+        module_peg_util.o
 
 module_simple_soa.o: \
 	mpas_smoke_config.o \

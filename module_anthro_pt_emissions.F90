@@ -107,7 +107,7 @@ contains
       do kk = kts,kte
          z_mid(kk)     = zmid(i,kk,j) - z_at_w(i,kts,j)
       enddo
-! Call Briggs for this EGU and timestep      
+! Call Briggs for this EGU and timestep    
       call plume_rise_briggs_rwc( wind_10m, T_1, T_2, PBL_H, z_mid, EFF_H, kemit, kts, kte, &
                                         STACK_HT,STACK_DIA,STACK_VEL,STACK_TEMP )
 ! Set the calculated emission layer

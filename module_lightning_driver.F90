@@ -58,18 +58,18 @@
  IMPLICIT NONE
 !-----------------------------------------------------------------
 
- REAL,     INTENT(IN)        :: dt
+ REAL(RKIND),     INTENT(IN)        :: dt
  CHARACTER(LEN=*),  INTENT(IN)  :: config_convection_scheme,config_microp_scheme,config_lightning_option
- REAL,     INTENT(IN)        :: lightning_dt, lightning_start_seconds
- REAL,     INTENT(INOUT)     :: lightning_activation_time
- REAL,     INTENT(IN)        :: iccg_prescribed_num, iccg_prescribed_den
+ REAL(RKIND),     INTENT(IN)        :: lightning_dt, lightning_start_seconds
+ REAL(RKIND),     INTENT(INOUT)     :: lightning_activation_time
+ REAL(RKIND),     INTENT(IN)        :: iccg_prescribed_num, iccg_prescribed_den
  INTEGER,  INTENT(IN)        :: lightning_cellcount_method
  INTEGER , INTENT(IN)        :: ids, ide, jds, jde, kds, kde,  &
                                 ims, ime, jms, jme, kms, kme,  &
                                 its, ite, jts, jte, kts, kte
 
 ! Making these optional just in case qualitative lightning indices get implemented
- REAL, OPTIONAL, DIMENSION( ims:ime,jms:jme ), &
+ REAL(RKIND), OPTIONAL, DIMENSION( ims:ime,jms:jme ), &
                  INTENT(OUT) :: ic_flashcount, ic_flashrate, &
                                 cg_flashcount, cg_flashrate
 
@@ -186,6 +186,7 @@
  USE module_ltng_crmpr92       ! config_lightning_option == 1,   ltng_crm_PR92w
                                ! config_lightning_option == 2,   ltng_crm_PR92z
  USE module_ltng_cpmpr92z      ! config_lightning_option == 11,  ltng_cpm_PR92z
+
 
 ! IC:CG methods
  USE module_ltng_iccg
@@ -510,8 +511,8 @@
 !-----------------------------------------------------------------
 
 ! Inputs
- REAL,    DIMENSION( ims:ime,kms:kme,jms:jme ), INTENT(IN   ) :: refl
- REAL,    INTENT(IN   ) :: reflthreshold
+ REAL(RKIND),    DIMENSION( ims:ime,kms:kme,jms:jme ), INTENT(IN   ) :: refl
+ REAL(RKIND),    INTENT(IN   ) :: reflthreshold
  INTEGER, INTENT(IN   ) :: lightning_cellcount_method
 
 ! Order dependent args for domain, mem, and tile dims
@@ -521,7 +522,7 @@
 
 
 ! Outputs
- REAL,    DIMENSION( kms:kme ), INTENT(  OUT) :: cellcount
+ REAL(RKIND),    DIMENSION( kms:kme ), INTENT(  OUT) :: cellcount
 
 ! Local vars
  INTEGER :: i,k,j
