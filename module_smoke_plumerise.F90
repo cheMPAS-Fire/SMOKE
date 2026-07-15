@@ -2174,12 +2174,12 @@ END function ESAT_PR
 !     ******************************************************************
 
 !=========================================================================
-! SRB: Sofiev and Briggs implementsation:
+! SRB: Sofiev and Briggs implementation:
 !=========================================================================
 
 subroutine plumerise_sofiev(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_in, &
                             zmid, z_lev, frp_w, lat, lon, k_min, k_max, ierr,     &
-                            kpbl_in, cp_in, hp_out)
+                            kpbl_in, cp_in)
   use mpas_kind_types
   implicit none
 
@@ -2190,7 +2190,6 @@ subroutine plumerise_sofiev(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_i
   real(RKIND), intent(in) :: frp_w, lat, lon
   integer, intent(inout) :: k_min, k_max
   integer, intent(out) :: ierr
-  real(RKIND), intent(out), optional :: hp_out
   integer, intent(in), optional :: kpbl_in
   real(RKIND), intent(in), optional :: cp_in
 
@@ -2242,7 +2241,6 @@ subroutine plumerise_sofiev(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_i
 
   ! Final plume top height
   Hp_final = max(hp_min, min(Hp_final, z_lev(kte)))
-  if (present(hp_out)) hp_out = Hp_final
 
   ! Get the k-index
   k_max = height_to_k(kte, z_lev, Hp_final)
@@ -2254,7 +2252,7 @@ end subroutine plumerise_sofiev
 
 subroutine plumerise_briggs(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_in, &
                                  zmid, z_lev, frp_w, lat, lon, k_min, k_max, ierr,      &
-                                 kpbl_in, cp_in, k2_b69, k2_b84, hp_b69, hp_b84)
+                                 kpbl_in, cp_in)
   use mpas_kind_types
   implicit none
 
@@ -2280,8 +2278,6 @@ subroutine plumerise_briggs(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_i
   integer :: regime   ! 1=stable, 2=neutral, 3=unstable
   real(RKIND) :: Hp69, Hp84
   real(RKIND) :: cp_used
-  integer, intent(out), optional :: k2_b69, k2_b84
-  real(RKIND), intent(out), optional :: hp_b69, hp_b84
 
   ierr = 0
   k_min = 2
@@ -2350,12 +2346,6 @@ subroutine plumerise_briggs(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_i
   ! Injection heights from both Briggs approaches
   Hp69 = max(hp_min, min(Hp69, z_lev(kte)))
   Hp84 = max(hp_min, min(Hp84, z_lev(kte)))
-
-  if (present(hp_b69)) hp_b69 = Hp69
-  if (present(hp_b84)) hp_b84 = Hp84
-
-  if (present(k2_b69)) k2_b69 = height_to_k(kte, z_lev, Hp69)
-  if (present(k2_b84)) k2_b84 = height_to_k(kte, z_lev, Hp84)
 
   ! Injection used by the model: B84 by default as it performed better in Sofiev et al. (2012) testing
   k_max = height_to_k(kte, z_lev, Hp84)
