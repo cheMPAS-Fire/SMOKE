@@ -159,14 +159,15 @@ CONTAINS
             & mass_smoke_f , mp_g , num_a , num_ac , num_aj , rho_eff , rh_clamped , sginia , sginic , sginin , sixpi , ss1 , ss2 ,&
             & ss3 , vbar_cm3 , vol_ac , vol_aj , vol_dry_a , vol_dust , vol_h2o , vol_oc , vol_smoke , vol_wet_a, &
             & vol_unspc, vol_nh4so4, vol_no3 ,dens_unspc, dens_sna, mass_unspc, mass_nh4so4, mass_no3, &
-            & mass_unspc_f , mass_nh4so4_f , mass_no3_f
+            & mass_unspc_f , mass_nh4so4_f , mass_no3_f, mass_soa, dens_soa, vol_soa, mass_bbsoa_f, mass_antsoa_f, &
+            & mass_antsoa, mass_bbsoa, vol_antsoa, vol_bbsoa
 
       INTEGER :: i , iflag , isize , j , k , ns
       COMPLEX , DIMENSION(1:NLWBANDS) :: lwref_index_dust , lwref_index_h2o , lwref_index_smoke, lwref_index_unspc, &
-                                         lwref_index_no3, lwref_index_nh4so4 
+                                         lwref_index_no3, lwref_index_nh4so4, lwref_index_soa 
       COMPLEX :: ri_ave_a , ri_dum
       COMPLEX , DIMENSION(1:NSWBANDS) :: swref_index_dust , swref_index_h2o , swref_index_smoke, swref_index_unspc, &
-                                         swref_index_no3, swref_index_nh4so4
+                                         swref_index_no3, swref_index_nh4so4, swref_index_soa
       REAL , DIMENSION(1:NBIN_O) :: xdia_cm , xdia_um , xmas_sectc , xmas_secti , xmas_sectj , xnum_sectc , xnum_secti , xnum_sectj
 !
 ! End of declarations rewritten by SPAG
@@ -181,8 +182,8 @@ CONTAINS
       iflag = 2
       duma = 1.0
  
-      dens_smoke = 1.6
-                   ! was 1.8 in WRF-Chem, but 1.6 used here for fresh smoke
+      dens_smoke = 1.6 ! was 1.8 in WRF-Chem, but 1.6 used here for fresh smoke
+      dens_soa = 1.6
       dens_dust = 2.6
       dens_sna = 1.8 ! WRF-Chem (nitrate,sulfate,ammonium = 1.8)
       dens_unspc = 1.0 ! WRF-Chem, approximate average from aerosols (api,ole,aro,oc)
@@ -212,6 +213,7 @@ CONTAINS
          swref_index_nh4so4(ns) = cmplx(Aer_optics(ID_NH4SO4)%sw_real(ns),Aer_optics(ID_NH4SO4)%sw_imag(ns))
          swref_index_no3(ns) = cmplx(Aer_optics(ID_NO3)%sw_real(ns),Aer_optics(ID_NO3)%sw_imag(ns))
          swref_index_unspc(ns) = cmplx(Aer_optics(ID_UNSPC)%sw_real(ns),Aer_optics(ID_UNSPC)%sw_imag(ns))
+         swref_index_soa(ns) = cmplx(Aer_optics(ID_UNSPC)%sw_real(ns),Aer_optics(ID_UNSPC)%sw_imag(ns))
  
          swref_index_h2o(ns) = cmplx(Aer_optics(ID_WATER)%sw_real(ns),Aer_optics(ID_WATER)%sw_imag(ns))
       ENDDO
@@ -222,6 +224,7 @@ CONTAINS
          lwref_index_nh4so4(ns) = cmplx(Aer_optics(ID_NH4SO4)%lw_real(ns),Aer_optics(ID_NH4SO4)%lw_imag(ns))
          lwref_index_no3(ns) = cmplx(Aer_optics(ID_NO3)%lw_real(ns),Aer_optics(ID_NO3)%lw_imag(ns))
          lwref_index_unspc(ns) = cmplx(Aer_optics(ID_UNSPC)%lw_real(ns),Aer_optics(ID_UNSPC)%lw_imag(ns))
+         lwref_index_soa(ns) = cmplx(Aer_optics(ID_UNSPC)%lw_real(ns),Aer_optics(ID_UNSPC)%lw_imag(ns))
  
          lwref_index_h2o(ns) = cmplx(Aer_optics(ID_WATER)%lw_real(ns),Aer_optics(ID_WATER)%lw_imag(ns))
       ENDDO
@@ -239,6 +242,8 @@ CONTAINS
  
 ! initialize - ms
                mass_smoke_f = 0.0
+               mass_bbsoa_f = 0.0
+               mass_antsoa_f = 0.0
                mass_smoke_c = 0.0
                mass_dust_f = 0.0
                mass_dust_c = 0.0
@@ -284,19 +289,30 @@ CONTAINS
                   mass_dust_c = MAX(0._RKIND, Chem(i,k,j,p_dust_coarse)) * conv1a
                ENDIF
 
-               vol_aj = (mass_smoke_f/dens_smoke) + (mass_dust_f/dens_dust) +     &
-                        (mass_unspc_f/dens_unspc) + (mass_no3_f/dens_sna) + &
-                        (mass_nh4so4_f/dens_sna) 
+               IF (valid_chem_idx(p_bbsoa, Num_chem)) THEN
+                  mass_bbsoa_f = MAX(0._RKIND, Chem(i,k,j,p_bbsoa)) * conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_antsoa, Num_chem)) THEN
+                  mass_antsoa_f = MAX(0._RKIND, Chem(i,k,j,p_antsoa)) * conv1a
+               ENDIF
+
+               vol_aj = (mass_smoke_f/dens_smoke) + (mass_dust_f/dens_dust) + &
+                        (mass_unspc_f/dens_unspc) + (mass_no3_f/dens_sna) +   &
+                        (mass_nh4so4_f/dens_sna) + (mass_antsoa_f/dens_soa) + &
+                        (mass_bbsoa_f/dens_soa)
 
                vol_ac = (mass_smoke_c/dens_smoke) + (mass_dust_c/dens_dust)
  
-               rho_eff = (mass_smoke_f+mass_dust_f+mass_nh4so4_f+mass_no3_f+mass_unspc_f)/max(TINY,vol_aj)
+               rho_eff = (mass_smoke_f+mass_dust_f+mass_nh4so4_f+mass_no3_f + &
+                       mass_unspc_f+mass_antsoa_f+mass_bbsoa_f)/max(TINY,vol_aj)
                lnsg = log(max(1.01,sginia))
                vbar_cm3 = (PI/6.0)*(max(1.0E-12,dg_f_cm)**3)*exp(4.5*lnsg*lnsg)
                mp_g = rho_eff*vbar_cm3
  
                IF ( mp_g>TINY ) THEN
-                  num_aj = (mass_smoke_f+mass_dust_f+mass_nh4so4_f+mass_no3_f+mass_unspc_f)/mp_g
+                  num_aj = (mass_smoke_f+mass_dust_f+mass_nh4so4_f+mass_bbsoa_f+mass_antsoa_f+&
+                            mass_no3_f+mass_unspc_f)/mp_g
                ELSE
                   num_aj = 0.0
                ENDIF
@@ -343,6 +359,8 @@ CONTAINS
                   mass_nh4so4 = mass_nh4so4_f*xmas_sectj(isize)
                   mass_no3 = mass_no3_f*xmas_sectj(isize)
                   mass_unspc = mass_unspc_f*xmas_sectj(isize)
+                  mass_antsoa = mass_antsoa_f*xmas_sectj(isize)
+                  mass_bbsoa = mass_bbsoa_f*xmas_sectj(isize)
  
                   vol_smoke = mass_smoke/dens_smoke
                   vol_oc = 0.9*mass_smoke/dens_smoke
@@ -350,14 +368,17 @@ CONTAINS
                   vol_nh4so4 = mass_nh4so4/dens_sna
                   vol_no3 = mass_no3/dens_sna
                   vol_unspc = mass_unspc/dens_unspc
+                  vol_antsoa = mass_antsoa/dens_unspc
+                  vol_bbsoa = mass_bbsoa/dens_unspc
  
-                  vol_dry_a = vol_smoke + vol_dust + vol_nh4so4 + vol_no3 + vol_unspc 
+                  vol_dry_a = vol_smoke + vol_dust + vol_nh4so4 + vol_no3 + vol_unspc + vol_antsoa + vol_bbsoa
 ! Initial version of Mie code.
 ! Now we turn off this
 ! Treat hygroscopic growth
 !          vol_wet_a = vol_dry_a
                   IF ( vol_dry_a>1.0E-20 ) THEN
-                     kappa_avg = (KAPPA_SMOKE*vol_oc+KAPPA_DUST*vol_dust+KAPPA_NH4SO4*vol_nh4so4+KAPPA_NO3*vol_no3)/vol_dry_a
+                     kappa_avg = (KAPPA_SMOKE*vol_oc+KAPPA_DUST*vol_dust+KAPPA_NH4SO4*vol_nh4so4+ &
+                             KAPPA_SMOKE*vol_antsoa+KAPPA_SMOKE*vol_bbsoa+KAPPA_NO3*vol_no3)/vol_dry_a
                   ELSE
                      kappa_avg = 0.0
                   ENDIF
@@ -379,7 +400,9 @@ CONTAINS
                   DO ns = 1 , NSWBANDS
                      IF ( vol_dry_a>1.0E-20 ) THEN
                         ri_dum = swref_index_smoke(ns)*vol_smoke + swref_index_dust(ns)*vol_dust + swref_index_h2o(ns)*vol_h2o + &
-                                 swref_index_unspc(ns)*vol_unspc + swref_index_nh4so4(ns)*vol_nh4so4 + swref_index_no3(ns)*vol_no3
+                                 swref_index_unspc(ns)*vol_unspc + swref_index_nh4so4(ns)*vol_nh4so4 + &
+                                 swref_index_no3(ns)*vol_no3 + swref_index_unspc(ns)*vol_antsoa + &
+                                 swref_index_unspc(ns)*vol_bbsoa
  
                         ri_ave_a = ri_dum/vol_wet_a
                      ELSE
@@ -391,7 +414,8 @@ CONTAINS
                   DO ns = 1 , NLWBANDS
                      IF ( vol_dry_a>1.0E-20 ) THEN
                         ri_dum = lwref_index_smoke(ns)*vol_smoke + lwref_index_dust(ns)*vol_dust + lwref_index_h2o(ns)*vol_h2o + &
-                                 lwref_index_unspc(ns)*vol_unspc + lwref_index_nh4so4(ns)*vol_nh4so4 + lwref_index_no3(ns)*vol_no3
+                                 lwref_index_unspc(ns)*vol_unspc + lwref_index_nh4so4(ns)*vol_nh4so4 + &
+                                 lwref_index_no3(ns)*vol_no3 + lwref_index_unspc(ns)*vol_antsoa + lwref_index_unspc(ns)*vol_bbsoa
                         ri_ave_a = ri_dum/vol_wet_a
                      ELSE
                         ri_ave_a = cmplx(1.5,0.0)
