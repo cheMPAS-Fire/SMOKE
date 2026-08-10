@@ -65,10 +65,10 @@ CONTAINS
       jj = Jts
       kk = Kts
  
-!      CALL optical_prep_simple(Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
-!                             & Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
-      CALL optical_prep_bb(Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
+      CALL optical_prep_simple(Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
                              & Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
+!      CALL optical_prep_bb(Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
+!                             & Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
  
       DO j = Jts , Jte
          DO i = Its , Ite
