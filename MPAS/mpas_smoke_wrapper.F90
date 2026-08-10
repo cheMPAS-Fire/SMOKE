@@ -148,7 +148,7 @@ contains
            hno3_bkgd             , coszen                , config_mie_aod_opt,               &
            aod3d_smoke, aod3d   , aod3d_simple,&
            tauaer_lw_p           , tauaer_sw_p           , ssaaer_sw_p          , asyaer_sw_p,&
-           ktau                  , dt                    , dxcell               ,            &
+           ktau                  , dt                    , radt                 ,dxcell      ,&
            area                  , ter                   , xice                 ,            &
            xland                 , u10                   , v10                  ,            &
            ust                   , xlat                  , xlong                ,            &
@@ -181,7 +181,7 @@ contains
                          ims,ime,jms,jme,kms,kme,        &
                          its,ite,jts,jte,kts,kte
 ! Timestep, day, constants
-    real(RKIND),intent(in):: dt, julian, g, cp, rd, gmt
+    real(RKIND),intent(in):: dt, julian, g, cp, rd, gmt, radt
 ! Time step #
     integer,intent(in):: ktau
     integer,intent(in)::nblocks
@@ -209,17 +209,17 @@ contains
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: raincv, rainncv, mavail                    
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme)         :: rmol, ust
 ! 2D Fire Input
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme), optional      :: totprcp_prev24, fire_end_hr,fmc_avg,     &
                                                                           efs_smold, efs_flam, efs_rsmold
     integer,intent(in), dimension(ims:ime,jms:jme),optional            :: eco_id
     real(RKIND),intent(in),dimension(ims:ime, jms:jme),optional        :: frp_in, fre_in      ! Fire input
 ! 2D + Time Fire Input
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme, nblocks),        &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme, nblocks),        &
                                                    optional      :: hwp_avg, fre_avg, frp_avg
 ! 2D HAB Input
     real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: bact_water_conc
 ! Residential Wood burning
-    real(RKIND),intent(in), dimension(ims:ims, jms:jme),optional    :: RWC_denominator, &
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: RWC_denominator, &
                                                                        RWC_annual_sum,                        &
                                                                        RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse, &
                                                                        RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse
@@ -432,9 +432,9 @@ contains
 !=============================================================
 ! Mie optics local variables (wrapper-level, NOT dummy args)
 !=============================================================
-    real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:4), intent(inout) :: tauaer_sw_p
-    real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:4), intent(inout) :: ssaaer_sw_p
-    real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:4), intent(inout) :: asyaer_sw_p
+    real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:14), intent(inout) :: tauaer_sw_p
+    real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:14), intent(inout) :: ssaaer_sw_p
+    real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:14), intent(inout) :: asyaer_sw_p
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:16), intent(inout) :: tauaer_lw_p
     real(RKIND), allocatable :: &
          tauaersw(:,:,:,:), extaersw(:,:,:,:), gaersw(:,:,:,:), &
@@ -704,7 +704,7 @@ contains
                  rho_phy,vvel,u_phy,v_phy,pi_phy,wind_phy,            &
                  z_at_w,zmid,g,cp,rd,                                 &
                  frp_out, min_bb_plume, max_bb_plume,                 &
-                 plume_wind_eff,  plumerise_opt,                      &
+                 plume_wind_eff,                                      &
                  do_plumerise,                                        &
                  kpbl_thetav,kpbl,curr_secs,                          &
                  xlat, xlong, uspdavg2d, hpbl2d, plume_alpha,         &
@@ -713,7 +713,7 @@ contains
                  e_bb_in, ebu, num_e_bb_in,                           &
                  ids,ide, jds,jde, kds,kde,                           &
                  ims,ime, jms,jme, kms,kme,                           &
-                 its,ite, jts,jte, kts,kte, errmsg, errflg            )
+                 its,ite, jts,jte, kts,kte, errmsg, errflg )
       if(errflg/=0) return
     end if
     if  (do_timing) call mpas_timer_stop('ebu_driver')
@@ -953,19 +953,19 @@ contains
     if  (do_timing) call mpas_timer_stop('wetdep_ls')
     endif
 
-    allocate(tauaersw(ims:ime,kms:kme,jms:jme,1:4))
-    allocate(gaersw  (ims:ime,kms:kme,jms:jme,1:4))
-    allocate(waersw  (ims:ime,kms:kme,jms:jme,1:4))
+    allocate(tauaersw(ims:ime,kms:kme,jms:jme,1:14))
+    allocate(gaersw  (ims:ime,kms:kme,jms:jme,1:14))
+    allocate(waersw  (ims:ime,kms:kme,jms:jme,1:14))
     allocate(tauaerlw(ims:ime,kms:kme,jms:jme,1:16))
-    allocate(extaersw(ims:ime,kms:kme,jms:jme,1:4))
-    allocate(bscoefsw(ims:ime,kms:kme,jms:jme,1:4))
+    allocate(extaersw(ims:ime,kms:kme,jms:jme,1:14))
+    allocate(bscoefsw(ims:ime,kms:kme,jms:jme,1:14))
 
-    allocate(l2aer(ims:ime,kms:kme,jms:jme,1:4))
-    allocate(l3aer(ims:ime,kms:kme,jms:jme,1:4))
-    allocate(l4aer(ims:ime,kms:kme,jms:jme,1:4))
-    allocate(l5aer(ims:ime,kms:kme,jms:jme,1:4))
-    allocate(l6aer(ims:ime,kms:kme,jms:jme,1:4))
-    allocate(l7aer(ims:ime,kms:kme,jms:jme,1:4))
+    allocate(l2aer(ims:ime,kms:kme,jms:jme,1:14))
+    allocate(l3aer(ims:ime,kms:kme,jms:jme,1:14))
+    allocate(l4aer(ims:ime,kms:kme,jms:jme,1:14))
+    allocate(l5aer(ims:ime,kms:kme,jms:jme,1:14))
+    allocate(l6aer(ims:ime,kms:kme,jms:jme,1:14))
+    allocate(l7aer(ims:ime,kms:kme,jms:jme,1:14))
     allocate(extaerlw(ims:ime,kms:kme,jms:jme,1:16))
 
     tauaer_lw_p = 0.0_RKIND
@@ -987,7 +987,7 @@ contains
     
 
     call mpas_log_write( ' Calling Aerosol Optical Properties Calculation')
-    call mpas_aod_diag( config_mie_aod_opt, curr_secs, dt,  &
+    call mpas_aod_diag( config_mie_aod_opt, curr_secs, dt, radt,  &
                   chem, aod3d, aod3d_simple, rho_phy, relhum, dz8w, num_chem,  &
                   tauaer_sw_p, extaersw, asyaer_sw_p, ssaaer_sw_p, bscoefsw, &
                   l2aer, l3aer, l4aer, l5aer, l6aer, l7aer,      &

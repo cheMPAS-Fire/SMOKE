@@ -23,7 +23,7 @@ CONTAINS
       valid_chem_idx = (idx >= 1 .AND. idx <= num_chem)
    END FUNCTION valid_chem_idx
 
-   SUBROUTINE optical_averaging(Id,Curr_secs,Dtstep,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,      &
+   SUBROUTINE optical_averaging(Id,Curr_secs,Dtstep,radt,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,      &
                               & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,&
                               & Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
  
@@ -37,25 +37,25 @@ CONTAINS
       INTEGER , INTENT(IN) :: Ims , Ime , Jms , Jme , Kms , Kme
       INTEGER , INTENT(IN) :: Its , Ite , Jts , Jte , Kts , Kte
       REAL(KIND=rkind) , INTENT(IN) :: Curr_secs
-      REAL , INTENT(IN) :: Dtstep
+      REAL , INTENT(IN) :: Dtstep, radt
       REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,Num_chem) , INTENT(IN) :: Chem
       REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) , INTENT(IN) :: Dz8w , Rho_phy , Relhum
  
-      REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) , INTENT(INOUT) :: Tauaersw , Extaersw , Gaersw , Waersw , Bscoefsw
-      REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) , INTENT(INOUT) :: L2aer , L3aer , L4aer , L5aer , L6aer , L7aer
+      REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) , INTENT(INOUT) :: Tauaersw , Extaersw , Gaersw , Waersw , Bscoefsw
+      REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) , INTENT(INOUT) :: L2aer , L3aer , L4aer , L5aer , L6aer , L7aer
       REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NLWBANDS) , INTENT(INOUT) :: Tauaerlw , Extaerlw
  
       REAL , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O) :: radius_wet , number_bin , radius_core
-      COMPLEX , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:4) :: swrefindx
+      COMPLEX , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:NSWBANDS) :: swrefindx
       COMPLEX , DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:NLWBANDS) :: lwrefindx
  
       REAL , DIMENSION(1:NBIN_O,Kts:Kte) :: radius_wet_col , number_bin_col
-      COMPLEX , DIMENSION(1:NBIN_O,Kts:Kte,1:4) :: swrefindx_col
+      COMPLEX , DIMENSION(1:NBIN_O,Kts:Kte,1:NSWBANDS) :: swrefindx_col
       COMPLEX , DIMENSION(1:NBIN_O,Kts:Kte,1:NLWBANDS) :: lwrefindx_col
       REAL , DIMENSION(Kts:Kte) :: dz
  
-      REAL , DIMENSION(4,Kts:Kte) :: swsizeaer , swextaer , swwaer , swgaer , swtauaer , swbscoef
-      REAL , DIMENSION(4,Kts:Kte) :: l2 , l3 , l4 , l5 , l6 , l7
+      REAL , DIMENSION(NSWBANDS,Kts:Kte) :: swsizeaer , swextaer , swwaer , swgaer , swtauaer , swbscoef
+      REAL , DIMENSION(NSWBANDS,Kts:Kte) :: l2 , l3 , l4 , l5 , l6 , l7
       REAL , DIMENSION(NLWBANDS,Kts:Kte) :: lwextaer , lwtauaer
  
       INTEGER :: i , j , k , isize , ns
@@ -65,7 +65,9 @@ CONTAINS
       jj = Jts
       kk = Kts
  
-      CALL optical_prep_simple(Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
+!      CALL optical_prep_simple(Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
+!                             & Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
+      CALL optical_prep_bb(Chem,Num_chem,Rho_phy,Relhum,radius_core,radius_wet,number_bin,swrefindx,lwrefindx,Ids,Ide,  &
                              & Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
  
       DO j = Jts , Jte
@@ -89,7 +91,7 @@ CONTAINS
  
  
             DO k = Kts , Kte
-               DO ns = 1 , 4
+               DO ns = 1 , NSWBANDS
                   Tauaersw(i,k,j,ns) = max(swtauaer(ns,k),1.E-20)
                   Extaersw(i,k,j,ns) = max(swextaer(ns,k),1.E-20)
                   Gaersw(i,k,j,ns) = max(min(swgaer(ns,k),1.-1.E-8),1.E-20)
@@ -438,6 +440,460 @@ CONTAINS
       ENDDO
  
    END SUBROUTINE optical_prep_simple
+
+   SUBROUTINE optical_prep_bb(Chem,Num_chem,Rho_phy,Relhum,Radius_core,Radius_wet,Number_bin,Swrefindx,Lwrefindx,Ids, &
+                           Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
+!---------------------------------------------------------------------------------------
+! Alternative to optical_prep_simple for chemically speciated biomass-burning aerosol.
+!
+! The transported smoke_fine mass is preserved and split optically as
+!   OA  = 90.0%, NO3 = 3.0%, SO4 = 1.0%, NH4 = 2.5%, BC = 3.5%.
+! Each smoke component is assigned 5% to the i mode and 95% to the j mode.
+! All non-smoke aerosol treatment follows optical_prep_simple.
+!---------------------------------------------------------------------------------------
+
+      USE module_data_rrtmgaeropt
+
+      REAL, PARAMETER :: PI = 3.14159265358979324
+      REAL, PARAMETER :: TINY = 1.0E-30
+      REAL, PARAMETER :: KAPPA_SMOKE = 0.14
+      REAL, PARAMETER :: KAPPA_DUST = 0.1
+      REAL, PARAMETER :: KAPPA_NH4SO4 = 0.5
+      REAL, PARAMETER :: KAPPA_NO3 = 0.5
+
+      ! OA, NO3, SO4, NH4, BC
+      REAL, PARAMETER, DIMENSION(5) :: bbfraction = &
+           (/ 0.900_RKIND, 0.030_RKIND, 0.010_RKIND, 0.025_RKIND, 0.035_RKIND /)
+
+      ! i mode, j mode
+      REAL, PARAMETER, DIMENSION(2) :: bbsize_fraction = &
+           (/ 0.050_RKIND, 0.950_RKIND /)
+
+      INTEGER, INTENT(IN) :: Num_chem
+      INTEGER, INTENT(IN) :: Ims
+      INTEGER, INTENT(IN) :: Ime
+      INTEGER, INTENT(IN) :: Jms
+      INTEGER, INTENT(IN) :: Jme
+      INTEGER, INTENT(IN) :: Kms
+      INTEGER, INTENT(IN) :: Kme
+      INTEGER, INTENT(IN) :: Its
+      INTEGER, INTENT(IN) :: Ite
+      INTEGER, INTENT(IN) :: Jts
+      INTEGER, INTENT(IN) :: Jte
+      INTEGER, INTENT(IN) :: Kts
+      INTEGER, INTENT(IN) :: Kte
+      REAL, INTENT(IN), DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,Num_chem) :: Chem
+      REAL, INTENT(IN), DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Rho_phy
+      REAL, INTENT(IN), DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Relhum
+      REAL, INTENT(OUT), DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O) :: Radius_core
+      REAL, INTENT(OUT), DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O) :: Radius_wet
+      REAL, INTENT(OUT), DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O) :: Number_bin
+      COMPLEX, INTENT(OUT), DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:NSWBANDS) :: Swrefindx
+      COMPLEX, INTENT(OUT), DIMENSION(Its:Ite,Kts:Kte,Jts:Jte,1:NBIN_O,1:NLWBANDS) :: Lwrefindx
+      INTEGER, INTENT(IN) :: Ids
+      INTEGER, INTENT(IN) :: Ide
+      INTEGER, INTENT(IN) :: Jds
+      INTEGER, INTENT(IN) :: Jde
+      INTEGER, INTENT(IN) :: Kds
+      INTEGER, INTENT(IN) :: Kde
+
+      REAL :: conv1a, dens_bc, dens_dust, dens_smoke, dens_sna, dens_soa, dens_unspc
+      REAL :: dg_c_cm, dg_f_cm, dg_i_cm, dgmin_cm, dgnum_um, dhi_um, dlo_tmp, dlo_um
+      REAL :: dp_dry_a, dp_wet_a, duma, kappa_avg, lnsg, mp_g
+      REAL :: mass_antsoa, mass_antsoa_f, mass_bbsoa, mass_bbsoa_f
+      REAL :: mass_bc, mass_bc_i, mass_bc_j
+      REAL :: mass_dust, mass_dust_c, mass_dust_f
+      REAL :: mass_nh4_i, mass_nh4_j, mass_nh4so4, mass_nh4so4_f
+      REAL :: mass_no3, mass_no3_f, mass_no3_i, mass_no3_j
+      REAL :: mass_oa_i, mass_oa_j
+      REAL :: mass_smoke, mass_smoke_c, mass_smoke_f, mass_smoke_i, mass_smoke_j
+      REAL :: mass_so4_i, mass_so4_j
+      REAL :: mass_unspc, mass_unspc_f
+      REAL :: num_a, num_ac, num_ai, num_aj
+      REAL :: rho_eff, rh_clamped, sginia, sginic, sginin
+      REAL :: sixpi, ss1, ss2, ss3, vbar_cm3
+      REAL :: vol_ac, vol_ai, vol_aj, vol_antsoa, vol_bbsoa, vol_bc
+      REAL :: vol_dry_a, vol_dust, vol_h2o, vol_nh4so4, vol_no3
+      REAL :: vol_smoke, vol_unspc, vol_wet_a
+
+      INTEGER :: i, iflag, isize, j, k, ns
+
+      COMPLEX, DIMENSION(1:NLWBANDS) :: lwref_index_bc, lwref_index_dust
+      COMPLEX, DIMENSION(1:NLWBANDS) :: lwref_index_h2o, lwref_index_nh4so4
+      COMPLEX, DIMENSION(1:NLWBANDS) :: lwref_index_no3, lwref_index_smoke
+      COMPLEX, DIMENSION(1:NLWBANDS) :: lwref_index_soa, lwref_index_unspc
+      COMPLEX :: ri_ave_a, ri_dum
+      COMPLEX, DIMENSION(1:NSWBANDS) :: swref_index_bc, swref_index_dust
+      COMPLEX, DIMENSION(1:NSWBANDS) :: swref_index_h2o, swref_index_nh4so4
+      COMPLEX, DIMENSION(1:NSWBANDS) :: swref_index_no3, swref_index_smoke
+      COMPLEX, DIMENSION(1:NSWBANDS) :: swref_index_soa, swref_index_unspc
+
+      REAL, DIMENSION(1:NBIN_O) :: xdia_cm, xdia_um
+      REAL, DIMENSION(1:NBIN_O) :: xmas_sectc, xmas_secti, xmas_sectj
+      REAL, DIMENSION(1:NBIN_O) :: xnum_sectc, xnum_secti, xnum_sectj
+
+      sixpi = 6.0/PI
+      dlo_um = 0.0390625
+      dhi_um = 10.0
+      dgmin_cm = 1.0E-07
+      iflag = 2
+      duma = 1.0
+
+      dens_smoke = 1.6
+      dens_soa = 1.6
+      dens_dust = 2.6
+      dens_sna = 1.8
+      dens_unspc = 1.0
+      dens_bc = 1.8
+
+      sginin = 2.0
+      sginia = 2.0
+      sginic = 2.2
+
+      dg_i_cm = 0.05E-4
+      dg_f_cm = 0.20E-4
+      dg_c_cm = 2.00E-4
+
+      dlo_tmp = dlo_um
+
+      DO isize = 1, NBIN_O
+         xdia_um(isize) = (dlo_tmp+dlo_tmp*2.0)/2.0
+         dlo_tmp = dlo_tmp*2.0
+      ENDDO
+
+      DO isize = 1, NBIN_O
+         xdia_cm(isize) = xdia_um(isize)*1.0E-4
+      ENDDO
+
+      DO ns = 1, NSWBANDS
+         swref_index_smoke(ns) = CMPLX(Aer_optics(ID_SMOKE)%sw_real(ns), &
+                                        Aer_optics(ID_SMOKE)%sw_imag(ns))
+         swref_index_dust(ns) = CMPLX(Aer_optics(ID_DUST)%sw_real(ns), &
+                                       Aer_optics(ID_DUST)%sw_imag(ns))
+         swref_index_nh4so4(ns) = CMPLX(Aer_optics(ID_NH4SO4)%sw_real(ns), &
+                                         Aer_optics(ID_NH4SO4)%sw_imag(ns))
+         swref_index_no3(ns) = CMPLX(Aer_optics(ID_NO3)%sw_real(ns), &
+                                      Aer_optics(ID_NO3)%sw_imag(ns))
+         swref_index_unspc(ns) = CMPLX(Aer_optics(ID_UNSPC)%sw_real(ns), &
+                                        Aer_optics(ID_UNSPC)%sw_imag(ns))
+         swref_index_soa(ns) = CMPLX(Aer_optics(ID_UNSPC)%sw_real(ns), &
+                                      Aer_optics(ID_UNSPC)%sw_imag(ns))
+         swref_index_bc(ns) = CMPLX(Aer_optics(ID_BC)%sw_real(ns), &
+                                     Aer_optics(ID_BC)%sw_imag(ns))
+         swref_index_h2o(ns) = CMPLX(Aer_optics(ID_WATER)%sw_real(ns), &
+                                      Aer_optics(ID_WATER)%sw_imag(ns))
+      ENDDO
+
+      DO ns = 1, NLWBANDS
+         lwref_index_smoke(ns) = CMPLX(Aer_optics(ID_SMOKE)%lw_real(ns), &
+                                        Aer_optics(ID_SMOKE)%lw_imag(ns))
+         lwref_index_dust(ns) = CMPLX(Aer_optics(ID_DUST)%lw_real(ns), &
+                                       Aer_optics(ID_DUST)%lw_imag(ns))
+         lwref_index_nh4so4(ns) = CMPLX(Aer_optics(ID_NH4SO4)%lw_real(ns), &
+                                         Aer_optics(ID_NH4SO4)%lw_imag(ns))
+         lwref_index_no3(ns) = CMPLX(Aer_optics(ID_NO3)%lw_real(ns), &
+                                      Aer_optics(ID_NO3)%lw_imag(ns))
+         lwref_index_unspc(ns) = CMPLX(Aer_optics(ID_UNSPC)%lw_real(ns), &
+                                        Aer_optics(ID_UNSPC)%lw_imag(ns))
+         lwref_index_soa(ns) = CMPLX(Aer_optics(ID_UNSPC)%lw_real(ns), &
+                                      Aer_optics(ID_UNSPC)%lw_imag(ns))
+         lwref_index_bc(ns) = CMPLX(Aer_optics(ID_BC)%lw_real(ns), &
+                                     Aer_optics(ID_BC)%lw_imag(ns))
+         lwref_index_h2o(ns) = CMPLX(Aer_optics(ID_WATER)%lw_real(ns), &
+                                      Aer_optics(ID_WATER)%lw_imag(ns))
+      ENDDO
+
+      Swrefindx = CMPLX(0.0,0.0)
+      Lwrefindx = CMPLX(0.0,0.0)
+      Radius_wet = 0.0
+      Number_bin = 0.0
+      Radius_core = 0.0
+
+      DO j = Jts, Jte
+         DO k = Kts, Kte
+            DO i = Its, Ite
+
+               mass_smoke_f = 0.0
+               mass_bbsoa_f = 0.0
+               mass_antsoa_f = 0.0
+               mass_smoke_c = 0.0
+               mass_dust_f = 0.0
+               mass_dust_c = 0.0
+               mass_unspc_f = 0.0
+               mass_no3_f = 0.0
+               mass_nh4so4_f = 0.0
+
+               mass_smoke_i = 0.0
+               mass_smoke_j = 0.0
+               mass_oa_i = 0.0
+               mass_oa_j = 0.0
+               mass_no3_i = 0.0
+               mass_no3_j = 0.0
+               mass_so4_i = 0.0
+               mass_so4_j = 0.0
+               mass_nh4_i = 0.0
+               mass_nh4_j = 0.0
+               mass_bc_i = 0.0
+               mass_bc_j = 0.0
+
+               vol_ai = 0.0
+               vol_aj = 0.0
+               vol_ac = 0.0
+               num_ai = 0.0
+               num_aj = 0.0
+               num_ac = 0.0
+
+               conv1a = Rho_phy(i,k,j)*1.0E-12
+
+               IF (valid_chem_idx(p_unspc_fine,Num_chem)) THEN
+                  mass_unspc_f = MAX(0._RKIND,Chem(i,k,j,p_unspc_fine))*conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_no3_a_fine,Num_chem)) THEN
+                  mass_no3_f = MAX(0._RKIND,Chem(i,k,j,p_no3_a_fine))*conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_so4_a_fine,Num_chem) .AND. &
+                   valid_chem_idx(p_nh4_a_fine,Num_chem)) THEN
+                  mass_nh4so4_f = MAX(0._RKIND,Chem(i,k,j,p_so4_a_fine)+ &
+                                               Chem(i,k,j,p_nh4_a_fine))*conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_smoke_fine,Num_chem)) THEN
+                  mass_smoke_f = MAX(0._RKIND,Chem(i,k,j,p_smoke_fine))*conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_dust_fine,Num_chem)) THEN
+                  mass_dust_f = MAX(0._RKIND,Chem(i,k,j,p_dust_fine))*conv1a
+               ENDIF
+
+               mass_smoke_c = 0.0_RKIND
+
+               IF (valid_chem_idx(p_dust_coarse,Num_chem)) THEN
+                  mass_dust_c = MAX(0._RKIND,Chem(i,k,j,p_dust_coarse))*conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_bbsoa,Num_chem)) THEN
+                  mass_bbsoa_f = MAX(0._RKIND,Chem(i,k,j,p_bbsoa))*conv1a
+               ENDIF
+
+               IF (valid_chem_idx(p_antsoa,Num_chem)) THEN
+                  mass_antsoa_f = MAX(0._RKIND,Chem(i,k,j,p_antsoa))*conv1a
+               ENDIF
+
+               ! Split only smoke_fine. Total transported smoke mass is unchanged.
+               mass_smoke_i = mass_smoke_f*bbsize_fraction(1)
+               mass_smoke_j = mass_smoke_f*bbsize_fraction(2)
+
+               mass_oa_i = mass_smoke_i*bbfraction(1)
+               mass_no3_i = mass_smoke_i*bbfraction(2)
+               mass_so4_i = mass_smoke_i*bbfraction(3)
+               mass_nh4_i = mass_smoke_i*bbfraction(4)
+               mass_bc_i = mass_smoke_i*bbfraction(5)
+
+               mass_oa_j = mass_smoke_j*bbfraction(1)
+               mass_no3_j = mass_smoke_j*bbfraction(2)
+               mass_so4_j = mass_smoke_j*bbfraction(3)
+               mass_nh4_j = mass_smoke_j*bbfraction(4)
+               mass_bc_j = mass_smoke_j*bbfraction(5)
+
+               ! The i mode contains only the 5% smoke allocation.
+               vol_ai = (mass_oa_i/dens_smoke) + (mass_no3_i/dens_sna) + &
+                        ((mass_so4_i+mass_nh4_i)/dens_sna) + (mass_bc_i/dens_bc)
+
+               ! The j mode retains all original background fine aerosol and 95% of smoke.
+               vol_aj = (mass_oa_j/dens_smoke) + (mass_no3_j/dens_sna) + &
+                        ((mass_so4_j+mass_nh4_j)/dens_sna) + (mass_bc_j/dens_bc) + &
+                        (mass_dust_f/dens_dust) + (mass_unspc_f/dens_unspc) + &
+                        (mass_no3_f/dens_sna) + (mass_nh4so4_f/dens_sna) + &
+                        (mass_antsoa_f/dens_soa) + (mass_bbsoa_f/dens_soa)
+
+               vol_ac = (mass_smoke_c/dens_smoke) + (mass_dust_c/dens_dust)
+
+               rho_eff = mass_smoke_i/MAX(TINY,vol_ai)
+               lnsg = LOG(MAX(1.01,sginin))
+               vbar_cm3 = (PI/6.0)*(MAX(1.0E-12,dg_i_cm)**3)*EXP(4.5*lnsg*lnsg)
+               mp_g = rho_eff*vbar_cm3
+
+               IF (mp_g>TINY) THEN
+                  num_ai = mass_smoke_i/mp_g
+               ELSE
+                  num_ai = 0.0
+               ENDIF
+
+               rho_eff = (mass_smoke_j+mass_dust_f+mass_nh4so4_f+mass_no3_f+ &
+                          mass_unspc_f+mass_antsoa_f+mass_bbsoa_f)/MAX(TINY,vol_aj)
+               lnsg = LOG(MAX(1.01,sginia))
+               vbar_cm3 = (PI/6.0)*(MAX(1.0E-12,dg_f_cm)**3)*EXP(4.5*lnsg*lnsg)
+               mp_g = rho_eff*vbar_cm3
+
+               IF (mp_g>TINY) THEN
+                  num_aj = (mass_smoke_j+mass_dust_f+mass_nh4so4_f+mass_bbsoa_f+ &
+                            mass_antsoa_f+mass_no3_f+mass_unspc_f)/mp_g
+               ELSE
+                  num_aj = 0.0
+               ENDIF
+
+               rho_eff = (mass_smoke_c+mass_dust_c)/MAX(TINY,vol_ac)
+               lnsg = LOG(MAX(1.01,sginic))
+               vbar_cm3 = (PI/6.0)*(MAX(1.0E-12,dg_c_cm)**3)*EXP(4.5*lnsg*lnsg)
+               mp_g = rho_eff*vbar_cm3
+
+               IF (mp_g>TINY) THEN
+                  num_ac = (mass_smoke_c+mass_dust_c)/mp_g
+               ELSE
+                  num_ac = 0.0
+               ENDIF
+
+               IF (num_ai>1.0E-20 .AND. vol_ai>1.0E-20) THEN
+                  ss1 = LOG(sginin)
+                  ss2 = EXP(ss1*ss1*36.0/8.0)
+                  ss3 = (sixpi*vol_ai/(num_ai*ss2))**0.3333333
+                  dgnum_um = MAX(dgmin_cm,ss3)*1.0E+04
+                  CALL sect02(dgnum_um,sginin,dens_smoke,iflag,duma,NBIN_O, &
+                              dlo_um,dhi_um,xnum_secti,xmas_secti)
+               ELSE
+                  xnum_secti = 0.0
+                  xmas_secti = 0.0
+               ENDIF
+
+               IF (num_aj>1.0E-20 .AND. vol_aj>1.0E-20) THEN
+                  ss1 = LOG(sginia)
+                  ss2 = EXP(ss1*ss1*36.0/8.0)
+                  ss3 = (sixpi*vol_aj/(num_aj*ss2))**0.3333333
+                  dgnum_um = MAX(dgmin_cm,ss3)*1.0E+04
+                  CALL sect02(dgnum_um,sginia,dens_smoke,iflag,duma,NBIN_O, &
+                              dlo_um,dhi_um,xnum_sectj,xmas_sectj)
+               ELSE
+                  xnum_sectj = 0.0
+                  xmas_sectj = 0.0
+               ENDIF
+
+               IF (num_ac>1.0E-20 .AND. vol_ac>1.0E-20) THEN
+                  ss1 = LOG(sginic)
+                  ss2 = EXP(ss1*ss1*36.0/8.0)
+                  ss3 = (sixpi*vol_ac/(num_ac*ss2))**0.3333333
+                  dgnum_um = MAX(dgmin_cm,ss3)*1.0E+04
+                  CALL sect02(dgnum_um,sginic,dens_dust,iflag,duma,NBIN_O, &
+                              dlo_um,dhi_um,xnum_sectc,xmas_sectc)
+               ELSE
+                  xnum_sectc = 0.0
+                  xmas_sectc = 0.0
+               ENDIF
+
+               DO isize = 1, NBIN_O
+
+                  ! In this routine, mass_smoke represents the smoke-derived OA mass.
+                  mass_smoke = mass_oa_i*xmas_secti(isize) + &
+                               mass_oa_j*xmas_sectj(isize) + &
+                               mass_smoke_c*xmas_sectc(isize)
+
+                  mass_bc = mass_bc_i*xmas_secti(isize) + &
+                            mass_bc_j*xmas_sectj(isize)
+
+                  mass_dust = mass_dust_f*xmas_sectj(isize) + &
+                              mass_dust_c*xmas_sectc(isize)
+
+                  mass_nh4so4 = mass_nh4so4_f*xmas_sectj(isize) + &
+                                (mass_so4_i+mass_nh4_i)*xmas_secti(isize) + &
+                                (mass_so4_j+mass_nh4_j)*xmas_sectj(isize)
+
+                  mass_no3 = mass_no3_f*xmas_sectj(isize) + &
+                             mass_no3_i*xmas_secti(isize) + &
+                             mass_no3_j*xmas_sectj(isize)
+
+                  mass_unspc = mass_unspc_f*xmas_sectj(isize)
+                  mass_antsoa = mass_antsoa_f*xmas_sectj(isize)
+                  mass_bbsoa = mass_bbsoa_f*xmas_sectj(isize)
+
+                  vol_smoke = mass_smoke/dens_smoke
+                  vol_bc = mass_bc/dens_bc
+                  vol_dust = mass_dust/dens_dust
+                  vol_nh4so4 = mass_nh4so4/dens_sna
+                  vol_no3 = mass_no3/dens_sna
+                  vol_unspc = mass_unspc/dens_unspc
+                  vol_antsoa = mass_antsoa/dens_unspc
+                  vol_bbsoa = mass_bbsoa/dens_unspc
+
+                  vol_dry_a = vol_smoke + vol_bc + vol_dust + vol_nh4so4 + &
+                              vol_no3 + vol_unspc + vol_antsoa + vol_bbsoa
+
+                  IF (vol_dry_a>1.0E-20) THEN
+                     kappa_avg = (KAPPA_SMOKE*vol_smoke + KAPPA_DUST*vol_dust + &
+                                  KAPPA_NH4SO4*vol_nh4so4 + KAPPA_SMOKE*vol_antsoa + &
+                                  KAPPA_SMOKE*vol_bbsoa + KAPPA_NO3*vol_no3)/vol_dry_a
+                  ELSE
+                     kappa_avg = 0.0
+                  ENDIF
+
+                  rh_clamped = MIN(0.95,MAX(0.0,Relhum(i,k,j)))
+                  vol_h2o = vol_dry_a*kappa_avg*(rh_clamped/(1.0-rh_clamped))
+                  vol_wet_a = vol_dry_a + vol_h2o
+
+                  num_a = num_ai*xnum_secti(isize) + &
+                          num_aj*xnum_sectj(isize) + &
+                          num_ac*xnum_sectc(isize)
+
+                  IF (num_a>1.0E-20 .AND. vol_dry_a>1.0E-20) THEN
+                     dp_dry_a = (sixpi*vol_dry_a/num_a)**0.3333333
+                     dp_wet_a = (sixpi*vol_wet_a/num_a)**0.3333333
+                  ELSE
+                     dp_dry_a = xdia_cm(isize)
+                     dp_wet_a = xdia_cm(isize)
+                  ENDIF
+
+                  DO ns = 1, NSWBANDS
+                     IF (vol_dry_a>1.0E-20) THEN
+                        ri_dum = swref_index_smoke(ns)*vol_smoke + &
+                                 swref_index_bc(ns)*vol_bc + &
+                                 swref_index_dust(ns)*vol_dust + &
+                                 swref_index_h2o(ns)*vol_h2o + &
+                                 swref_index_unspc(ns)*vol_unspc + &
+                                 swref_index_nh4so4(ns)*vol_nh4so4 + &
+                                 swref_index_no3(ns)*vol_no3 + &
+                                 swref_index_unspc(ns)*vol_antsoa + &
+                                 swref_index_unspc(ns)*vol_bbsoa
+                        ri_ave_a = ri_dum/vol_wet_a
+                     ELSE
+                        ri_ave_a = CMPLX(1.5,0.0)
+                     ENDIF
+                     Swrefindx(i,k,j,isize,ns) = ri_ave_a
+                  ENDDO
+
+                  DO ns = 1, NLWBANDS
+                     IF (vol_dry_a>1.0E-20) THEN
+                        ri_dum = lwref_index_smoke(ns)*vol_smoke + &
+                                 lwref_index_bc(ns)*vol_bc + &
+                                 lwref_index_dust(ns)*vol_dust + &
+                                 lwref_index_h2o(ns)*vol_h2o + &
+                                 lwref_index_unspc(ns)*vol_unspc + &
+                                 lwref_index_nh4so4(ns)*vol_nh4so4 + &
+                                 lwref_index_no3(ns)*vol_no3 + &
+                                 lwref_index_unspc(ns)*vol_antsoa + &
+                                 lwref_index_unspc(ns)*vol_bbsoa
+                        ri_ave_a = ri_dum/vol_wet_a
+                     ELSE
+                        ri_ave_a = CMPLX(1.5,0.0)
+                     ENDIF
+                     Lwrefindx(i,k,j,isize,ns) = ri_ave_a
+                  ENDDO
+
+                  IF (dp_wet_a/2.0<(dlo_um*1.0E-4)/2.0) THEN
+                     Radius_wet(i,k,j,isize) = (dlo_um*1.0E-4)/2.0
+                  ELSE
+                     Radius_wet(i,k,j,isize) = dp_wet_a/2.0
+                  ENDIF
+
+                  Number_bin(i,k,j,isize) = num_a
+                  Radius_core(i,k,j,isize) = 0.0
+
+               ENDDO
+
+            ENDDO
+         ENDDO
+      ENDDO
+
+   END SUBROUTINE optical_prep_bb
  
  
    SUBROUTINE mieaer(Id,Iclm,Jclm,Nbin_a,Number_bin_col,Radius_wet_col,Swrefindx_col,Lwrefindx_col,Dz,Curr_secs,Kts,Kte,Swsizeaer, &
@@ -448,7 +904,7 @@ CONTAINS
       USE module_peg_util , only:peg_error_fatal , peg_message
       USE module_data_rrtmgaeropt , only:Aer_optics , Num_aer_species
  
-      INTEGER , PARAMETER :: NSPINT = 4 ! Num of spectral for FAST-J
+      INTEGER , PARAMETER :: NSPINT = 14 ! Num of spectral for FAST-J
       INTEGER , INTENT(IN) :: Kts , Kte
       INTEGER , INTENT(IN) :: Id , Iclm , Jclm , Nbin_a
       REAL(KIND=rkind) , INTENT(IN) :: Curr_secs
@@ -1442,7 +1898,7 @@ CONTAINS
 !
 ! PARAMETER definitions rewritten by SPAG
 !
-      INTEGER , PARAMETER :: MAXANG = 501 , MXANG2 = MAXANG/2 + 1 , MAXTRM = 1100
+      INTEGER , PARAMETER :: MAXANG = 501 , MXANG2 = MAXANG/2 + 1 , MAXTRM = 1500
       REAL*8 , PARAMETER :: ONETHR = 1./3.
 !
 ! Dummy argument declarations rewritten by SPAG
@@ -1951,7 +2407,7 @@ CONTAINS
 !
 ! PARAMETER definitions rewritten by SPAG
 !
-      INTEGER , PARAMETER :: MAXTRM = 1102 , MAXMOM = 2*MAXTRM , MXMOM2 = MAXMOM/2 , MAXRCP = 4*MAXTRM + 2
+      INTEGER , PARAMETER :: MAXTRM = 1502 , MAXMOM = 2*MAXTRM , MXMOM2 = MAXMOM/2 , MAXRCP = 4*MAXTRM + 2
 !
 ! Dummy argument declarations rewritten by SPAG
 !
@@ -4522,7 +4978,7 @@ CONTAINS
 !
 ! PARAMETER definitions rewritten by SPAG
 !
-      INTEGER , PARAMETER :: MAXTRM = 1102 , MAXMOM = 2*MAXTRM , MXMOM2 = MAXMOM/2 , MAXRCP = 4*MAXTRM + 2
+      INTEGER , PARAMETER :: MAXTRM = 1502 , MAXMOM = 2*MAXTRM , MXMOM2 = MAXMOM/2 , MAXRCP = 4*MAXTRM + 2
 !
 ! Dummy argument declarations rewritten by SPAG
 !
