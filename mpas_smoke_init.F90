@@ -46,7 +46,18 @@ module mpas_smoke_init
    p_plastic_fine = -1, &
    p_dms          = -1, &
    p_nox          = -1, &
-   p_co           = -1
+   p_co           = -1, &
+   p_soa          = -1, &
+   p_bbsoa        = -1, &
+   p_antsoa       = -1, &
+   p_bbvoc        = -1, &
+   p_antvoc       = -1, &
+   p_bc           = -1, &
+   p_oc           = -1, &
+   p_brc          = -1
+   
+   !
+   REAL(RKIND), save :: lightning_activation_time
 
    contains
 
@@ -61,7 +72,7 @@ module mpas_smoke_init
                                  index_ssalt_fine, index_ssalt_coarse,                &
                                  index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
                                  index_so2, index_nh3, index_ch4, index_nox, index_co, &
-                                 index_bact_fine                      )
+                                 index_bact_fine, index_bc, index_oc, index_brc                )
 
     implicit none
 
@@ -76,7 +87,7 @@ module mpas_smoke_init
                            index_ssalt_fine, index_ssalt_coarse,                &
                            index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
                            index_so2, index_nh3, index_ch4, index_nox, index_co, &
-                           index_bact_fine
+                           index_bact_fine, index_bc, index_oc, index_brc
 
         if(present(index_smoke_ultrafine))  p_smoke_ultrafine  = index_smoke_ultrafine - chemistry_start + 1
         if(present(index_dust_ultrafine))   p_dust_ultrafine   = index_dust_ultrafine - chemistry_start + 1
@@ -111,6 +122,9 @@ module mpas_smoke_init
         if(present(index_nox))              p_nox              = index_nox - chemistry_start + 1
         if(present(index_co))               p_co               = index_co - chemistry_start + 1
         if(present(index_bact_fine))        p_bact_fine        = index_bact_fine - chemistry_start + 1
+        if(present(index_bc))               p_bc               = index_bc - chemistry_start + 1
+        if(present(index_oc))               p_oc               = index_oc - chemistry_start + 1
+        if(present(index_brc))              p_brc              = index_brc - chemistry_start + 1
  
    end subroutine set_scalar_indices
 

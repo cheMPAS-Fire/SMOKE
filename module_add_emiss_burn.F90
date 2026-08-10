@@ -20,6 +20,7 @@ CONTAINS
                            index_e_bb_in_co, index_e_bb_in_nh3,     &
                            index_e_bb_in_ch4,                       &
                            index_e_bb_in_nox, index_e_bb_in_so2,    &
+                           index_e_bb_in_voc,                       &
                            ids,ide, jds,jde, kds,kde,               &
                            ims,ime, jms,jme, kms,kme,               &
                            its,ite, jts,jte, kts,kte                )
@@ -36,7 +37,8 @@ CONTAINS
                            index_e_bb_in_smoke_coarse,              &
                            index_e_bb_in_co, index_e_bb_in_nh3,     &
                            index_e_bb_in_ch4,                       &
-                           index_e_bb_in_nox, index_e_bb_in_so2
+                           index_e_bb_in_nox, index_e_bb_in_so2,    &
+                           index_e_bb_in_voc
 
    real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, 1:num_chem ),                 &
          INTENT(INOUT ) ::                                   chem
@@ -83,8 +85,12 @@ CONTAINS
             conv_gas = dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
            elseif (ebb_dcycle==2) then
             conv= coef_bb_dc(i,j)*dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
+            conv_gas = coef_bb_dc(i,j)* dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
            endif
            
+           conv = conv*sc_factor
+           conv_gas = conv_gas*sc_factor
+
            dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_fine)
            chem(i,k,j,p_smoke_fine) = chem(i,k,j,p_smoke_fine) + dm_smoke
            chem(i,k,j,p_smoke_fine) = MIN(MAX(chem(i,k,j,p_smoke_fine),epsilc),5.e+3_RKIND)
@@ -134,6 +140,12 @@ CONTAINS
               dm_smoke = conv*ebu(i,k,j,index_e_bb_in_nh3)
               chem(i,k,j,p_nh3) = chem(i,k,j,p_nh3) + dm_smoke
               chem(i,k,j,p_nh3) = MIN(MAX(chem(i,k,j,p_nh3),epsilc),5.e+3_RKIND)
+           endif 
+          ! VOC
+           if (p_bbvoc > 0) then
+              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_voc)
+              chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + dm_smoke
+              chem(i,k,j,p_bbvoc) = MIN(MAX(chem(i,k,j,p_bbvoc),epsilc),5.e+3_RKIND)
            endif 
             
 

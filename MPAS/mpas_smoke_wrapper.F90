@@ -15,7 +15,8 @@ module mpas_smoke_wrapper
    use module_add_emiss_burn, only : add_emis_burn
    use dep_dry_simple_mod,    only : dry_dep_driver_simple
    use dep_dry_mod_emerson,   only : dry_dep_driver_emerson, particle_settling_wrapper
-   use dep_data_mod,          only : aero_dry_dep_init, aero_wet_dep_init 
+   use dep_dry_mod_wesley,    only : calc_gas_dep_vel
+   use dep_data_mod,          only : aero_dry_dep_init, aero_wet_dep_init, gas_dry_dep_init
    use rad_data_mod,          only : aero_rad_init
    use module_wetdep_ls,      only : wetdep_ls
    use dust_fengsha_mod,      only : gocart_dust_fengsha_driver
@@ -27,6 +28,8 @@ module mpas_smoke_wrapper
    use ssalt_mod
    use module_smoke_diagnostics
    use module_data_rrtmgaeropt
+   use module_hab_emissions,  only : hab_bacteria_driver
+   use module_lightning_driver
    use module_simple_soa, only : simple_soa, simple_soa_voc
 
    implicit none
@@ -44,6 +47,7 @@ contains
            config_ultrafine, config_coarse,                                                  &
            index_smoke_ultrafine , index_smoke_fine            , index_smoke_coarse,         &
            index_soa, index_bbsoa, index_antsoa, index_bbvoc, index_antvoc,  config_soa_scheme, &
+           index_bc, index_oc, index_brc,                                                    &
            index_dust_ultrafine  , index_dust_fine             , index_dust_coarse,          &
            index_ssalt_fine      , index_ssalt_coarse          ,                             &
            index_polp_tree       , index_polp_grass            , index_polp_weed,            &
@@ -56,28 +60,38 @@ contains
            e_ant_pt_in        , num_e_ant_pt_in          , num_anthro_pt,                  &
            e_ant_stack_groups_in , num_e_ant_stack_groups_in   ,                             &
            index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,     &
-           index_e_ant_pt_in_unspc_fine,                         &
            ant_pt_local_cell_idx, ant_pt_rank,  myrank,                                        &
            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
            index_e_bb_in_co, index_e_bb_in_nh3, index_e_bb_in_ch4,                           &
-           index_e_bb_in_nox, index_e_bb_in_so2, &
+           index_e_bb_in_nox, index_e_bb_in_so2, index_e_bb_in_voc,                             &
+           index_e_bb_in_bc, index_e_bb_in_oc,                                                  & 
            index_e_ant_in_unspc_ultrafine, index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,  &
            index_e_ant_in_smoke_ultrafine,index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
            index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine, &
            index_e_ant_in_nh4_a_fine, index_e_ant_in_so2, &
            index_e_ant_in_nh3, index_e_ant_in_ch4,                                           &
-           index_e_ant_in_co, index_e_ant_in_nox,                                            &
+           index_e_ant_in_co, index_e_ant_in_nox, index_e_ant_in_voc,                        &
+           index_e_ant_in_bc, index_e_ant_in_oc,                                             &
+           index_e_ant_pt_in_unspc_ultrafine, index_e_ant_pt_in_unspc_fine, index_e_ant_pt_in_unspc_coarse,  &
+           index_e_ant_pt_in_smoke_ultrafine,index_e_ant_pt_in_smoke_fine, index_e_ant_pt_in_smoke_coarse,   &
+           index_e_ant_pt_in_no3_a_fine, index_e_ant_pt_in_so4_a_fine, &
+           index_e_ant_pt_in_nh4_a_fine, index_e_ant_pt_in_so2, &
+           index_e_ant_pt_in_nh3, index_e_ant_pt_in_ch4,                                           &
+           index_e_ant_pt_in_co, index_e_ant_pt_in_nox, index_e_ant_pt_in_voc,                        &
+           index_e_ant_pt_in_bc, index_e_ant_pt_in_oc,                                       &
            index_e_bio_in_polp_tree, index_e_bio_in_polp_grass, index_e_bio_in_polp_weed,    &
            index_e_vol_in_vash_fine, index_e_vol_in_vash_coarse,                             &
            index_e_bb_out_smoke_ultrafine, index_e_bb_out_smoke_fine, index_e_bb_out_smoke_coarse, & 
            index_e_bb_out_nox, index_e_bb_out_ch4,index_e_bb_out_co,                         &
-           index_e_bb_out_so2,index_e_bb_out_nh3,       &
+           index_e_bb_out_so2,index_e_bb_out_nh3,index_e_bb_out_voc,                         &
+           index_e_bb_out_bc, index_e_bb_out_oc,                                             &
            index_e_ant_out_unspc_ultrafine, index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse,   &
            index_e_ant_out_smoke_ultrafine, index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse,   &
            index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine, &
            index_e_ant_out_nh4_a_fine, index_e_ant_out_so2, &
            index_e_ant_out_nh3, index_e_ant_out_ch4, &
-           index_e_ant_out_co, index_e_ant_out_nox, &
+           index_e_ant_out_co, index_e_ant_out_nox, index_e_ant_out_voc,                     &
+           index_e_ant_out_bc, index_e_ant_out_oc,                                           &
            index_e_bio_out_polp_tree, index_e_bio_out_polp_grass, index_e_bio_out_polp_weed, &
            index_e_vol_out_vash_fine,  index_e_vol_out_vash_coarse,                          &
            index_e_dust_out_dust_ultrafine, index_e_dust_out_dust_fine, index_e_dust_out_dust_coarse,  &
@@ -97,7 +111,8 @@ contains
            ddvel                 , wetdep_resolved       , tend_chem_settle      ,           &
            do_mpas_smoke         , do_mpas_dust          , do_mpas_pollen        ,           &
            do_mpas_anthro        , do_mpas_ssalt         , do_mpas_volc          ,           &
-           do_mpas_sna           , do_mpas_soa           , do_mpas_methane       , do_mpas_hab           ,           &
+           do_mpas_sna           , do_mpas_soa           , do_mpas_methane       ,           &
+           do_mpas_hab           , do_mpas_carbon_aero   ,                                   &
            do_mpas_rwc           , do_mpas_anthro_pt     ,                                   &
            calc_bb_emis_online   , bb_beta               ,                                   &
            hwp_method            , hwp_alpha             , wetdep_ls_opt        ,            &
@@ -107,9 +122,22 @@ contains
            add_fire_moist_flux   , plumerisefire_frq     , bb_qv_scale_factor   ,            &
            dust_alpha            , dust_gamma            , dust_drylimit_factor ,            &
            dust_moist_correction ,                                                           &
+           ic_flashcount, ic_flashrate, cg_flashcount, cg_flashrate, lpi,                    &
            num_pols_per_polp     , pollen_emis_scale_factor,                                 &
            tree_pollen_emis_scale_factor, grass_pollen_emis_scale_factor        ,            &
            weed_pollen_emis_scale_factor,                                                    &
+           bact_water_conc,                                                                  &   
+           config_convection_scheme, config_microp_scheme,                                   &
+           do_pollen_lightning_rupture, do_pollen_rh_rupture,                                &
+           config_lightning_option, &
+           lightning_dt, &
+           lightning_start_seconds, &
+           flashrate_factor, &
+           iccg_method, &
+           iccg_prescribed_num, &
+           iccg_prescribed_den, &
+           lightning_cellcount_method, &
+           lightning_cldtop_adjustment, &
            anthro_emis_scale_factor, anthro_pt_emis_scale_factor,                            &
            bb_input_prevh        , rwc_emis_scale_factor, plumerise_opt_rwc     ,            &
            RWC_denominator       , RWC_annual_sum       ,                                    &
@@ -121,7 +149,7 @@ contains
            aod3d_smoke, aod3d   , aod3d_simple,&
            tauaer_lw_p           , tauaer_sw_p           , ssaaer_sw_p          , asyaer_sw_p,&
            ktau                  , dt                    , dxcell               ,            &
-           area                  ,                                                           &
+           area                  , ter                   , xice                 ,            &
            xland                 , u10                   , v10                  ,            &
            ust                   , xlat                  , xlong                ,            &
            tskin                 , pblh                  , t2m                  ,            &
@@ -136,6 +164,7 @@ contains
            rainncv               , dpt2m                 , znt                  ,            &
            mavail                , g                     , vegfra               ,            &
            landusef              , cldfrac               , ktop_deep            ,            &
+           refl10cm              ,                                                           &
            cp                    , rd                    , gmt                  ,            &
            ids       , ide       , jds       , jde       , kds       , kde      ,            &
            ims       , ime       , jms       , jme       , kms       , kme      ,            &
@@ -166,7 +195,7 @@ contains
     integer,intent(in),dimension(1:num_anthro_pt),optional :: ant_pt_local_cell_idx, ant_pt_rank
     integer,intent(in) :: myrank
 ! 2D mesh arguments
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland   ! grid
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)             :: xlat, xlong, dxcell, area, xland, xice, ter   ! grid
 ! 2D Met input
     integer,intent(in), dimension(ims:ime, jms:jme)                :: isltyp, ivgtyp ! domainant soil, vegetation type
     integer,intent(in), dimension(ims:ime, jms:jme)                :: kpbl          ! k-index of PBLH
@@ -187,6 +216,8 @@ contains
 ! 2D + Time Fire Input
     real(RKIND),intent(in), dimension(ims:ims, jms:jme, nblocks),        &
                                                    optional      :: hwp_avg, fre_avg, frp_avg
+! 2D HAB Input
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: bact_water_conc
 ! Residential Wood burning
     real(RKIND),intent(in), dimension(ims:ims, jms:jme),optional    :: RWC_denominator, &
                                                                        RWC_annual_sum,                        &
@@ -222,34 +253,53 @@ contains
                            index_ssalt_fine, index_ssalt_coarse,                    &
                            index_so4_a_fine, index_no3_a_fine, index_nh4_a_fine,    &
                            index_so2, index_nh3, index_ch4,                         &
-                           index_co,  index_nox, index_bact_fine    
+                           index_co,  index_nox, index_bact_fine,                   &
+                           index_bc, index_oc, index_brc   
     integer, intent(in),optional :: &
                            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
                            index_e_bb_in_co, index_e_bb_in_ch4, index_e_bb_in_nox, &
-                           index_e_bb_in_so2, index_e_bb_in_nh3, &
+                           index_e_bb_in_so2, index_e_bb_in_nh3, index_e_bb_in_voc, &
+                           index_e_bb_in_bc, index_e_bb_in_oc
+    integer, intent(in),optional :: &
                            index_e_ant_in_unspc_ultrafine, index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse, &
                            index_e_ant_in_smoke_ultrafine, index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse, &
                            index_e_ant_in_no3_a_fine, index_e_ant_in_so4_a_fine, &
                            index_e_ant_in_nh4_a_fine, index_e_ant_in_so2, &
                            index_e_ant_in_nh3, index_e_ant_in_ch4,    &
                            index_e_ant_in_co,  index_e_ant_in_nox,    &
+                           index_e_ant_in_voc, &
+                           index_e_ant_in_bc, index_e_ant_in_oc
+    integer, intent(in),optional :: &
+                           index_e_ant_pt_in_unspc_ultrafine, index_e_ant_pt_in_unspc_fine, index_e_ant_pt_in_unspc_coarse, &
+                           index_e_ant_pt_in_smoke_ultrafine, index_e_ant_pt_in_smoke_fine, index_e_ant_pt_in_smoke_coarse, &
+                           index_e_ant_pt_in_no3_a_fine, index_e_ant_pt_in_so4_a_fine, &
+                           index_e_ant_pt_in_nh4_a_fine, index_e_ant_pt_in_so2, &
+                           index_e_ant_pt_in_nh3, index_e_ant_pt_in_ch4,    &
+                           index_e_ant_pt_in_co,  index_e_ant_pt_in_nox,    &
+                           index_e_ant_pt_in_voc, &
+                           index_e_ant_pt_in_bc, index_e_ant_pt_in_oc
+   integer, intent(in),optional :: &
                            index_e_bio_in_polp_tree, index_e_bio_in_polp_grass, index_e_bio_in_polp_weed, &
                            index_e_vol_in_vash_fine,  index_e_vol_in_vash_coarse
-    integer, intent(in),optional :: &
+   integer, intent(in),optional :: &
                            index_e_bb_out_smoke_ultrafine, index_e_bb_out_smoke_fine, index_e_bb_out_smoke_coarse, &
                            index_e_bb_out_ch4, index_e_bb_out_co, index_e_bb_out_nox, index_e_bb_out_nh3, index_e_bb_out_so2, &
+                           index_e_bb_out_voc, index_e_bb_out_bc, index_e_bb_out_oc
+   integer, intent(in),optional :: &
                            index_e_ant_out_unspc_ultrafine, index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
                            index_e_ant_out_smoke_ultrafine, index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse, &
                            index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine, &
                            index_e_ant_out_nh4_a_fine, index_e_ant_out_so2, &
                            index_e_ant_out_nh3, index_e_ant_out_ch4, &
                            index_e_ant_out_co, index_e_ant_out_nox, &
+                           index_e_ant_out_voc,                     & 
+                           index_e_ant_out_bc, index_e_ant_out_oc
+   integer, intent(in),optional :: &
                            index_e_bio_out_polp_tree, index_e_bio_out_polp_grass, index_e_bio_out_polp_weed, &
                            index_e_vol_out_vash_fine,  index_e_vol_out_vash_coarse, &
                            index_e_dust_out_dust_ultrafine, index_e_dust_out_dust_fine, index_e_dust_out_dust_coarse, &
                            index_e_ss_out_ssalt_fine, index_e_ss_out_ssalt_coarse
-    integer, intent(in),optional ::  index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,  &
-                                     index_e_ant_pt_in_unspc_fine
+    integer, intent(in),optional ::  index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG
 ! 2D dust input arrays 
     real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional  :: sandfrac_in, clayfrac_in, uthres_in, &        ! dust (FENGSHA) input
                                                                      rdrag_in, ssm_in ! dust (FENGSHA) input
@@ -258,6 +308,8 @@ contains
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: hwp, coef_bb_dc
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: hfx_bb, qfx_bb, frac_grid_burned
     integer,intent(inout),dimension(ims:ime,jms:jme),optional      :: min_bb_plume, max_bb_plume, max_rwc_plume
+    real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: ic_flashcount, ic_flashrate, cg_flashcount, cg_flashrate, lpi
+    real(RKIND),intent(inout),dimension(ims:ime, kms:kme, jms:jme),optional :: refl10cm
 ! 2D + chem output arrays
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme, 1:num_chem),optional :: wetdep_resolved
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme, 1:num_chem),optional :: drydep_flux
@@ -288,6 +340,7 @@ contains
      logical,intent(in)               :: do_mpas_methane
      logical,intent(in)               :: do_mpas_hab
      logical,intent(in)               :: do_mpas_rwc
+     logical,intent(in)               :: do_mpas_carbon_aero
      character(len=*),intent(in)      :: config_extra_chemical_tracers
      logical,intent(in)               :: config_ultrafine, config_coarse
      logical,intent(in)               :: do_mpas_anthro_pt
@@ -314,11 +367,22 @@ contains
      real(RKIND),intent(in)           :: dust_alpha, dust_gamma
      real(RKIND),intent(in)           :: dust_drylimit_factor, dust_moist_correction
      integer,intent(in)               :: bb_input_prevh
-!     integer,intent(in)               :: online_rwc_emis
      real(RKIND),intent(in),optional  :: pollen_emis_scale_factor, num_pols_per_polp 
      real(RKIND),intent(in),optional  :: tree_pollen_emis_scale_factor, &
                                          grass_pollen_emis_scale_factor, &
                                          weed_pollen_emis_scale_factor
+     logical, intent(in)                :: do_pollen_lightning_rupture
+     logical, intent(in)                :: do_pollen_rh_rupture
+     character(len=*), intent(in)       :: config_lightning_option
+     real(kind=RKIND), intent(in)       :: lightning_dt
+     real(kind=RKIND), intent(in)       :: lightning_start_seconds
+     real(kind=RKIND), intent(in)       :: flashrate_factor
+     integer, intent(in)                :: iccg_method
+     real(kind=RKIND), intent(in)       :: iccg_prescribed_num
+     real(kind=RKIND), intent(in)       :: iccg_prescribed_den
+     integer, intent(in)                :: lightning_cellcount_method
+     real(kind=RKIND), intent(in)       :: lightning_cldtop_adjustment
+     character(len=*), intent(in)       :: config_convection_scheme, config_microp_scheme 
 
 !----------------------------------
 !>-- Local Variables
@@ -330,15 +394,13 @@ contains
     integer :: julday
 !>- dust & chemistry variables
     real(RKIND), dimension(ims:ime, 1:nlcat, jms:jme) :: vegfrac
-    ! JLS, temporary, need to read in like SMOKE_RRFS/MPAS
-    real(RKIND), dimension(ims:ime, jms:jme) :: total_flashrate
 !>- plume variables
     ! -- buffers
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, num_e_bb_in) :: ebu
     real(RKIND), dimension(ims:ime, jms:jme)          :: flam_frac,                               &
                                                          fire_hist, peak_hr,                      &
                                                          hwp_day_avg,                             &
-                                                         uspdavg2d, hpbl2d, wind10m
+                                                         uspdavg2d, hpbl2d, wind10m, windgustpot
     real(RKIND), dimension(ims:ime, jms:jme)          :: lu_nofire, lu_qfire, lu_sfire
     integer,     dimension(ims:ime, jms:jme)          :: fire_type
     integer,     dimension(ims:ime, jms:jme)          :: kpbl_thetav
@@ -410,17 +472,38 @@ contains
                     index_ssalt_fine, index_ssalt_coarse,                          &
                     index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,          &
                     index_so2, index_nh3, index_ch4, index_nox, index_co,          &
-                    index_bact_fine                                                )
+                    index_bact_fine, index_bc, index_oc, index_brc                 )
                                                                           
       call mpas_log_write( ' Initializing dry deposition parameterss ')
       call aero_dry_dep_init()
+      call gas_dry_dep_init()
       call mpas_log_write( ' Initializing wet deposition parameterss ')
       call aero_wet_dep_init()
       call mpas_log_write( ' Initializing radiation feedback parameterss ')
       call aero_rad_init()
+      if ( config_lightning_option .ne. 'off' ) then
+         call lightning_init( &
+                              dt,   &
+                            ! Namelist control options
+                             config_convection_scheme,config_microp_scheme,      &
+                             config_lightning_option, lightning_dt,           &
+                             lightning_start_seconds,                  &
+                             lightning_activation_time,                              &
+                             iccg_prescribed_num, iccg_prescribed_den, &
+                             lightning_cellcount_method,                        &
+                            ! Order dependent args for domain, mem, and tile dims
+                             ids, ide, jds, jde, kds, kde,             &
+                             ims, ime, jms, jme, kms, kme,             &
+                             its, ite, jts, jte, kts, kte,             &
+                            ! IC and CG flash rates and accumulated flash count
+                             ic_flashcount, ic_flashrate,              &
+                             cg_flashcount, cg_flashrate              &
+                            )
+     endif
    endif
 !
     uspdavg2d   = 0._RKIND
+    windgustpot = 0._RKIND
     hpbl2d      = 0._RKIND
     peak_hr     = 0._RKIND
     flam_frac   = 0._RKIND
@@ -437,18 +520,58 @@ contains
         ktau, nlcat,cp,ebb_dcycle,ebb_min,                                  &
         xland,xlat,xlong,ivgtyp,isltyp,landusef,                            & ! JLS TODO LANDUSEF /= VEGFRA?
         snowh,u10,v10,wind10m,t2m,dpt2m,mavail,hwp,hwp_day_avg,             &
+        hwp_method, totprcp_prev24, swdown, hpbl2d, curr_secs,               & ! SRB: added for HWP calcs 
+        windgustpot, uspdavg2d,                                             & !SRB
         index_e_bb_in_smoke_fine,num_e_bb_in,kfire,e_bb_in,                 &
         t_phy,u_phy,v_phy,p_phy,pi_phy,z_at_w,                              &
         dz8w,dz8w_flip,                                                     &
         rho_phy,qv,relhum,rh2m,rri,                                         &
-        total_flashrate,                                                    &
-        wind_phy,theta_phy,zmid,kpbl_thetav,                                &
+        wind_phy,theta_phy,zmid,kpbl,kpbl_thetav,                           &
         peak_hr,coef_bb_dc,fire_hist,                                       &
         lu_nofire, lu_qfire, lu_sfire, fire_type,                           &
         ids,ide, jds,jde, kds,kde,                                          &
         ims,ime, jms,jme, kms,kme,                                          &
         its,ite, jts,jte, kts,kte)
    if  (do_timing) call mpas_timer_stop('smoke_prep')
+
+   
+   if ( config_lightning_option .ne. 'off' ) then
+       call lightning_driver ( &
+                          ! Frequently used prognostics
+                            curr_secs, dt, area,                  &
+                            xlat, xlong, xland, ter,               &
+                            t_phy, p_phy, rho_phy,                &
+                            u_phy, v_phy, vvel,                   &
+                            theta_phy, pi_phy,dz8w,                  &
+                            zmid,                                 &
+                            qv,qc_vis,qr_vis,qi_vis,qs_vis,qg_vis,   &
+                          ! Scheme specific prognostics
+                            ktop_deep,                            &
+                            refl10cm,                             &
+                          ! Mandatory namelist inputs
+                            config_lightning_option,                     &
+                            lightning_dt,                         &
+                            lightning_start_seconds,              &
+                            lightning_activation_time,                          &
+                            flashrate_factor,                     &
+                          ! IC:CG namelist settings
+                            iccg_method,                          &
+                            iccg_prescribed_num,                  &
+                            iccg_prescribed_den,                  &
+                          ! Scheme specific namelist inputs
+                            lightning_cellcount_method,                     &
+                            lightning_cldtop_adjustment,                    &
+                          ! Order dependent args for domain, mem, and tile dims
+                            ids, ide, jds, jde, kds, kde,         &
+                            ims, ime, jms, jme, kms, kme,         &
+                            its, ite, jts, jte, kts, kte,         &
+                          ! Mandatory outputs for all quantitative schemes
+                            ic_flashcount, ic_flashrate,          &
+                            cg_flashcount, cg_flashrate,           &
+                            lpi                                   &
+                            )
+
+   endif
 
         
    if ( do_mpas_smoke ) then
@@ -581,7 +704,7 @@ contains
                  rho_phy,vvel,u_phy,v_phy,pi_phy,wind_phy,            &
                  z_at_w,zmid,g,cp,rd,                                 &
                  frp_out, min_bb_plume, max_bb_plume,                 &
-                 plume_wind_eff,                                      &
+                 plume_wind_eff,  plumerise_opt,                      &
                  do_plumerise,                                        &
                  kpbl_thetav,kpbl,curr_secs,                          &
                  xlat, xlong, uspdavg2d, hpbl2d, plume_alpha,         &
@@ -614,6 +737,7 @@ contains
                         index_e_bb_in_co, index_e_bb_in_nh3,          &
                         index_e_bb_in_ch4,                            &
                         index_e_bb_in_nox, index_e_bb_in_so2,         &
+                        index_e_bb_in_voc,                            &
                         ids,ide, jds,jde, kds,kde,                    &
                         ims,ime, jms,jme, kms,kme,                    &
                         its,ite, jts,jte, kts,kte                     )
@@ -628,9 +752,11 @@ contains
     call  pollen_driver       (                                       &
        num_chem, chem,                                                &
        dt, u10, v10, rho_phy, dz8w, t_phy, z_at_w, ktop_deep,         &
-       xland, raincv, rainncv, relhum, swdown, total_flashrate,       &
+       xland, raincv, rainncv, relhum, swdown,                        & 
+       ic_flashrate, cg_flashrate,                                    & 
        cldfrac,                                                       &
        num_pols_per_polp,pollen_emis_scale_factor,                    &
+       do_pollen_lightning_rupture, do_pollen_rh_rupture,              &
        tree_pollen_emis_scale_factor,                                 &
        grass_pollen_emis_scale_factor,                                &
        weed_pollen_emis_scale_factor,                                 &
@@ -649,7 +775,7 @@ contains
     endif
 
   ! -- add sea salt emissions
-  if (do_mpas_ssalt .or. do_mpas_hab) then
+  if (do_mpas_ssalt) then
     if  (do_timing) call mpas_timer_start('seasalt_driver')
      call gocart_seasalt_driver (                                     &
              dt,rri,t_phy,u_phy,v_phy,                                &
@@ -664,6 +790,22 @@ contains
              its,ite, jts,jte, kts,kte                                )
     if  (do_timing) call mpas_timer_stop('seasalt_driver')
     endif
+
+  ! -- add sea salt emissions
+  if (do_mpas_hab) then
+    if  (do_timing) call mpas_timer_start('hab_driver')
+       call mpas_log_write( ' Calling hab driver')
+       call hab_bacteria_driver(dt, rho_phy, dz8w, u10, v10, xland,    &
+                                   xice, tskin, t2m,               &
+                                   bact_water_conc,                &
+                                   chem,num_chem,                  &
+                                   ids, ide, jds, jde, kds, kde,   &
+                                   ims, ime, jms, jme, kms, kme,   &
+                                   its, ite, jts, jte, kts, kte    )
+    if  (do_timing) call mpas_timer_stop('hab_driver')
+    endif
+    
+
 
     if ( do_mpas_dust ) then
     if  (do_timing) call mpas_timer_start('dust_driver')
@@ -702,6 +844,7 @@ contains
             index_e_ant_in_nh4_a_fine,                                &
             index_e_ant_in_so2, index_e_ant_in_nh3,index_e_ant_in_ch4,&
             index_e_ant_in_nox, index_e_ant_in_co,                    &
+            index_e_ant_in_voc,                                       &
             index_e_ant_out_unspc_ultrafine,                          &
             index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
             index_e_ant_out_no3_a_fine, index_e_ant_out_so4_a_fine,   &
@@ -709,6 +852,7 @@ contains
             index_e_ant_out_so2, index_e_ant_out_nh3,                 &
             index_e_ant_out_ch4, index_e_ant_out_nox,                 &
             index_e_ant_out_co,                                       &
+            index_e_ant_out_voc,                                      &
             ids,ide, jds,jde, kds,kde,                                &
             ims,ime, jms,jme, kms,kme,                                &
             its,ite, jts,jte, kts,kte                                 )
@@ -716,11 +860,17 @@ contains
           call mpas_log_write( ' Calling anthro point source emis driver')
           call mpas_smoke_anthro_pt_emis_driver(dt,gmt,julday,ktau,                     &
                               xlat,xlong,xland, chem,num_chem,dz8w,t_phy,rho_phy,       &
-                              z_at_w,zmid,pblh,wind10m,area,                            &
+                              z_at_w,zmid,hpbl2d,wind10m,area,                            &
                               e_ant_pt_in,num_anthro_pt,num_e_ant_pt_in,                &
                               e_ant_stack_groups_in, num_e_ant_stack_groups_in,         &
                               anthro_pt_emis_scale_factor,                              &
-                              index_e_ant_pt_in_unspc_fine,                             &
+                              index_e_ant_pt_in_unspc_ultrafine,                           &
+                              index_e_ant_pt_in_unspc_fine, index_e_ant_pt_in_unspc_coarse,   &
+                              index_e_ant_pt_in_no3_a_fine, index_e_ant_pt_in_so4_a_fine,     &
+                              index_e_ant_pt_in_nh4_a_fine,                                &
+                              index_e_ant_pt_in_so2, index_e_ant_pt_in_nh3,index_e_ant_pt_in_ch4,&
+                              index_e_ant_pt_in_nox, index_e_ant_pt_in_co,                    &
+                              index_e_ant_pt_in_voc,                                       &
                               index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
                               index_STKLT, index_STKLG,                                 &
                               ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
@@ -731,29 +881,11 @@ contains
     if  (do_timing) call mpas_timer_stop('anthro_driver')
     endif
 
-!    if ( online_rwc_emis .gt. 0 ) then
-!       call mpas_log_write( ' Calling online residential wood combustion  driver')
-!       call mpas_smoke_rwc_emis_driver(dt,gmt,julday,krwc,           &
-!            xlat,xlong, chem,num_chem,dz8w,t_phy,rho_phy,             &
-!            rwc_emis_scale_factor,                                    &
-!            online_rwc_emis, RWC_denominator, RWC_annual_sum,         &
-!            RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse,   &
-!            RWC_annual_sum_unspc_fine, RWC_annual_sum_unspc_coarse,   &
-!            e_ant_out, num_e_ant_out,                                 &
-!            index_e_ant_in_unspc_fine, index_e_ant_in_unspc_coarse,   &
-!            index_e_ant_in_smoke_fine, index_e_ant_in_smoke_coarse,   &
-!            index_e_ant_out_unspc_fine, index_e_ant_out_unspc_coarse, &
-!            index_e_ant_out_smoke_fine, index_e_ant_out_smoke_coarse, &
-!            ids,ide, jds,jde, kds,kde,                                &
-!            ims,ime, jms,jme, kms,kme,                                &
-!            its,ite, jts,jte, kts,kte                                 )
-!    endif
-
     if ( do_mpas_rwc ) then
        call mpas_log_write( ' Calling online residential wood combustion driver')
        call mpas_smoke_rwc_emis_driver(ktau,dt,gmt,julday,            &
             xlat,xlong, xland, chem,num_chem,dz8w,t_phy,rho_phy,      &
-            z_at_w,zmid,pblh,wind10m,rwc_emis_scale_factor,           &
+            z_at_w,zmid,hpbl2d,wind10m,rwc_emis_scale_factor,           &
             max_rwc_plume, plumerise_opt_rwc,                         &
             RWC_denominator, RWC_annual_sum,                          &
             RWC_annual_sum_smoke_fine, RWC_annual_sum_smoke_coarse,   &
@@ -780,6 +912,16 @@ contains
         ids,ide, jds,jde, kds,kde,                                    &
         ims,ime, jms,jme, kms,kme,                                    &
         its,ite, jts,jte, kts,kte, curr_secs                          )
+    ! Check for gases - only a few now, will want to tie into namelist
+    if (index_so2 .gt. 0 .or. index_nh3 .gt. 0  .or. &
+        index_ch4 .gt. 0 .or. index_co .gt. 0 .or. &
+        index_nox .gt. 0) then
+        call calc_gas_dep_vel(                                         &
+           num_chem,julday,                                            &
+           ust, wind_phy, t_phy, p_phy, swdown, ivgtyp,                &
+           ddvel,                                                      &
+           ims, ime, jms, jme, its, ite, jts, jte                      )
+    endif
     if  (do_timing) call mpas_timer_stop('drydep_driver')
     if  (do_timing) call mpas_timer_start('settling')
     if (pm_settling .gt. 0 ) then
@@ -942,12 +1084,13 @@ contains
         ktau, nlcat,cp,ebb_dcycle,ebb_min,                                  &
         xland,xlat,xlong,ivgtyp,isltyp,vegfrac,                             &
         snowh,u10,v10,wind10m,t2m,dpt2m,wetness,hwp,hwp_day_avg,            &
+        hwp_method, totprcp_prev24, swdown, hpbl2d, curr_secs,               & ! SRB: added for HWP calcs
+        windgustpot, uspdavg2d,                                             & !SRB
         index_e_bb_in_smoke_fine,num_e_bb_in,kfire,e_bb_in,                 &
         t_phy,u_phy,v_phy,p_phy,pi_phy,z_at_w,                              &
         dz8w,dz8w_flip,                                                     &
         rho_phy,qv,relhum,rh2m,rri,                                         &
-        total_flashrate,                                                    &
-        wind_phy,theta_phy,zmid,kpbl_thetav,                                &
+        wind_phy,theta_phy,zmid,kpbl,kpbl_thetav,                           &
         peak_hr,coef_bb_dc,fire_hist,                                       &
         lu_nofire, lu_qfire, lu_sfire, fire_type,                           &
         ids,ide, jds,jde, kds,kde,                                          &
@@ -968,24 +1111,34 @@ contains
 
     real(RKIND),intent(in),   dimension(ims:ime, jms:jme) :: xland, xlat, xlong,                   &
                                         snowh, u10, v10, t2m, dpt2m, wetness
+    real(RKIND),intent(in),   dimension(ims:ime, jms:jme) :: swdown 
+    real(RKIND),intent(in),   dimension(ims:ime, jms:jme) :: totprcp_prev24 ! SRB: added for HWP calcs
+    integer,intent(in)                                    :: hwp_method
+    real(RKIND)                                           :: curr_secs 
     real(RKIND),intent(in),   dimension(ims:ime, kms:kme, jms:jme) :: qv, z_at_w,                  &
                                         p_phy, t_phy, u_phy, v_phy, pi_phy, rho_phy, dz8w
     real(RKIND),intent(out),  dimension(ims:ime, kms:kme, jms:jme) :: zmid, wind_phy,theta_phy,   &
                                        relhum, rri, dz8w_flip
     integer    ,intent(out),  dimension(ims:ime, jms:jme) :: fire_type, kpbl_thetav
+    integer    ,intent(in),   dimension(ims:ime, jms:jme) :: kpbl
     real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: lu_nofire, lu_qfire, lu_sfire
     real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: fire_hist, peak_hr, hwp_day_avg
     real(RKIND),intent(inout),dimension(ims:ime,jms:jme),optional :: hwp, coef_bb_dc
-    real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: total_flashrate, wind10m, rh2m
+    real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: wind10m, rh2m
     real(RKIND),intent(in),   dimension(ims:ime,1:kfire,jms:jme,1:num_e_bb_in),optional :: e_bb_in
+    real(RKIND),intent(out),  dimension(ims:ime, jms:jme) :: hpbl2d
 
     !local variables
     real(RKIND), parameter :: delta_theta4gust = 0.5
     real(RKIND) :: theta, wdgust, snoweq, term2, term3
+    real(RKIND) :: SFCWIND,WIND,DELWIND,DZ
 !    real(RKIND), dimension(ims:ime, jms:jme) :: 
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme) :: thetav
 
-    integer :: i, j, k, k1, nv
+    integer :: i, j, k, k1, nv, hour_int, kpbl2
+    real(RKIND) :: precip_factor, wet_fact, precip_tot
+    real(RKIND), dimension(ims:ime, jms:jme) ::  totprcp, ter ! SRB: placeholder for now
+    real(RKIND), intent(out), dimension(ims:ime, jms:jme) ::  windgustpot, uspdavg2d
 
     if ( do_mpas_smoke ) then
        if (ktau==1) then
@@ -1043,7 +1196,6 @@ contains
     ! JLS, TODO, lightning flashrate
     do j=jts,jte
     do i=its,ite
-       total_flashrate(i,j) = 0._RKIND
        rh2m(i,j) = relhum(i,1,j)
 ! TODO, JLS, check
 !       rh2m(i,j) = EXP((17.625_RKIND*(dpt2m(i,j)+273.15_RKIND))/(243.04_RKIND+(dpt2m(i,j)+273.15_RKIND))) / &
@@ -1116,17 +1268,81 @@ contains
    
 
 ! TODO - JLS add HWP options 
-       !>-- HWP: Pre-release of RRFSv1 method - using wind gust calculated via UPP Method
+!---- Calculate wind gust potential and average boundary layer wind
+       do i = its,ite
+       do j = jts,jte
+          ter(i,j) = z_at_w(i,kts,j)  ! SRB: placeholder for now
+          SFCWIND          = sqrt(u10(i,j)**2+v10(i,j)**2)
+          windgustpot(i,j) = SFCWIND
+          uspdavg2d(i,j)   = SFCWIND
+           ! SRB - Adding safeguard for kpbl for first timestep
+           if (ktau==1) then
+              kpbl2 = kpbl_thetav(i,j)
+           else 
+              kpbl2 = kpbl(i,j)
+           endif
+
+          if (kpbl2+1 .ge. kts+1 ) then
+             do k=kts+1,kpbl2+1   ! Use kpbl from MYNN
+                WIND = wind_phy(i,k,j) !sqrt(us3d(i,k,j)**2+vs3d(i,k,j)**2)
+                uspdavg2d(i,j) = uspdavg2d(i,j) + WIND
+                DELWIND = WIND - SFCWIND
+                DZ = zmid(i,k,j) - ter(i,j)
+                DELWIND = DELWIND*(1.0-MIN(0.5,DZ/2000.))
+                windgustpot(i,j) = max(windgustpot(i,j),SFCWIND+DELWIND)
+             enddo
+          endif
+          uspdavg2d(i,j)  =  uspdavg2d(i,j) / real(kpbl2)
+          hpbl2d(i,j)     =  z_at_w(i,kpbl2,j) - z_at_w(i,kts,j) ! From MYNN
+       enddo
+       enddo
+
+       hour_int = floor(curr_secs/3600._RKIND)
+       precip_factor  = 2.5_RKIND + real(hour_int, kind=RKIND)*2.5_RKIND/24._RKIND
+
+       !do i=its, ite
+       !do j=jts, jte
+           !totprcp_prev24 (i,j) = 0._RKIND
+       totprcp = 0._RKIND  ! SRB: placeholder for now
+       !enddo
+       !enddo
+
        do i=its, ite
        do j=jts, jte
+         if (xland(i,j) .eq. 0) then
+            wet_fact=vegfrac(i,17,j)
+         else
+            wet_fact=1._RKIND
+         endif
+
          wind10m(i,j) = sqrt(u10(i,j)**2.+v10(i,j)**2.)
-         wdgust  =max(wind10m(i,j),3._RKIND)
-         snoweq  =max((25._RKIND - snowh(i,j))/25._RKIND,0._RKIND)
+         wdgust  = max(wind10m(i,j),3._RKIND) ! SRB: =SFCIWND2 in RRFSv1
+
+         SELECT CASE (hwp_method)
+         CASE(1)
+           ! SRB: HWP calculation used in RRFSv1
+           if (ebb_dcycle .eq. 2) then
+              precip_tot = totprcp(i,j)+totprcp_prev24(i,j)
+           else
+              precip_tot = totprcp(i,j)
+           endif
+           hwp(i,j) =  0.022_RKIND*max(precip_factor-(precip_tot*1.e+3_RKIND),0._RKIND)/precip_factor * &
+                       ((1._RKIND-wetness(i,j)*wet_fact)**0.51_RKIND) *                                                      &
+                       (wdgust*hpbl2d(i,j))**0.57 *                                                                          &
+                       MIN(25.0_RKIND,MAX(15._RKIND,t2m(i,j)-dpt2m(i,j)))**0.74 *                                            &
+                       MIN(3._RKIND, 1._RKIND + swdown(i,j)/250._RKIND)**0.18
+         CASE(2)
+           
+           snoweq  =max((25._RKIND - snowh(i,j))/25._RKIND,0._RKIND)
 !         term2   = max(t2m(i,j)-dpt2m(i,j),15._RKIND)**1.03 ! TODO, floating point exception
-         term2   = 15._RKIND
-         term3   = (1._RKIND-wetness(i,j))**0.4
-         hwp(i,j)= 0.177_RKIND * wdgust**0.97 * term2 * ((1._RKIND-wetness(i,j))**0.4) * snoweq
+           term2   = 15._RKIND
+           term3   = (1._RKIND-wetness(i,j))**0.4
+           hwp(i,j)= 0.177_RKIND * wdgust**0.97 * term2 * ((1._RKIND-wetness(i,j))**0.4) * snoweq
+
+         CASE DEFAULT
+         END SELECT
          hwp_day_avg(i,j)=hwp(i,j)
+
        enddo
        enddo
     endif ! do_mpas_smoke
