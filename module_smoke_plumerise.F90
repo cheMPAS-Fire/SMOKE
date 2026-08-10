@@ -2173,5 +2173,458 @@ RETURN
 END function ESAT_PR
 !     ******************************************************************
 
+!=========================================================================
+! SRB: Sofiev and Briggs implementation:
+!=========================================================================
+
+subroutine plumerise_sofiev(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_in, &
+                            zmid, z_lev, frp_w, lat, lon, k_min, k_max, ierr,     &
+                            kpbl_in, cp_in)
+  use mpas_kind_types
+  implicit none
+
+  integer, intent(in) :: kte
+  real(RKIND), intent(in) :: u_in(kte), v_in(kte), w_in(kte)
+  real(RKIND), intent(in) :: theta_in(kte), pi_in(kte), rho_in(kte), qv_in(kte)
+  real(RKIND), intent(in) :: zmid(kte), z_lev(kte)
+  real(RKIND), intent(in) :: frp_w, lat, lon
+  integer, intent(inout) :: k_min, k_max
+  integer, intent(out) :: ierr
+  integer, intent(in), optional :: kpbl_in
+  real(RKIND), intent(in), optional :: cp_in
+
+  ! Constants
+  real(RKIND), parameter :: g0    = 9.81_RKIND
+  real(RKIND), parameter :: Pf0   = 1.0e6_RKIND
+  real(RKIND), parameter :: N0sq  = 2.5e-4_RKIND   ! per Sofiev et al. Eq (9): N0^2
+  real(RKIND), parameter :: hp_min = 100.0_RKIND
+
+  ! Sofiev coefs for ABL plumes
+  real(RKIND), parameter :: a_abl = 0.24_RKIND, b_abl = 170.0_RKIND, g_abl = 0.35_RKIND, d_abl = 0.60_RKIND
+  ! Sofiev coefs for free-tropo plumes
+  real(RKIND), parameter :: a_ft  = 0.93_RKIND, b_ft  = 298.0_RKIND, g_ft  = 0.13_RKIND, d_ft  = 0.70_RKIND
+  ! Sofiev coefs for trial injection
+  real(RKIND), parameter :: a_det = 0.15_RKIND, b_det = 102.0_RKIND, g_det = 0.49_RKIND, d_det = 0.00_RKIND
+
+  real(RKIND) :: Habl, N2_ft
+  real(RKIND) :: Hp_trial, Hp_final
+
+  ierr = 0
+  k_min = 2
+  k_max = 3
+
+  ! Check for kpbl 
+  if (.not. present(kpbl_in)) then
+     ierr = 1
+     return
+  end if
+  if (kpbl_in < 2 .or. kpbl_in > kte) then
+     ierr = 2
+     return
+  end if
+
+  ! Get the PBL height [m]
+  Habl = max(0.0_RKIND, min(z_lev(kpbl_in), z_lev(kte)))
+
+  ! Compute the Brunt-Vaisala Frequency in free-troposphere
+  call compute_N2_ft(kte, theta_in, z_lev, kpbl_in, N2_ft)
+
+  ! Step 1: trial height using Eq (21) in Sofiev et al. (2012)
+  Hp_trial = sofiev_hp(Habl, frp_w, N2_ft, Pf0, N0sq, a_det, b_det, g_det, d_det)
+
+  ! Step 2: compare to HABL; use Eq (13) if inside ABL, else Eq (19)
+  if (Hp_trial <= Habl) then
+     Hp_final = sofiev_hp(Habl, frp_w, N2_ft, Pf0, N0sq, a_abl, b_abl, g_abl, d_abl)
+  else
+     Hp_final = sofiev_hp(Habl, frp_w, N2_ft, Pf0, N0sq, a_ft,  b_ft,  g_ft,  d_ft)
+  end if
+
+  ! Final plume top height
+  Hp_final = max(hp_min, min(Hp_final, z_lev(kte)))
+
+  ! Get the k-index
+  k_max = height_to_k(kte, z_lev, Hp_final)
+
+  ! Sanity check
+  if (k_max <= k_min) k_max = min(kte, k_min+1)
+
+end subroutine plumerise_sofiev
+
+subroutine plumerise_briggs(kte, u_in, v_in, w_in, theta_in, pi_in, rho_in, qv_in, &
+                                 zmid, z_lev, frp_w, lat, lon, k_min, k_max, ierr,      &
+                                 kpbl_in, cp_in)
+  use mpas_kind_types
+  implicit none
+
+  integer, intent(in) :: kte
+  real(RKIND), intent(in) :: u_in(kte), v_in(kte), w_in(kte)
+  real(RKIND), intent(in) :: theta_in(kte), pi_in(kte), rho_in(kte), qv_in(kte)
+  real(RKIND), intent(in) :: zmid(kte), z_lev(kte)
+  real(RKIND), intent(in) :: frp_w, lat, lon
+  integer, intent(inout) :: k_min, k_max
+  integer, intent(out) :: ierr
+  integer, intent(in), optional :: kpbl_in
+  real(RKIND), intent(in), optional :: cp_in
+  ! Constants
+  real(RKIND), parameter :: g0 = 9.81_RKIND
+  real(RKIND), parameter :: hp_min = 100.0_RKIND
+  real(RKIND), parameter :: U_min  = 0.1_RKIND
+  real(RKIND), parameter :: dT_plume = 200.0_RKIND   ! pragmatic default
+
+  integer :: kpbl
+  real(RKIND) :: Habl, N2_ft, N_ft
+  real(RKIND) :: U_pbl, rho_pbl, Ta, Tp
+  real(RKIND) :: ustar, wstar, wrms
+  integer :: regime   ! 1=stable, 2=neutral, 3=unstable
+  real(RKIND) :: Hp69, Hp84
+  real(RKIND) :: cp_used
+
+  ierr = 0
+  k_min = 2
+  k_max = 3
+
+  ! Check for kpbl 
+  if (.not. present(kpbl_in)) then
+     ierr = 1
+     return
+  end if
+  kpbl = kpbl_in
+  if (kpbl < 2 .or. kpbl > kte) then
+     ierr = 2
+     return
+  end if
+
+  cp_used = 1004.0_RKIND
+  if (present(cp_in)) cp_used = cp_in
+
+  ! Get the PBL height [m]
+  Habl = max(0.0_RKIND, min(z_lev(kpbl), z_lev(kte)))
+
+  ! Compute the Brunt-Vaisala Frequency in free-troposphere
+  call compute_N2_ft(kte, theta_in, z_lev, kpbl, N2_ft)
+  N_ft = sqrt(max(N2_ft, 1.0e-6_RKIND))
+
+  ! Get PBL averaged windspeed and density
+  call mean_pbl_met(kte, u_in, v_in, w_in, rho_in, kpbl, U_pbl, wrms, rho_pbl)
+  U_pbl = max(U_pbl, U_min)
+  rho_pbl = max(rho_pbl, 0.2_RKIND)
+
+  ! Ambient temperature, taking first level temperature for now
+  Ta = temperature_from_theta_pi(theta_in(1), pi_in(1), cp_used)
+
+  ! Plume temperature, for now use a constant delta above ambience
+  Tp = max(350.0_RKIND, Ta + dT_plume)
+
+  ! Estimate the stability regime 
+  call diagnose_regime(theta_in, z_lev, w_in, kpbl, N2_ft, regime)
+
+  ! ---- B69 (Eq 17 in Sofiev et al. (2012), wildfire-adapted)
+  if (regime == 1) then
+     if (U_pbl <= 0.5_RKIND) then
+        Hp69 = 5.7_RKIND * ( g0*frp_w / ( (N_ft**3) * Tp*cp_used*rho_pbl ) )**0.25_RKIND
+     else
+        Hp69 = 2.4_RKIND * ( g0*frp_w / ( N2_ft * U_pbl * Tp*cp_used*rho_pbl ) )**(1.0_RKIND/3.0_RKIND)
+     end if
+  else
+     Hp69 = 29.0_RKIND * ( g0*frp_w / ( Tp*cp_used*rho_pbl ) )**(3.0_RKIND/5.0_RKIND) / U_pbl
+  end if
+
+  ! ---- B84 (Eq 18 in Sofiev et al. (2012), wildfire-adapted)
+  ustar = max(0.1_RKIND, 0.1_RKIND * U_pbl)   ! proxy - could be highly uncertain
+  wstar = max(0.1_RKIND, wrms)                ! proxy from resolved vertical velocity
+
+  select case (regime)
+  case (1)  ! stable
+     Hp84 = 2.7_RKIND * ( g0*frp_w / ( N2_ft * U_pbl * cp_used*rho_pbl*Tp ) )**(1.0_RKIND/3.0_RKIND)
+  case (2)  ! neutral
+     Hp84 = 0.72_RKIND * ( g0*frp_w / ( (ustar**2) * U_pbl * cp_used*rho_pbl*Tp ) )
+  case default  ! unstable
+     Hp84 = 1.1_RKIND * ( g0*frp_w * (max(Habl,50.0_RKIND)**(2.0_RKIND/3.0_RKIND)) / &
+                          ( (wstar**2) * U_pbl * cp_used*rho_pbl*Tp ) )**(3.0_RKIND/5.0_RKIND)
+  end select
+
+  ! Injection heights from both Briggs approaches
+  Hp69 = max(hp_min, min(Hp69, z_lev(kte)))
+  Hp84 = max(hp_min, min(Hp84, z_lev(kte)))
+
+  ! Injection used by the model: B84 by default as it performed better in Sofiev et al. (2012) testing
+  k_max = height_to_k(kte, z_lev, Hp84)
+
+  if (k_max <= k_min) k_max = min(kte, k_min+1)
+
+end subroutine plumerise_briggs
+
+! Some functions for the above subroutines
+real(RKIND) function sofiev_hp(Habl, frp_w, N2_ft, Pf0, N0sq, a, b, gexp, d)
+  use mpas_kind_types
+  implicit none
+  real(RKIND), intent(in) :: Habl, frp_w, N2_ft, Pf0, N0sq
+  real(RKIND), intent(in) :: a, b, gexp, d
+
+! Get the plume top height: Sofiev's equation
+  sofiev_hp = a*Habl + b * (max(frp_w,1.0_RKIND)/Pf0)**gexp * exp( -d * (N2_ft / N0sq) )
+
+end function sofiev_hp
+
+subroutine compute_N2_ft(kte, theta, z, kpbl, N2_ft)
+! Estimate the Brunt-Vaisala frequency squared
+  use mpas_kind_types
+  implicit none
+  integer, intent(in) :: kte, kpbl
+  real(RKIND), intent(in) :: theta(kte), z(kte)
+  real(RKIND), intent(out) :: N2_ft
+
+  real(RKIND), parameter :: g0 = 9.81_RKIND
+  integer :: k, k1, k2
+  real(RKIND) :: Habl, z0, z1, zbar, thbar, num, den, slope
+
+  Habl = max(0.0_RKIND, min(z(kpbl), z(kte)))
+
+  ! ~2*HABL above the PBL top
+  z0 = max(2.0_RKIND*Habl - 250.0_RKIND, z(kpbl) + 200.0_RKIND)
+  z1 = z0 + 500.0_RKIND
+
+  k1 = -1; k2 = -1
+  do k = 2, kte
+     if (k1 < 0 .and. z(k) >= z0) k1 = k
+     if (k2 < 0 .and. z(k) >= z1) k2 = k
+  end do
+  if (k1 < 0) k1 = min(kte-2, max(kpbl+1, 2))
+  if (k2 < 0) k2 = min(kte, k1+6)
+  if (k2 <= k1) k2 = min(kte, k1+2)
+
+  zbar = 0.0_RKIND; thbar = 0.0_RKIND
+  do k = k1, k2
+     zbar  = zbar  + z(k)
+     thbar = thbar + theta(k)
+  end do
+  zbar  = zbar  / real(k2-k1+1, RKIND)
+  thbar = thbar / real(k2-k1+1, RKIND)
+
+  num = 0.0_RKIND; den = 0.0_RKIND
+  do k = k1, k2
+     num = num + (z(k)-zbar)*(theta(k)-thbar)
+     den = den + (z(k)-zbar)*(z(k)-zbar)
+  end do
+
+  if (den <= 0.0_RKIND .or. thbar <= 0.0_RKIND) then
+     slope = (theta(min(k1+1,kte)) - theta(k1)) / max(1.0_RKIND, (z(min(k1+1,kte)) - z(k1)))
+  else
+     slope = num / den
+  end if
+
+  N2_ft = (g0 / thbar) * slope
+
+ if (N2_ft < 1.0e-6_RKIND) N2_ft = 1.0e-6_RKIND
+
+end subroutine compute_N2_ft
+
+subroutine mean_pbl_met(kte, u, v, w, rho, kpbl, Ubar, wrms, rhobar)
+! Get the mean values within PBL
+  use mpas_kind_types
+  implicit none
+  integer, intent(in) :: kte, kpbl
+  real(RKIND), intent(in) :: u(kte), v(kte), w(kte), rho(kte)
+  real(RKIND), intent(out) :: Ubar, wrms, rhobar
+  integer :: k, n
+  real(RKIND) :: sumU, sumW2, sumR
+
+  sumU = 0.0_RKIND; sumW2 = 0.0_RKIND; sumR = 0.0_RKIND
+  n = max(1, kpbl)
+
+  do k = 1, kpbl
+     sumU  = sumU  + sqrt(u(k)*u(k) + v(k)*v(k))
+     sumW2 = sumW2 + w(k)*w(k)
+     sumR  = sumR  + rho(k)
+  end do
+
+  Ubar   = sumU / real(n, RKIND)
+  wrms   = sqrt(sumW2 / real(n, RKIND))
+  rhobar = sumR / real(n, RKIND)
+end subroutine mean_pbl_met
+
+subroutine diagnose_regime(theta, z, w, kpbl, N2_ft, regime)
+! Estimate stability regime for Briggs 
+  use mpas_kind_types
+  implicit none
+  real(RKIND), intent(in) :: theta(:), z(:), w(:)
+  integer, intent(in) :: kpbl
+  real(RKIND), intent(in) :: N2_ft
+  integer, intent(out) :: regime
+
+  real(RKIND) :: dtheta
+  real(RKIND) :: wrms
+  integer :: k, n
+  real(RKIND) :: sumW2
+
+  dtheta = theta(kpbl) - theta(1)
+
+  ! stable = if strong positive stratification across the PBL
+  ! unstable = if significant vertical motion in PBL and weak stratification
+  ! else = neutral
+
+  sumW2 = 0.0_RKIND
+  n = max(1, kpbl)
+  do k = 1, kpbl
+     sumW2 = sumW2 + w(k)*w(k)
+  end do
+  wrms = sqrt(sumW2 / real(n, RKIND))
+
+  if (dtheta > 2.0_RKIND) then
+     regime = 1   ! stable
+  else if (wrms > 0.5_RKIND) then
+     regime = 3   ! unstable
+  else
+     regime = 2   ! neutral
+  end if
+end subroutine diagnose_regime
+
+integer function height_to_k(kte, z_lev, h)
+! Get the model k-index based on height
+  use mpas_kind_types
+  implicit none
+  integer, intent(in) :: kte
+  real(RKIND), intent(in) :: z_lev(kte)
+  real(RKIND), intent(in) :: h
+  integer :: k
+
+  height_to_k = 2
+  do k = 2, kte
+     if (z_lev(k) >= h) then
+        height_to_k = k
+        return
+     end if
+  end do
+  height_to_k = kte
+end function height_to_k
+
+real(RKIND) function temperature_from_theta_pi(theta, pi, cp)
+! Get temperature from theta
+  use mpas_kind_types
+  implicit none
+  real(RKIND), intent(in) :: theta, pi, cp
+  temperature_from_theta_pi = theta * (pi / cp)
+end function temperature_from_theta_pi
+
+! Sigmoid function for mapping variables
+real(RKIND) function sigmoid(x)
+  use mpas_kind_types
+  implicit none
+  real(RKIND), intent(in) :: x
+  sigmoid = 1.0_RKIND / (1.0_RKIND + exp(-x))
+end function sigmoid
+
+! Median estimation
+real(RKIND) function median3(a,b,c)
+  use mpas_kind_types
+  implicit none
+  real(RKIND), intent(in) :: a,b,c
+  if ((a>=b .and. a<=c) .or. (a<=b .and. a>=c)) then
+     median3 = a
+  else if ((b>=a .and. b<=c) .or. (b<=a .and. b>=c)) then
+     median3 = b
+  else
+     median3 = c
+  end if
+end function median3
+
+! Hybrid plumerise approach
+subroutine hybrid_weights_and_height(kte, u, v, w, theta, qv, zlev, kpbl, frp_w, &
+                                     hp_f, hp_s, hp_b, hp_h, wf, ws, wb)
+  use mpas_kind_types
+  implicit none
+  integer, intent(in) :: kte, kpbl
+  real(RKIND), intent(in) :: u(kte), v(kte), w(kte), theta(kte), qv(kte), zlev(kte)
+  real(RKIND), intent(in) :: frp_w
+  real(RKIND), intent(in) :: hp_f, hp_s, hp_b
+  real(RKIND), intent(out) :: hp_h, wf, ws, wb
+
+  ! Some constants (tunable)
+  real(RKIND), parameter :: Pf0 = 1.0e6_RKIND
+  real(RKIND), parameter :: sigma_out = 2000.0_RKIND   ! outlier scale (m)
+  real(RKIND), parameter :: wb_cap = 0.50_RKIND        ! cap Briggs
+
+  real(RKIND) :: Habl, N2_ft, U_pbl, wrms, rho_dummy
+  real(RKIND) :: qv_pbl, logfrp
+  real(RKIND) :: s_frp_hi, s_stable, s_windy, s_conv, s_moist
+  real(RKIND) :: sf, ss, sb
+  real(RKIND) :: hmed, pf, ps, pb, sumw
+  integer :: k
+
+  Habl = max(0.0_RKIND, min(zlev(kpbl), zlev(kte)))
+  call compute_N2_ft(kte, theta, zlev, kpbl, N2_ft)
+
+  ! PBL means
+  U_pbl = 0.0_RKIND
+  wrms  = 0.0_RKIND
+  qv_pbl= 0.0_RKIND
+  do k = 1, kpbl
+     U_pbl  = U_pbl  + sqrt(u(k)*u(k) + v(k)*v(k))
+     wrms   = wrms   + w(k)*w(k)
+     qv_pbl = qv_pbl + qv(k)
+  end do
+  U_pbl  = U_pbl / real(max(1,kpbl), RKIND)
+  wrms   = sqrt(wrms / real(max(1,kpbl), RKIND))
+  qv_pbl = qv_pbl / real(max(1,kpbl), RKIND)
+
+  logfrp = log10(max(frp_w,1.0_RKIND))
+
+  ! Smooth indicators based on sigmoid function
+  s_frp_hi = sigmoid((logfrp - 7.0_RKIND)/0.6_RKIND)              ! ~1 for FRP >> 1e7 W
+  s_stable = sigmoid((N2_ft  - 1.5e-4_RKIND)/6.0e-5_RKIND)        ! stable FT
+  s_windy  = sigmoid((U_pbl  - 6.0_RKIND)/2.0_RKIND)              ! windy PBL
+  s_conv   = sigmoid((wrms   - 0.7_RKIND)/0.4_RKIND)              ! convective/turbulent PBL
+  s_moist  = sigmoid((qv_pbl - 0.0035_RKIND)/0.0015_RKIND)        ! moist PBL
+
+  ! Base scores: The coefficients are chosen based on how well the scheme works in certain conditions
+  ! Freitas: high FRP + convective/moist
+  sf = 0.15_RKIND + 0.65_RKIND*(s_frp_hi*s_conv) + 0.20_RKIND*s_moist
+
+  ! Sofiev: moderate FRP and stable FT
+  ss = 0.45_RKIND + 0.25_RKIND*(1.0_RKIND - s_frp_hi) + 0.25_RKIND*s_stable + 0.05_RKIND*s_moist
+
+  ! Briggs: windy + stable/neutral
+  sb = 0.10_RKIND + 0.60_RKIND*(s_windy*s_stable*(1.0_RKIND - s_conv)) + 0.30_RKIND*(s_windy*(1.0_RKIND - s_moist))
+
+  ! Estimate outlier relative to median height and penalize the scores
+  hmed = median3(hp_f, hp_s, hp_b)
+  pf = exp( -((abs(hp_f - hmed)/sigma_out)**2) )
+  ps = exp( -((abs(hp_s - hmed)/sigma_out)**2) )
+  pb = exp( -((abs(hp_b - hmed)/sigma_out)**2) )
+
+  ! Adjusted scores after considering the penalties
+  sf = sf * pf
+  ss = ss * ps
+  sb = sb * pb
+
+  ! Normalize scores
+  sumw = sf + ss + sb
+  if (sumw <= 1.0e-12_RKIND) then
+     wf = 0.0_RKIND; ws = 1.0_RKIND; wb = 0.0_RKIND
+  else
+     wf = sf/sumw
+     ws = ss/sumw
+     wb = sb/sumw
+  end if
+
+  ! Cap Briggs influence and re-normalize; since Briggs is not wildfire focused
+  if (wb > wb_cap) then
+     wb = wb_cap
+     sumw = wf + ws + wb
+     wf = wf/sumw
+     ws = ws/sumw
+     wb = wb/sumw
+  end if
+
+  ! Estimate the hybrid plume height
+  hp_h = wf*hp_f + ws*hp_s + wb*hp_b
+
+  ! Sanity check
+  hp_h = max(100.0_RKIND, min(hp_h, zlev(kte)))
+
+end subroutine hybrid_weights_and_height
+
+
+
 !      ------------------------------------------------------------------------
 end module module_smoke_plumerise

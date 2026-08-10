@@ -711,7 +711,7 @@ contains
                  rho_phy,vvel,u_phy,v_phy,pi_phy,wind_phy,            &
                  z_at_w,zmid,g,cp,rd,                                 &
                  frp_out, min_bb_plume, max_bb_plume,                 &
-                 plume_wind_eff,                                      &
+                 plume_wind_eff,  plumerise_opt,                      &
                  do_plumerise,                                        &
                  kpbl_thetav,kpbl,curr_secs,                          &
                  xlat, xlong, uspdavg2d, hpbl2d, plume_alpha,         &
