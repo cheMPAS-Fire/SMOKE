@@ -23,7 +23,7 @@ CONTAINS
       valid_chem_idx = (idx >= 1 .AND. idx <= num_chem)
    END FUNCTION valid_chem_idx
 
-   SUBROUTINE optical_averaging(Id,Curr_secs,Dtstep,radt,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,      &
+   SUBROUTINE optical_averaging(Id,Curr_secs,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,      &
                               & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,&
                               & Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
  
@@ -37,7 +37,6 @@ CONTAINS
       INTEGER , INTENT(IN) :: Ims , Ime , Jms , Jme , Kms , Kme
       INTEGER , INTENT(IN) :: Its , Ite , Jts , Jte , Kts , Kte
       REAL(KIND=rkind) , INTENT(IN) :: Curr_secs
-      REAL , INTENT(IN) :: Dtstep, radt
       REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,Num_chem) , INTENT(IN) :: Chem
       REAL , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) , INTENT(IN) :: Dz8w , Rho_phy , Relhum
  

@@ -19,7 +19,7 @@ MODULE module_smoke_diagnostics
 
 CONTAINS
 
-   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Dtstep,radt,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
+   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
                           & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,&
                           & Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
 
@@ -32,8 +32,6 @@ CONTAINS
       INTEGER , INTENT(IN) :: Kme
       INTEGER , INTENT(IN) :: Id
       REAL(rkind) , INTENT(IN) :: Curr_secs
-      REAL(rkind) , INTENT(IN) :: Dtstep
-      REAL(rkind) , INTENT(IN) :: radt
       REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:Num_chem) :: Chem
       REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d_Simple
       REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d
@@ -106,7 +104,7 @@ CONTAINS
       case (ID_MIE_OFF)
 
       case (ID_MIE_SIMPLE)
-        CALL optical_averaging(Id,Curr_secs,Dtstep,radt,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
+        CALL optical_averaging(Id,Curr_secs,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
                            & L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,&
                            & Its,Ite,Jts,Jte,Kts,Kte)
         DO j = Jts , Jte
