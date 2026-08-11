@@ -121,7 +121,7 @@ contains
            plume_alpha           , bb_emis_scale_factor, ebb_dcycle             ,            &
            drydep_opt            , pm_settling           , add_fire_heat_flux   ,            &
            add_fire_moist_flux   , plumerisefire_frq     , bb_qv_scale_factor   ,            &
-           dust_opt              , ch_dust               ,                                   &
+           dust_opt              ,                                                           &
            dust_alpha            , dust_gamma            , dust_drylimit_factor ,            &
            dust_moist_correction ,                                                           &
            ic_flashcount, ic_flashrate, cg_flashcount, cg_flashrate, lpi,                    &
@@ -371,7 +371,6 @@ contains
      integer,intent(in)               :: bb_beta
      real(RKIND),intent(in)           :: dust_alpha, dust_gamma
      integer,intent(in)               :: dust_opt
-     real(RKIND),intent(in)           :: ch_dust
      real(RKIND),intent(in)           :: dust_drylimit_factor, dust_moist_correction
      integer,intent(in)               :: bb_input_prevh
      real(RKIND),intent(in),optional  :: pollen_emis_scale_factor, num_pols_per_polp 
@@ -840,7 +839,7 @@ contains
               u_phy,v_phy,chem,rho_phy,dz8w,smois,u10,v10,          &
               erod_in,isltyp,xland,area,g,                          &
               e_dust_out, num_e_dust_out,                           &
-              ch_dust,                                              &
+              dust_alpha,                                           &
               index_e_dust_out_dust_fine,                           &
               index_e_dust_out_dust_coarse,                         &
               num_emis_dust,num_chem,nsoil,num_soil_types,          &
