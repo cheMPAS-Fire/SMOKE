@@ -21,6 +21,7 @@ OBJS = \
 	module_plumerise.o \
 	dust_data_mod.o \
 	dust_fengsha_mod.o \
+	dust_gocart_simple_mod.o \
 	ssalt_mod.o \
 	mpas_smoke_wrapper.o \
 	mpas_smoke_init.o \
@@ -78,6 +79,11 @@ rad_data_mod.o: \
 	mpas_mie_module.o
 
 dust_fengsha_mod.o: \
+	mpas_smoke_config.o \
+	dust_data_mod.o \
+	mpas_smoke_init.o
+
+dust_gocart_simple.o: \
 	mpas_smoke_config.o \
 	dust_data_mod.o \
 	mpas_smoke_init.o

@@ -20,6 +20,7 @@ module mpas_smoke_wrapper
    use rad_data_mod,          only : aero_rad_init
    use module_wetdep_ls,      only : wetdep_ls
    use dust_fengsha_mod,      only : gocart_dust_fengsha_driver
+   use dust_gocart_simple_mod,only : gocart_dust_simple_driver
    use pollen_mod,            only : pollen_driver
    use module_anthro_emissions
    use module_anthro_pt_emissions
@@ -43,7 +44,7 @@ contains
     subroutine mpas_smoke_driver(                                                            &
            configs, num_chem              , chemistry_start             , chem           ,            &
            config_extra_chemical_tracers,                                                    &
-           kanthro    , kbio, kfire, kvol,                                                   &
+           kanthro    , kbio, kfire, kvol, num_soil_types,                                   &
            config_ultrafine, config_coarse,                                                  &
            index_smoke_ultrafine , index_smoke_fine            , index_smoke_coarse,         &
            index_soa, index_bbsoa, index_antsoa, index_bbvoc, index_antvoc,  config_soa_scheme, &
@@ -102,7 +103,7 @@ contains
            eco_id, efs_smold, efs_flam, efs_rsmold,fmc_avg,                                  &
            hfx_bb                , qfx_bb         ,  frac_grid_burned    ,                   &
            min_bb_plume          , max_bb_plume,  max_rwc_plume,                             &
-           sandfrac_in           , clayfrac_in    , uthres_in, rdrag_in, ssm_in,             &
+           sandfrac_in           , clayfrac_in    , uthres_in, rdrag_in, ssm_in, erod_in,    &
            e_ant_in, e_bb_in, e_bio_in, e_vol_in,                                            &
            e_ant_out, e_bb_out, e_bio_out, e_dust_out, e_ss_out, e_vol_out,                  &
            num_e_ant_in, num_e_bb_in, num_e_bio_in, num_e_vol_in,                            &
@@ -120,6 +121,7 @@ contains
            plume_alpha           , bb_emis_scale_factor, ebb_dcycle             ,            &
            drydep_opt            , pm_settling           , add_fire_heat_flux   ,            &
            add_fire_moist_flux   , plumerisefire_frq     , bb_qv_scale_factor   ,            &
+           dust_opt              ,                                                           &
            dust_alpha            , dust_gamma            , dust_drylimit_factor ,            &
            dust_moist_correction ,                                                           &
            ic_flashcount, ic_flashrate, cg_flashcount, cg_flashrate, lpi,                    &
@@ -188,6 +190,7 @@ contains
 ! Dimensions and indexes
     integer,intent(in):: nsoil, nlcat, num_chem, chemistry_start
     integer,intent(in):: kanthro, kbio, kfire, kvol
+    integer,intent(in):: num_soil_types
     integer,intent(in):: num_e_ant_in,  num_e_bb_in,  num_e_bio_in,  num_e_vol_in
     integer,intent(in):: num_e_ant_out, num_e_bb_out, num_e_bio_out, num_e_dust_out, num_e_ss_out, num_e_vol_out
     integer,intent(in):: num_e_ant_pt_in, num_anthro_pt, num_e_ant_stack_groups_in
@@ -303,6 +306,8 @@ contains
 ! 2D dust input arrays 
     real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional  :: sandfrac_in, clayfrac_in, uthres_in, &        ! dust (FENGSHA) input
                                                                      rdrag_in, ssm_in ! dust (FENGSHA) input
+! 3D dust input arrays
+    real(RKIND),intent(in), dimension(ims:ime, 1:num_soil_types, jms:jme),optional  :: erod_in ! dust (GOCART Simple) input
 ! 2D input/output arrays
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: frp_out, fre_out, EFs_map
     real(RKIND),intent(inout),dimension(ims:ime, jms:jme),optional :: hwp, coef_bb_dc
@@ -365,6 +370,7 @@ contains
      integer,intent(in)               :: plumerisefire_frq
      integer,intent(in)               :: bb_beta
      real(RKIND),intent(in)           :: dust_alpha, dust_gamma
+     integer,intent(in)               :: dust_opt
      real(RKIND),intent(in)           :: dust_drylimit_factor, dust_moist_correction
      integer,intent(in)               :: bb_input_prevh
      real(RKIND),intent(in),optional  :: pollen_emis_scale_factor, num_pols_per_polp 
@@ -810,24 +816,37 @@ contains
     if ( do_mpas_dust ) then
     if  (do_timing) call mpas_timer_start('dust_driver')
     call mpas_log_write( ' Calling dust driver')
-!    if ( dust_opt .eq. 5 ) then
-    !-- compute dust (FENGSHA)
-       call gocart_dust_fengsha_driver(dt,ktau,chem,rho_phy,          &
-            smois,tslb,p8w,                                           &
-            isltyp,snowh,xland,area,g,                                &
-            ust,znt,                                                  &
-            clayfrac_in,sandfrac_in,                                  &
-            uthres_in, rdrag_in, ssm_in,                              &
-            e_dust_out, num_e_dust_out,                               &
-            index_e_dust_out_dust_fine,                               &
-            index_e_dust_out_dust_coarse,                             &
-            num_emis_dust,num_chem,nsoil,                             &
-            dust_alpha, dust_gamma, dust_drylimit_factor,             &
-            dust_moist_correction,                                    &
-            ids,ide, jds,jde, kds,kde,                                &
-            ims,ime, jms,jme, kms,kme,                                &
-            its,ite, jts,jte, kts,kte                                 )
-!    end if
+      if ( dust_opt .eq. 1 ) then
+         !-- compute dust (FENGSHA)
+         call gocart_dust_fengsha_driver(dt,ktau,chem,rho_phy,          &
+              smois,tslb,p8w,                                           &
+              isltyp,snowh,xland,area,g,                                &
+              ust,znt,                                                  &
+              clayfrac_in,sandfrac_in,                                  &
+              uthres_in, rdrag_in, ssm_in,                              &
+              e_dust_out, num_e_dust_out,                               &
+              index_e_dust_out_dust_fine,                               &
+              index_e_dust_out_dust_coarse,                             &
+              num_emis_dust,num_chem,nsoil,                             &
+              dust_alpha, dust_gamma, dust_drylimit_factor,             &
+              dust_moist_correction,                                    &
+              ids,ide, jds,jde, kds,kde,                                &
+              ims,ime, jms,jme, kms,kme,                                &
+              its,ite, jts,jte, kts,kte                                 )
+      else if ( dust_opt .eq. 2 ) then
+         call mpas_log_write( ' GOCART Simple')
+         call gocart_dust_simple_driver(dt,ktau,                    &
+              u_phy,v_phy,chem,rho_phy,dz8w,smois,u10,v10,          &
+              erod_in,isltyp,xland,area,g,                          &
+              e_dust_out, num_e_dust_out,                           &
+              dust_alpha,                                           &
+              index_e_dust_out_dust_fine,                           &
+              index_e_dust_out_dust_coarse,                         &
+              num_emis_dust,num_chem,nsoil,num_soil_types,          &
+              ids,ide, jds,jde, kds,kde,                            &
+              ims,ime, jms,jme, kms,kme,                            &
+              its,ite, jts,jte, kts,kte                             )
+      end if
     if  (do_timing) call mpas_timer_stop('dust_driver')
     end if
 
