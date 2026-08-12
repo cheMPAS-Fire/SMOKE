@@ -25,7 +25,7 @@ contains
        u_phy,v_phy,chem,rho_phy,dz8w,smois,u10,v10,          &
        erod_in,isltyp,xland,area,g,                          &
        e_dust_out, num_e_dust_out,                           &
-       ch_dust,                                              &
+       dust_alpha,                                              &
        index_e_dust_out_dust_fine,                           & 
        index_e_dust_out_dust_coarse,                         &
        num_emis_dust,num_chem,num_soil_layers,num_soil_types,&
@@ -46,7 +46,7 @@ contains
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: xland     ! dominant land use type
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: area      ! area of grid cell [m2]
     REAL(RKIND), DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: u10, v10  ! 10m wind speed [m/s]
-    REAL(RKIND), INTENT(IN) :: ch_dust
+    REAL(RKIND), INTENT(IN) :: dust_alpha
 
     INTEGER, DIMENSION( ims:ime , jms:jme ), INTENT(IN) :: isltyp  ! soil type
 
@@ -70,7 +70,7 @@ contains
     REAL(RKIND) :: w10m, gwet ! 
     real(RKIND) :: dxy
     real(RKIND) :: conver,converi ! conversion values 
-    real(RKIND) :: ch_fix
+    real(RKIND) :: ch_dust
     real(RKIND), DIMENSION (num_emis_dust) :: tc
     real(RKIND), DIMENSION (num_emis_dust) :: bems
 
@@ -87,7 +87,7 @@ contains
     nmx=5
 
     ! maching scale from the namelist value
-    ch_fix = ch_dust*1.0E-8
+    ch_dust = dust_alpha*1.0E-8
 
     k=kts
     do j=jts,jte
@@ -126,7 +126,7 @@ contains
              bems(:) = 0._RKIND
              call source_du( imx,jmx,lmx,nmx,num_soil_types, dt, tc,                 &
                             erod, ilwi, w10m, gwet, airden,        &
-                            dz_lowest,bems,g,ch_fix)       
+                            dz_lowest,bems,g,ch_dust)       
              
              chem(i,kts,j,p_dust_fine)  = chem(i,kts,j,p_dust_fine) + (tc(1)+0.38*tc(2))*converi ! 0.38 = ln(2.5/2)/ln(3.6/2)
              chem(i,kts,j,p_dust_coarse)= chem(i,kts,j,p_dust_coarse) + (0.62*tc(2)+tc(3)+0.737*tc(4))*converi ! 0.737 = ln(10/6)/ln(12/6)
@@ -145,7 +145,7 @@ contains
   
   SUBROUTINE source_du( imx,jmx,lmx,nmx,num_soil_types, dt1, tc, &
                      erod, ilwi, w10m, gwet, airden, &
-                     dz_lowest,bems,g0,ch_fix)
+                     dz_lowest,bems,g0,ch_dust)
 
 ! ****************************************************************************
 ! *  Evaluate the source of each dust particles size classes  (kg/m3)        
@@ -182,7 +182,7 @@ contains
   REAL(RKIND)    :: den(nmx), diam(nmx)
   REAL(RKIND)    :: u_ts0, u_ts, dsrc, srce
   REAL(RKIND), intent(in)    :: g0
-  REAL(RKIND), intent(in)    :: ch_fix
+  REAL(RKIND), intent(in)    :: ch_dust
   REAL(RKIND)    :: rhoa, g,dt1
   INTEGER :: i, j, n, m, k
 
@@ -214,7 +214,7 @@ contains
               srce = frac_s(n)*erod(m)   ! (kg s^2 m^-5)
               IF (ilwi == 1 ) THEN
                                     !(kg s^2 m^-5)*(m^3 s^-3)*s = (kg/m2) per dt1
-                 dsrc = ch_fix*srce*w10m**2 * (w10m - u_ts)*dt1 
+                 dsrc = ch_dust*srce*w10m**2 * (w10m - u_ts)*dt1 
               ELSE 
                  dsrc = 0.0
               END IF
