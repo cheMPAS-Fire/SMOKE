@@ -636,6 +636,7 @@ contains
          endif ! ktau = 1
       endif ! calc emis_online
 
+    hfx_bb = 0._RKIND ! SRB: Initializing fire heat flux to 0's
   ! Compute the heat/moisture fluxes
     if ( add_fire_heat_flux ) then
      do j = jts,jte
