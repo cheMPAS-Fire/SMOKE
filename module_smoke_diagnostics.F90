@@ -19,7 +19,7 @@ MODULE module_smoke_diagnostics
 
 CONTAINS
 
-   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Dtstep,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
+   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
                           & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,&
                           & Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
 
@@ -32,24 +32,23 @@ CONTAINS
       INTEGER , INTENT(IN) :: Kme
       INTEGER , INTENT(IN) :: Id
       REAL(rkind) , INTENT(IN) :: Curr_secs
-      REAL(rkind) , INTENT(IN) :: Dtstep
       REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:Num_chem) :: Chem
       REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d_Simple
       REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d
       REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Rho_phy
       REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Relhum
       REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Dz8w
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: Tauaersw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: Extaersw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: Gaersw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: Waersw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: Bscoefsw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: L2aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: L3aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: L4aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: L5aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: L6aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:4) :: L7aer
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Tauaersw
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Extaersw
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Gaersw
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Waersw
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Bscoefsw
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L2aer
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L3aer
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L4aer
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L5aer
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L6aer
+      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L7aer
       REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NLWBANDS) :: Tauaerlw
       REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NLWBANDS) :: Extaerlw
       INTEGER , INTENT(IN) :: Ids
@@ -67,7 +66,7 @@ CONTAINS
 !
 ! Local variable declarations
 !
-      REAL(rkind) :: alpha , ext , tau400 , tau550 , tau600, y_factor
+      REAL(rkind) :: alpha , ext , tau390 , tau550 , tau525, y_factor
       INTEGER :: i , j , k , nv
 
 ! New AOD implemented here, Minsu Choi CIRES/NOAA GSL
@@ -105,17 +104,17 @@ CONTAINS
       case (ID_MIE_OFF)
 
       case (ID_MIE_SIMPLE)
-        CALL optical_averaging(Id,Curr_secs,Dtstep,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
+        CALL optical_averaging(Id,Curr_secs,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
                            & L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,&
                            & Its,Ite,Jts,Jte,Kts,Kte)
         DO j = Jts , Jte
           DO k = Kts , Kte
             DO i = Its , Ite
-              tau400 = Tauaersw(i,k,j,2)
-              tau600 = Tauaersw(i,k,j,3)
-              IF ( tau400 > 1.E-23_RKIND .AND. tau600 > 1.E-23_RKIND ) THEN
-                alpha = LOG(tau400 / tau600) / LOG(600.0_RKIND / 400.0_RKIND)
-                tau550 = tau400 * (400.0_RKIND / 550.0_RKIND)**alpha
+              tau390 = Tauaersw(i,k,j,11)
+              tau525 = Tauaersw(i,k,j,10)
+              IF ( tau390 > 1.E-23_RKIND .AND. tau525 > 1.E-23_RKIND ) THEN
+                alpha = LOG(tau390 / tau525) / LOG(525.298_RKIND / 390.182_RKIND)
+                tau550 = tau390 * (390.182_RKIND / 550.0_RKIND)**alpha
               ELSE
                 tau550 = 0.0_RKIND
               ENDIF

@@ -16,6 +16,11 @@ module mpas_smoke_init
    p_unspc_ultrafine = -1, &
    p_smoke_fine   = -1, &
    p_smoke_coarse = -1, &
+   p_soa          = -1, &
+   p_bbsoa        = -1, &
+   p_antsoa       = -1, &
+   p_bbvoc        = -1, &
+   p_antvoc       = -1, &
    p_dust_fine    = -1, &
    p_dust_coarse  = -1, &
    p_polp_all     = -1, &

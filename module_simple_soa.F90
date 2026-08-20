@@ -35,7 +35,8 @@ contains
 
     integer :: i, j, k
 
-    real(RKIND), parameter :: oh_ref = 1.5e6_RKIND
+    real(RKIND), parameter :: oh_ref = 1.5e6_RKIND  ! molecules/cm3
+    real(RKIND), parameter :: oh_night = 1.3e4_RKIND  ! molecules/cm3, Y Lu et al. 1992. Chemical and Physical Meteorology
     real(RKIND), parameter :: koh = 1.25e-11_RKIND
 
     ! Simple diagnostic SOA yield using excess CO as proxy
@@ -58,6 +59,7 @@ contains
     real(RKIND), parameter :: mw_co = 28.0_RKIND
     real(RKIND), parameter :: mw_air = 28.97_RKIND
 
+    real(RKIND) :: light_frac
     real(RKIND) :: oh_eff
     real(RKIND) :: aging_frac
     real(RKIND) :: co_excess
@@ -71,16 +73,24 @@ contains
       do i = its, ite
         ! using swdown, suppressing OH radical at night
         ! simple method, Minsu Choi CIRES/NOAA GSL
-        ! This is very early implementation
-        ! Here is some simple estimation, at night will be zero
         ! during daytime, oh_eff ranges from ~1.9e5 to 1.5e6 molecules cm-3
-        if (swdown(i,j) > sw_min .and. coszen(i,j) > 0.0_RKIND) then
-          oh_eff = oh_ref * min(1.0_RKIND, swdown(i,j) / sw_ref)
-        else
-          oh_eff = 0.0_RKIND
-        endif
+        ! Applying nighttime OH concentration
+        light_frac = max(0.0_RKIND, &
+                min(1.0_RKIND, swdown(i,j) / sw_ref))
 
-        ! Fom Hodzic and Jimenez, 2011
+        if (coszen(i,j) > 0.0_RKIND) then
+          oh_eff = max(oh_night, oh_ref * light_frac)
+        else
+          oh_eff = oh_night
+        endif
+! Old version, keep it as reference        
+!        if (swdown(i,j) > sw_min .and. coszen(i,j) > 0.0_RKIND) then
+!          oh_eff = oh_ref * min(1.0_RKIND, swdown(i,j) / sw_ref)
+!        else
+!          oh_eff = 0.0_RKIND
+!        endif
+
+        ! From Hodzic and Jimenez, 2011
         aging_frac = 1.0_RKIND - exp(-koh * oh_eff * dtstep)
 
         if (aging_frac <= 0.0_RKIND) cycle
@@ -132,13 +142,15 @@ contains
   real(RKIND), dimension(ims:ime,jms:jme), intent(in) :: swdown, coszen
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: rho_phy, dz8w
 
-  ! CO emissions, already converted to mol m-2 s-1
+  ! BB CO emission flux: mol m-2 s-1
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: e_bb_co
+  ! Anthropogenic CO emission increment from e_ant_out: ppmv
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: e_ant_co
 
   integer :: i, j, k
 
   real(RKIND), parameter :: oh_ref      = 1.5e6_RKIND
+  real(RKIND), parameter :: oh_night    = 1.3e4_RKIND  ! molecules/cm3, Y Lu et al. 1992. Chemical and Physical Meteorology
   real(RKIND), parameter :: koh         = 1.25e-11_RKIND
   real(RKIND), parameter :: soa_co_yld  = 0.08_RKIND
   real(RKIND), parameter :: sw_ref      = 800.0_RKIND
@@ -148,6 +160,7 @@ contains
   real(RKIND), parameter :: mw_co       = 28.0_RKIND      ! g mol-1
   real(RKIND), parameter :: mw_air      = 0.02897_RKIND   ! kg mol-1
 
+  real(RKIND) :: light_frac
   real(RKIND) :: oh_eff
   real(RKIND) :: aging_frac
   real(RKIND) :: co_add
@@ -160,16 +173,21 @@ contains
   do j = jts, jte
   do i = its, ite
 
-     if (swdown(i,j) > sw_min .and. coszen(i,j) > 0.0_RKIND) then
-        oh_eff = oh_ref * min(1.0_RKIND, swdown(i,j) / sw_ref)
+     light_frac = max(0.0_RKIND, &
+             min(1.0_RKIND, swdown(i,j) / sw_ref))
+
+     if (coszen(i,j) > 0.0_RKIND) then
+       oh_eff = max(oh_night, oh_ref * light_frac)
      else
-        oh_eff = 0.0_RKIND
+       oh_eff = oh_night
      endif
-
      aging_frac = 1.0_RKIND - exp(-koh * oh_eff * dtstep)
-
+!     if (swdown(i,j) > sw_min .and. coszen(i,j) > 0.0_RKIND) then
+!        oh_eff = oh_ref * min(1.0_RKIND, swdown(i,j) / sw_ref)
+!     else
+!        oh_eff = 0.0_RKIND
+!     endif
      do k = kts, kte
-
         ! Wildfire CO emission -> transported bbVOC precursor
         if (e_bb_co(i,k,j) > 0.0_RKIND) then
            co_add = dtstep * mw_air * e_bb_co(i,k,j) / &
@@ -193,18 +211,20 @@ contains
            chem(i,k,j,p_bbsoa) = min(max(chem(i,k,j,p_bbsoa), epsilc), soa_max)
         endif
 
-        ! Anthropogenic CO emission -> transported antVOC precursor
+        ! Anthropogenic CO increment is already in ppmv
         if (p_antvoc > 0 .and. p_antvoc <= num_chem .and. &
             e_ant_co(i,k,j) > 0.0_RKIND) then
-
-           co_add = dtstep * mw_air * e_ant_co(i,k,j) / &
-                    (rho_phy(i,k,j) * dz8w(i,k,j))
-
+        
+           ! ppmv -> mol/mol
+           co_add = e_ant_co(i,k,j) * 1.0e-6_RKIND
+        
+           ! mol/mol CO -> ug/kg CO-equivalent SOA precursor
            voc_add = soa_co_yld * co_add * &
                      ((mw_co * 1.0e-3_RKIND) / mw_air) * 1.0e9_RKIND
-
+        
            chem(i,k,j,p_antvoc) = chem(i,k,j,p_antvoc) + voc_add
            chem(i,k,j,p_antvoc) = min(max(chem(i,k,j,p_antvoc), epsilc), voc_max)
+        
         endif
 
         ! Transported antVOC precursor -> antSOA
