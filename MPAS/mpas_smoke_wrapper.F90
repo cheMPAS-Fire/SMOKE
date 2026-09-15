@@ -60,6 +60,7 @@ contains
            index_no3_a_fine      , index_so4_a_fine            , index_nh4_a_fine,           &
            index_nh3             , index_so2                   , index_ch4,                  &
            index_co              , index_nox                   , index_bact_fine,            &
+           index_polp_tree_numb  ,                                                           &
            e_ant_pt_in        , num_e_ant_pt_in          , num_anthro_pt,                  &
            e_ant_stack_groups_in , num_e_ant_stack_groups_in   ,                             &
            index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,     &
@@ -130,18 +131,13 @@ contains
            num_pols_per_polp     , pollen_emis_scale_factor,                                 &
            tree_pollen_emis_scale_factor, grass_pollen_emis_scale_factor        ,            &
            weed_pollen_emis_scale_factor,                                                    &
-           bact_water_conc,                                                                  &   
+           bact_water_conc,                                                                  &  
+           diam_polp_tree_dynamic,                                                           & 
            config_convection_scheme, config_microp_scheme,                                   &
            do_pollen_lightning_rupture, do_pollen_rh_rupture,                                &
-           config_lightning_option, &
-           lightning_dt, &
-           lightning_start_seconds, &
-           flashrate_factor, &
-           iccg_method, &
-           iccg_prescribed_num, &
-           iccg_prescribed_den, &
-           lightning_cellcount_method, &
-           lightning_cldtop_adjustment, &
+           config_lightning_option, lightning_dt, lightning_start_seconds, flashrate_factor, &
+           iccg_method, iccg_prescribed_num, iccg_prescribed_den,                            &
+           lightning_cellcount_method, lightning_cldtop_adjustment,                          &
            anthro_emis_scale_factor, anthro_pt_emis_scale_factor,                            &
            bb_input_prevh        , rwc_emis_scale_factor, plumerise_opt_rwc     ,            &
            RWC_denominator       , RWC_annual_sum       ,                                    &
@@ -223,6 +219,8 @@ contains
 ! 2D + Time Fire Input
     real(RKIND),intent(in), dimension(ims:ime, jms:jme, nblocks),        &
                                                    optional      :: hwp_avg, fre_avg, frp_avg
+! 2D Pollen Input
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: diam_polp_tree_dynamic
 ! 2D HAB Input
     real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional    :: bact_water_conc
 ! Residential Wood burning
@@ -261,7 +259,7 @@ contains
                            index_so4_a_fine, index_no3_a_fine, index_nh4_a_fine,    &
                            index_so2, index_nh3, index_ch4,                         &
                            index_co,  index_nox, index_bact_fine,                   &
-                           index_bc, index_oc, index_brc   
+                           index_bc, index_oc, index_brc, index_polp_tree_numb   
     integer, intent(in),optional :: &
                            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
                            index_e_bb_in_co, index_e_bb_in_ch4, index_e_bb_in_nox, &
@@ -488,7 +486,8 @@ contains
                     index_ssalt_fine, index_ssalt_coarse,                          &
                     index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,          &
                     index_so2, index_nh3, index_ch4, index_nox, index_co,          &
-                    index_bact_fine, index_bc, index_oc, index_brc                 )
+                    index_bact_fine, index_bc, index_oc, index_brc,                &
+                    index_polp_tree_numb                                           )
                                                                           
       call mpas_log_write( ' Initializing dry deposition parameterss ')
       call aero_dry_dep_init()
@@ -779,8 +778,9 @@ contains
        xland, raincv, rainncv, relhum, swdown,                        & 
        ic_flashrate, cg_flashrate,                                    & 
        cldfrac,                                                       &
+       diam_polp_tree_dynamic,                                        &
        num_pols_per_polp,pollen_emis_scale_factor,                    &
-       do_pollen_lightning_rupture, do_pollen_rh_rupture,              &
+       do_pollen_lightning_rupture, do_pollen_rh_rupture,             &
        tree_pollen_emis_scale_factor,                                 &
        grass_pollen_emis_scale_factor,                                &
        weed_pollen_emis_scale_factor,                                 &

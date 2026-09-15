@@ -49,7 +49,8 @@ module mpas_smoke_init
    p_antvoc       = -1, &
    p_bc           = -1, &
    p_oc           = -1, &
-   p_brc          = -1
+   p_brc          = -1, &
+   p_polp_tree_numb=-1 
    
    !
    REAL(RKIND), save :: lightning_activation_time
@@ -67,7 +68,8 @@ module mpas_smoke_init
                                  index_ssalt_fine, index_ssalt_coarse,                &
                                  index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
                                  index_so2, index_nh3, index_ch4, index_nox, index_co, &
-                                 index_bact_fine, index_bc, index_oc, index_brc                )
+                                 index_bact_fine, index_bc, index_oc, index_brc,       &
+                                 index_polp_tree_numb                )
 
     implicit none
 
@@ -82,7 +84,8 @@ module mpas_smoke_init
                            index_ssalt_fine, index_ssalt_coarse,                &
                            index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
                            index_so2, index_nh3, index_ch4, index_nox, index_co, &
-                           index_bact_fine, index_bc, index_oc, index_brc
+                           index_bact_fine, index_bc, index_oc, index_brc,       &
+                           index_polp_tree_numb
 
         if(present(index_smoke_ultrafine))  p_smoke_ultrafine  = index_smoke_ultrafine - chemistry_start + 1
         if(present(index_dust_ultrafine))   p_dust_ultrafine   = index_dust_ultrafine - chemistry_start + 1
@@ -120,6 +123,7 @@ module mpas_smoke_init
         if(present(index_bc))               p_bc               = index_bc - chemistry_start + 1
         if(present(index_oc))               p_oc               = index_oc - chemistry_start + 1
         if(present(index_brc))              p_brc              = index_brc - chemistry_start + 1
+        if(present(index_polp_tree_numb))   p_polp_tree_numb   = index_polp_tree_numb - chemistry_start + 1
  
    end subroutine set_scalar_indices
 
