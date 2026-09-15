@@ -74,6 +74,7 @@ contains
        real(RKIND) :: Rs                      ! Surface resistance
        real(RKIND) :: growth_fac,vsettl,dtmax,conver,converi,dzmin
        real(RKIND) :: rmol_local
+       real(RKIND) :: particle_mass
        integer :: i, j, k, ntdt, nv
        integer :: icall=0
 !> -- Gas constant
@@ -165,35 +166,29 @@ contains
                    local_rho_cm = rho_phy(i,k,j) * 1.e-3_RKIND
                    do nv = 1, num_chem
                       if (dp_cm(nv) .lt. 0._RKIND) cycle  ! At some point we'll do something different for gasses
+                      if ( p_polp_tree_numb .gt. 0 .and. nv .eq. p_polp_tree ) then  
+                         ! First calculate mass and convert to kg
+                         particle_mass = chem(i,k,j,p_polp_tree) / chem(i,k,j,p_polp_tree_numb) * 1.e-9_RKIND
+                         ! then replace the diameter with the dynamic diameter and convert to centimeters
+                         dp_cm(nv) = ( (6.0_RKIND * particle_mass) / (pi * aerodens_gcm3(nv) * 1.e3_RKIND) )**(1.0_RKIND/3.0_RKIND * 1.e2_RKIND
+                      endif
                       ! Cunningham correction factor
                       cterm = 2._RKIND * local_freepath / dp_cm(nv)
                       tval = dp_cm(nv) / local_freepath
                       Cc = 1._RKIND + cterm * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * tval ) )
                       ! Gravitational Settling
+                      ! First account for dynamic diameter of tree pollen
                       vg(i,k,j,nv) = aerodens_gcm3(nv) * dp_cm(nv) * dp_cm(nv) * g100 * Cc / &       ! Convert gravity to cm/s^2
                              ( 18._RKIND * local_airvisc * (local_rho_cm) ) ! Convert density to mol/cm^
                    enddo
+                   if ( p_polp_tree_numb .gt. 0 ) then
+                      vg(i,k,j,p_polp_tree_numb) = vg(i,k,j,p_polp_tree)
+                   endif
                 enddo
              enddo
           enddo
+          
 !$omp end parallel do
-!          do nv = 1, num_chem
-!             if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
-!             ! Convert diameter to cm and aerodens to g/cm3
-!             dp       = aero_diam(nv) * 100._RKIND
-!             aerodens = aero_dens(nv) * 1.e-3_RKIND
-!             do j = jts, jte
-!             do k = kts, kte
-!             do i = its, ite
-!                ! Cunningham correction factor
-!                Cc = 1._RKIND + 2._RKIND * freepath(i,k,j) / dp * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * dp / freepath(i,k,j) ) )
-!                ! Gravitational Settling
-!                vg(i,k,j,nv) = aerodens * dp * dp * g100 * Cc / &       ! Convert gravity to cm/s^2
-!                       ( 18._RKIND * airkinvisc(i,k,j) * (rho_phy(i,k,j)*1.e-3_RKIND) ) ! Convert density to mol/cm^
-!             enddo
-!             enddo
-!             enddo
-!          enddo
        elseif (settling_opt .eq. 2 ) then
         ! Calculate setting velocities based on AERSETT, accounting for non-sphericity
            call particle_settling_aersett(t_phy,rho_phy,p_phy,vg,num_chem,  &
@@ -217,6 +212,13 @@ contains
                 do nv = 1, num_chem
                   if (dp_cm(nv) .lt. 0._RKIND) cycle  ! At some point we'll do something different for gasses
                   ! Cunningham correction factor
+                  ! First account for dynamic diameter of tree pollen
+                  if ( p_polp_tree_numb .gt. 0 .and. nv .eq. p_polp_tree ) then
+                     ! First calculate mass and convert to kg
+                     particle_mass = chem(i,k,j,p_polp_tree) / chem(i,k,j,p_polp_tree_numb) * 1.e-9_RKIND
+                     ! then replace the diameter with the dynamic diameter and convert to centimeters
+                     dp_cm(nv) = ( (6.0_RKIND * particle_mass) / (pi * aerodens_gcm3(nv) * 1.e3_RKIND) )**(1.0_RKIND/3.0_RKIND) * 1.e2_RKIND
+                  endif
                   tval = dp_cm(nv) / local_freepath
                   Cc = 1._RKIND + 2._RKIND * local_freepath / dp_cm(nv) * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * tval ) )
                   ! Brownian Diffusion
@@ -245,6 +247,11 @@ contains
                   endif
                   drydep_flux(i,j,nv) = drydep_flux(i,j,nv) + chem(i,k,j,nv)*rho_phy(i,k,j)*ddvel(i,j,nv)*dt*10._RKIND
                 enddo
+                if (p_polp_tree_numb .gt. 0 ) then
+                   ddvel(i,j,p_polp_tree_numb) = ddvel(i,j,p_polp_tree)
+                   drydep_flux(i,j,p_polp_tree_numb) = drydep_flux(i,j,p_polp_tree_numb) + &
+                                  chem(i,k,j,p_polp_tree_numb)*rho_phy(i,k,j)*ddvel(i,j,p_polp_tree_numb)*dt*10._RKIND
+                endif
           enddo
        enddo
 !$omp end parallel do
@@ -343,6 +350,7 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
      REAL(RKIND), DIMENSION(ims:ime,kms:kme,jms:jme,1:num_chem), INTENT(INOUT) :: tend_chem_settle
      
      REAL(RKIND) :: dt_settl, growth_fac, four_ninths, dzmin, vsettl, dtmax
+     RELA(RKIND) :: particle_mass, particle_diameter
      INTEGER     :: ntdt, ndt_settl
 !
 !--- Local------
@@ -357,8 +365,6 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
 
      do nv = 1,num_chem
      if (aero_diam(nv) .lt. 0) cycle  ! At some point we'll do something different for gasses
-     ! -- NOTE, diameters and densities are NOT converted to cm and g/cm3 like in Emerson
-     vsettl = four_ninths * gravity * aero_dens(nv) * ( growth_fac * ( 0.5_RKIND * aero_diam(nv) ))**2.0_RKIND * one_over_dyn_visc
 
      do j = jts,jte
      do i = its,ite
@@ -370,6 +376,16 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
      ! -- Determine the maximum time-step satisying the CFL condition:
      ! -- dt_settl calculations (from original coarsepm_settling)
      ! 1.5E-5 = dyn_visc --> dust_data_mod.F90
+     ! -- NOTE, diameters and densities are NOT converted to cm and g/cm3 like in Emerson
+     if ( p_polp_tree_numb .gt. 0 .and. nv .eq. p_polp_tree ) then
+         ! First calculate mass and convert to kg
+          particle_mass = chem(i,k,j,p_polp_tree) / chem(i,k,j,p_polp_tree_numb) * 1.e-9_RKIND
+         ! then replace the diameter with the dynamic diameter
+          particle_diameter = ( (6.0_RKIND * particle_mass) / (pi * aerodens_gcm3(nv) * 1.e3_RKIND) )**(1.0_RKIND/3.0_RKIND)
+     else
+          particle_diameter = aero_diam(nv) 
+     endif 
+     vsettl = four_ninths * gravity * aero_dens(nv) * ( growth_fac * ( 0.5_RKIND * particle_diameter ))**2.0_RKIND * one_over_dyn_visc
 
      dtmax = dzmin / vsettl
  
@@ -395,6 +411,10 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
                         *rho_phy(i,k,j))/(delz_flip(i,l2+1,j)*rho_phy(i,k-1,j)))          ! [ug/kg]
         endif
         tend_chem_settle(i,k,j,nv) = tend_chem_settle(i,k,j,nv) + (temp_tc - chem(i,k,j,nv))
+        ! Assign settling tendency to tree pollen number if available
+        if ( nv .eq. p_polp_tree .and. p_polp_tree_numb .gt. 0 ) then
+           tend_chem_settle(i,k,j,p_polp_tree_numb) = tend_chem_settle(i,k,j,p_polp_tree) * (chem(i,k,j,p_polp_tree_numb) / chem(i,k,j,p_polp_tree))
+        endif
 
      enddo ! k
      enddo ! n
@@ -430,17 +450,25 @@ subroutine particle_settling_aersett(t_phy,rho_phy,p_phy,vg, num_chem,          
 
    INTEGER :: i,j,k,nv
 
-   REAL(RKIND) :: D, rho_p, rho_a, aspect_p, mu_a, mfp_a, temp_a
+   REAL(RKIND) :: D, rho_p, rho_a, aspect_p, mu_a, mfp_a, temp_a, particle_mass
 
    do nv = 1,num_chem
     ! Particle diameter, density 
       D        = aero_diam(nv)
+      if D .lt. 0._RKIND) cycle
+
       rho_p    = aero_dens(nv)
       aspect_p = 1.05_RKIND !aero_aspect(nv)
     !  
       do j = jts,jte
       do k = kts,kte
       do i = its,ite
+         if ( p_polp_tree_numb .gt. 0 .and. nv .eq. p_polp_tree ) then
+            ! First calculate mass and convert to kg
+             particle_mass = chem(i,k,j,p_polp_tree) / chem(i,k,j,p_polp_tree_numb) * 1.e-9_RKIND
+            ! then replace the diameter with the dynamic diameter
+             D = ( (6.0_RKIND * particle_mass) / (pi * aero_dens(nv) ) )**(1.0_RKIND/3.0_RKIND)
+         endif 
         ! Air density 
          rho_a  = rho_phy(i,k,j)
          mu_a  =  beta * t_phy(i,k,j)**1.5 / (t_phy(i,k,j)+S)
@@ -449,6 +477,9 @@ subroutine particle_settling_aersett(t_phy,rho_phy,p_phy,vg, num_chem,          
         !
          vg(i,k,j,nv) = vinfty_aersett_spheroids_avg(D, rho_p, rho_a, mu_a, mfp_a, aspect_p, temp_a, use_LUT)
         !
+         if ( p_polp_tree_numb .gt. 0 .and. nv .eq. p_polp_tree) then
+            vg(i,k,j,p_polp_tree_numb) = vg(i,k,j,nv)
+         endif
       end do
       end do
       end do
