@@ -231,7 +231,7 @@ contains
 
       if (p_polp_tree_numb .gt. 0) then
          emis = tree_pollen_emis_scale_factor * pollen_emis_scale_factor * ppemfact_numb_tree * factaa
-         chem(i,kts,p_polp_tree_numb) = chem(i,kts,j,p_polp_tree_numb) + emis
+         chem(i,kts,j,p_polp_tree_numb) = chem(i,kts,j,p_polp_tree_numb) + emis
       endif
 
       emis = grass_pollen_emis_scale_factor * pollen_emis_scale_factor * factaa * ppemfact_mass_grass
