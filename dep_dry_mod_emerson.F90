@@ -170,7 +170,7 @@ contains
                          ! First calculate mass and convert to kg
                          particle_mass = chem(i,k,j,p_polp_tree) / chem(i,k,j,p_polp_tree_numb) * 1.e-9_RKIND
                          ! then replace the diameter with the dynamic diameter and convert to centimeters
-                         dp_cm(nv) = ( (6.0_RKIND * particle_mass) / (pi * aerodens_gcm3(nv) * 1.e3_RKIND) )**(1.0_RKIND/3.0_RKIND * 1.e2_RKIND
+                         dp_cm(nv) = ( (6.0_RKIND * particle_mass) / ( pi * aero_dens(nv) ) )**(1.0_RKIND/3.0_RKIND) * 1.e2_RKIND
                       endif
                       ! Cunningham correction factor
                       cterm = 2._RKIND * local_freepath / dp_cm(nv)
@@ -191,7 +191,8 @@ contains
 !$omp end parallel do
        elseif (settling_opt .eq. 2 ) then
         ! Calculate setting velocities based on AERSETT, accounting for non-sphericity
-           call particle_settling_aersett(t_phy,rho_phy,p_phy,vg,num_chem,  &
+           call particle_settling_aersett(t_phy,rho_phy,p_phy,vg,           &
+                           chem,num_chem,                                   &
                            ids,ide, jds,jde, kds,kde,                       &
                            ims,ime, jms,jme, kms,kme,                       &
                            its,ite, jts,jte, kts,kte                        )
@@ -217,7 +218,7 @@ contains
                      ! First calculate mass and convert to kg
                      particle_mass = chem(i,k,j,p_polp_tree) / chem(i,k,j,p_polp_tree_numb) * 1.e-9_RKIND
                      ! then replace the diameter with the dynamic diameter and convert to centimeters
-                     dp_cm(nv) = ( (6.0_RKIND * particle_mass) / (pi * aerodens_gcm3(nv) * 1.e3_RKIND) )**(1.0_RKIND/3.0_RKIND) * 1.e2_RKIND
+                     dp_cm(nv) = ( (6.0_RKIND * particle_mass) / ( pi * aero_dens(nv) ) )**(1.0_RKIND/3.0_RKIND) * 1.e2_RKIND
                   endif
                   tval = dp_cm(nv) / local_freepath
                   Cc = 1._RKIND + 2._RKIND * local_freepath / dp_cm(nv) * ( 1.257_RKIND + 0.4_RKIND*exp( -0.55_RKIND * tval ) )
@@ -350,7 +351,7 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
      REAL(RKIND), DIMENSION(ims:ime,kms:kme,jms:jme,1:num_chem), INTENT(INOUT) :: tend_chem_settle
      
      REAL(RKIND) :: dt_settl, growth_fac, four_ninths, dzmin, vsettl, dtmax
-     RELA(RKIND) :: particle_mass, particle_diameter
+     REAL(RKIND) :: particle_mass, particle_diameter
      INTEGER     :: ntdt, ndt_settl
 !
 !--- Local------
@@ -381,7 +382,7 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
          ! First calculate mass and convert to kg
           particle_mass = chem(i,k,j,p_polp_tree) / chem(i,k,j,p_polp_tree_numb) * 1.e-9_RKIND
          ! then replace the diameter with the dynamic diameter
-          particle_diameter = ( (6.0_RKIND * particle_mass) / (pi * aerodens_gcm3(nv) * 1.e3_RKIND) )**(1.0_RKIND/3.0_RKIND)
+          particle_diameter = ( (6.0_RKIND * particle_mass) / (pi * aero_dens(nv) ) )**(1.0_RKIND/3.0_RKIND)
      else
           particle_diameter = aero_diam(nv) 
      endif 
@@ -427,7 +428,7 @@ subroutine particle_settling_wrapper(tend_chem_settle,chem,rho_phy,delz_flip,vg,
 end subroutine particle_settling_wrapper
 
 
-subroutine particle_settling_aersett(t_phy,rho_phy,p_phy,vg, num_chem,          &
+subroutine particle_settling_aersett(t_phy,rho_phy,p_phy,vg, chem, num_chem,    &
                                      ids,ide, jds,jde, kds,kde,                 &
                                      ims,ime, jms,jme, kms,kme,                 &
                                      its,ite, jts,jte, kts,kte                  )
@@ -438,6 +439,8 @@ subroutine particle_settling_aersett(t_phy,rho_phy,p_phy,vg, num_chem,          
    INTEGER, INTENT(IN ) :: num_chem
    REAL(RKIND), DIMENSION(ims:ime,kms:kme,jms:jme), INTENT (IN)  :: rho_phy, t_phy, p_phy
    REAL(RKIND), DIMENSION(ims:ime,kms:kme,jms:jme,1:num_chem), INTENT(INOUT) :: vg
+   REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, 1:num_chem ),  &
+                                             INTENT(IN ) :: chem
 
   real(RKIND), parameter  :: beta=1.458e-6_RKIND
      ! The beta constant in kg/(s.m.K^.5) in the expression for dynamic viscosity.
@@ -455,7 +458,7 @@ subroutine particle_settling_aersett(t_phy,rho_phy,p_phy,vg, num_chem,          
    do nv = 1,num_chem
     ! Particle diameter, density 
       D        = aero_diam(nv)
-      if D .lt. 0._RKIND) cycle
+      if (D .lt. 0._RKIND) cycle
 
       rho_p    = aero_dens(nv)
       aspect_p = 1.05_RKIND !aero_aspect(nv)
