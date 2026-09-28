@@ -166,7 +166,7 @@ contains
            swdown                , z0                    , snowh                ,            &
            julian                , rmol                  , raincv               ,            &
            rainncv               , dpt2m                 , znt                  ,            &
-           mavail                , g                     , vegfra               ,            &
+           mavail                , g                     ,                                   &
            landusef              , cldfrac               , ktop_deep            ,            &
            refl10cm              ,                                                           &
            nwfa2d                , nifa2d                , config_mp_aero_emission  ,        &
@@ -209,7 +209,6 @@ contains
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: u10, v10      ! 10-m winds
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: tskin, t2m, dpt2m            ! temperature
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: pblh              ! PBL height [m]
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: vegfra
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: swdown, z0, snowh, znt
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: coszen
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: raincv, rainncv, mavail                    
@@ -404,7 +403,6 @@ contains
 !>-- indexes, time
     integer :: julday
 !>- dust & chemistry variables
-    real(RKIND), dimension(ims:ime, 1:nlcat, jms:jme) :: vegfrac
 !>- plume variables
     ! -- buffers
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, num_e_bb_in) :: ebu
@@ -455,7 +453,7 @@ contains
          l5aer(:,:,:,:), l6aer(:,:,:,:), l7aer(:,:,:,:)
     real(RKIND), allocatable :: &
          tauaerlw(:,:,:,:), extaerlw(:,:,:,:)
-    logical :: do_mie, call_mie
+    logical :: do_mie, call_mie, call_aod
     integer,intent(in) :: mie_frq
     real(RKIND) :: mie_interval_secs
 !=============================================================
@@ -602,7 +600,7 @@ contains
       if ( calc_bb_emis_online ) then
          call mpas_log_write( ' Calling module wildfire smoke emissions ')
            ! Calculate the wildfire emission factors
-             call compute_emission_factors( EFs_map, vegfrac, bb_beta,                       &
+             call compute_emission_factors( EFs_map, landusef, bb_beta,                       &
                                             eco_id, efs_smold, efs_flam, efs_rsmold,         &
                                             fmc_avg, mavail,                                 &
                                             nlcat, dt, gmt,                                  &
@@ -689,7 +687,7 @@ contains
                               chem,num_chem,julday,gmt,xlat,xlong,     &
                               fire_end_hr,peak_hr,curr_secs,coef_bb_dc,&
                               fire_hist,hwp,hwp_avg,hwp_day_avg,       &  !I think fire_hist replaced sc_factor
-                              vegfrac, eco_id, nblocks,                &
+                              landusef, eco_id, nblocks,                &
                               lu_nofire, lu_qfire, lu_sfire,           &
                               swdown,ebb_dcycle,ebu,num_e_bb_in,       &
                               index_e_bb_in_smoke_fine,                &
@@ -754,7 +752,8 @@ contains
                         swdown,ebb_dcycle,ebu,num_e_bb_in,            &
                         fire_type,                                    &
                         qv, add_fire_moist_flux,                      &
-                        bb_emis_scale_factor, aod3d_smoke,            &
+                        do_mpas_sna,                                  &
+                        bb_emis_scale_factor,                         &
                         index_e_bb_in_smoke_ultrafine,                &
                         index_e_bb_in_smoke_fine,                     &
                         index_e_bb_in_smoke_coarse,                   &
@@ -1004,7 +1003,9 @@ contains
            (ktau == 2)
     endif
 
-    if (call_mie) then
+    call_aod = call_mie .or. (.not. do_mie)
+
+    if (call_aod) then
       allocate(tauaersw(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(gaersw  (ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(waersw  (ims:ime,kms:kme,jms:jme,1:NSWBANDS))
@@ -1064,12 +1065,12 @@ contains
     endif
 
     call mpas_log_write( ' Calculating VIS ')
-    call mpas_visibility_diag(    qc_vis,qr_vis,qi_vis,qs_vis,qg_vis,    &
-                                  blcldw_vis,blcldi_vis,                 &
-                                  rho_phy,wind10m,wind_phy,              &
-                                  rh2m,relhum,qv, &
-                                  t2m,t_phy, &
-                                  coszen,aod3d,vis,                 &
+    call mpas_visibility_diag(    qc_vis,qr_vis,qi_vis,qs_vis,qg_vis, &
+                                  blcldw_vis,blcldi_vis,            &
+                                  rho_phy,wind10m,wind_phy,         &
+                                  rh2m,relhum,qv,                   &
+                                  t2m,t_phy,                        &
+                                  coszen,aod3d,dz8w, vis,           &
                                   ids,ide, jds,jde, kds,kde,        &
                                   ims,ime, jms,jme, kms,kme,        &
                                   its,ite, jts,jte, kts,kte         )
@@ -1096,6 +1097,19 @@ contains
     enddo
     enddo
     enddo
+    endif
+
+    if (do_mpas_sna) then
+      call mpas_log_write('Calling SNA driver')
+      call mpas_smoke_tactic_sna_driver( &
+           ktau, dt, chem, num_chem,     &
+           relhum, t_phy, dz8w, rho_phy, &
+!           nifa, nwfa,         &
+           nifa, nwfa, hno3_bkgd,        &
+           swdown, coszen,               &
+           ids, ide, jds, jde, kds, kde, &
+           ims, ime, jms, jme, kms, kme, &
+           its, ite, jts, jte, kts, kte)
     endif
 
     ! Simple SOA scheme, 1 = total SOA only, 2 = BB-SOA, Anthropogenic-SOA
@@ -1154,7 +1168,7 @@ contains
  subroutine mpas_smoke_prep(                                                &
         do_mpas_smoke,                                                      &
         ktau, nlcat,cp,ebb_dcycle,ebb_min,                                  &
-        xland,xlat,xlong,ivgtyp,isltyp,vegfrac,                             &
+        xland,xlat,xlong,ivgtyp,isltyp,landusef,                             &
         snowh,u10,v10,wind10m,t2m,dpt2m,wetness,hwp,hwp_day_avg,            &
         hwp_method, totprcp_prev24, swdown, hpbl2d, curr_secs,               & ! SRB: added for HWP calcs
         windgustpot, uspdavg2d,                                             & !SRB
@@ -1179,7 +1193,7 @@ contains
     logical,intent(in)     :: do_mpas_smoke
     real(RKIND),intent(in) :: cp, ebb_min
     integer,intent(in), dimension(ims:ime, jms:jme) :: isltyp, ivgtyp
-    real(RKIND),intent(in),   dimension(ims:ime, nlcat, jms:jme) :: vegfrac
+    real(RKIND),intent(in),   dimension(ims:ime, nlcat, jms:jme) :: landusef
 
     real(RKIND),intent(in),   dimension(ims:ime, jms:jme) :: xland, xlat, xlong,                   &
                                         snowh, u10, v10, t2m, dpt2m, wetness
@@ -1316,12 +1330,12 @@ contains
               lu_nofire(i,j) = 1.0
            else
              ! Permanent wetlands, snow/ice, water, barren tundra:
-             lu_nofire(i,j)= vegfrac(i,11,j) + vegfrac(i,15,j) + vegfrac(i,17,j) + vegfrac(i,20,j)
+             lu_nofire(i,j)= landusef(i,11,j) + landusef(i,15,j) + landusef(i,17,j) + landusef(i,20,j)
              ! cropland, urban, cropland/natural mosaic, barren and sparsely
              ! vegetated and non-vegetation areas:
-             lu_qfire(i,j) = lu_nofire(i,j) + vegfrac(i,12,j) + vegfrac(i,13,j) + vegfrac(i,14,j) + vegfrac(i,16,j)
+             lu_qfire(i,j) = lu_nofire(i,j) + landusef(i,12,j) + landusef(i,13,j) + landusef(i,14,j) + landusef(i,16,j)
              ! Savannas and grassland fires, these fires last longer than the Ag fires:
-             lu_sfire(i,j) = lu_qfire(i,j) + vegfrac(i,8,j) + vegfrac(i,9,j) + vegfrac(i,10,j)
+             lu_sfire(i,j) = lu_qfire(i,j) + landusef(i,8,j) + landusef(i,9,j) + landusef(i,10,j)
              if (lu_nofire(i,j)>0.95) then ! no fires
                fire_type(i,j) = 0
              else if (lu_qfire(i,j)>0.9) then   ! Ag. and urban fires
@@ -1382,7 +1396,7 @@ contains
        do i=its, ite
        do j=jts, jte
          if (xland(i,j) .eq. 0) then
-            wet_fact=vegfrac(i,17,j)
+            wet_fact=landusef(i,17,j)
          else
             wet_fact=1._RKIND
          endif

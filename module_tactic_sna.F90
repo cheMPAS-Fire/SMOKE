@@ -1,174 +1,341 @@
-!>\file  module_tactic_sna.F90
-!! This file contains the MPAS-Aerosols/RRFS SNA module
-
-module module_tactic_sna
 !
-!  This module developed by Jordan Schnell (CIRES/NOAA GSL) following 
-!  Druge et al., (2019) - https://doi.org/10.5194/acp-19-3707-2019
+!  This module developed by Jordan Schnell (CIRES/NOAA GSL) following
+!  Druge et al. (2019)
+!  https://doi.org/10.5194/acp-19-3707-2019
+!
 !  For serious questions contact jordan.schnell@noaa.gov
-!
-  use mpas_kind_types
-  use mpas_smoke_init
-  use mpas_smoke_config, only : pi
+!  Code further updated by Minsu Choi, CIRES/NOAA GSL
 
-  implicit none
+MODULE module_tactic_sna
 
-  private
+  USE mpas_kind_types, ONLY : RKIND
+  USE mpas_smoke_init, ONLY : p_unspc_fine, p_smoke_fine, p_nox, &
+                              p_nh3, p_nh4_a_fine, p_so2,        &
+                              p_so4_a_fine, p_no3_a_fine
 
-  public :: mpas_smoke_tactic_sna_driver
+  IMPLICIT NONE
 
-contains
+  PRIVATE
+  PUBLIC :: mpas_smoke_tactic_sna_driver
 
-  subroutine mpas_smoke_tactic_sna_driver (                                          &
-                           dt, chem, num_chem,                                       &
-                           relhum, t_phy, dz8w, rho_phy,                             &
-                           nifa, nwfa, hno3_bkgd,                                    &
-                           ids,ide, jds,jde, kds,kde,                                &
-                           ims,ime, jms,jme, kms,kme,                                &
-                           its,ite, jts,jte, kts,kte                                 )
+  ! Unspecified (anthropogenic) fine PM left after the previous call.
+  ! Used to speciate only the mass added since that call.
+  REAL(RKIND), ALLOCATABLE, SAVE :: unspc_tmp(:,:,:)
 
-   IMPLICIT NONE
+CONTAINS
 
-   INTEGER,      INTENT(IN   ) :: num_chem,                          &
-                                  ids,ide, jds,jde, kds,kde,         &
-                                  ims,ime, jms,jme, kms,kme,         &
-                                  its,ite, jts,jte, kts,kte
-   REAL(RKIND),INTENT(IN) :: dt
-   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme),INTENT(IN) :: dz8w, rho_phy, t_phy, relhum, nifa, nwfa
-   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme),INTENT(INOUT) :: hno3_bkgd
-   REAL(RKIND),DIMENSION(ims:ime,kms:kme,jms:jme,1:num_chem), INTENT(INOUT) :: chem
-                                                                               
-  ! local
-   INTEGER :: i,j,k,n
-   REAL(RKIND) :: TA, TS, TN, DRH, Kp, RH1, p1, p2, p3, pc, TA_star, GAMMA, RSA
-   REAL(RKIND) :: NH4SO4, TA_rem, NH3SO4, NH4NO3, NH3_u, NH3_eq, HNO3_eq, tau
-   REAL(RKIND) :: nh3_m, nh4_a_fine_m, so4_a_fine_m, hno3_m, no3_a_fine_m
-   REAL(RKIND) :: Dg, lambda, Kn, khno3
-  ! parameters
-   REAL(RKIND), PARAMETER :: Ac = 6.022E23_RKIND
-   REAL(RKIND), PARAMETER :: Ra = 8.314_RKIND
-   REAL(RKIND), PARAMETER :: da = 4.5e-10_RKIND
-   REAL(RKIND), PARAMETER :: ma = 0.029_RKIND
-   REAL(RKIND), PARAMETER :: mhno3 = 0.063_RKIND
-   REAL(RKIND), PARAMETER :: Dw = 0.5E-6_RKIND
-   REAL(RKIND), PARAMETER :: mw_nh3 = 17.031_RKIND   ! g/mol
-   REAL(RKIND), PARAMETER :: mw_nh4 = 18.04_RKIND   ! g/mol
-   REAL(RKIND), PARAMETER :: mw_so4 = 96.06_RKIND   ! g/mol
-   REAL(RKIND), PARAMETER :: mw_no3 = 62.0049_RKIND ! g/mol
-   REAL(RKIND), PARAMETER :: mw_hno3 = 63.01_RKIND  ! g/mol
+  SUBROUTINE mpas_smoke_tactic_sna_driver(              &
+                         ktau, dt, chem, num_chem,       &
+                         relhum, t_phy, dz8w, rho_phy,   &
+                         nifa, nwfa, hno3_bkgd,          &
+                         swdown, coszen,                 &
+                         ids, ide, jds, jde, kds, kde,   &
+                         ims, ime, jms, jme, kms, kme,   &
+                         its, ite, jts, jte, kts, kte)
 
-   do j = jts,jte
-   do k = kts,kte
-   do i = its,ite
-    
-    ! Convert to molar concentrations    
-      nh3_m        = chem(i,k,j,p_nh3)        * rho_phy(i,k,j)/mw_nh3
-      nh4_a_fine_m = chem(i,k,j,p_nh4_a_fine) * rho_phy(i,k,j)/mw_nh4
-      so4_a_fine_m = chem(i,k,j,p_so4_a_fine) * rho_phy(i,k,j)/mw_so4
-      hno3_m       = hno3_bkgd(i,k,j)         * rho_phy(i,k,j)/mw_hno3
-      no3_a_fine_m = chem(i,k,j,p_no3_a_fine) * rho_phy(i,k,j)/mw_no3
+    IMPLICIT NONE
 
-    ! Determine total molar ammonia, nitrate, sulfate
-      TA = nh3_m + nh4_a_fine_m
-      TS = so4_a_fine_m
-      TN = hno3_m + no3_a_fine_m
+    INTEGER, INTENT(IN) :: ktau, num_chem,               &
+                           ids, ide, jds, jde, kds, kde, &
+                           ims, ime, jms, jme, kms, kme, &
+                           its, ite, jts, jte, kts, kte
 
-    ! Deterimine the sulfate regime
-      RSA = TS / TA
-      if ( RSA .gt. 1._RKIND) then
-         GAMMA = 1.0_RKIND
-      elseif ( RSA .gt. 0.5_RKIND .and. RSA .le. 1. ) then
-         GAMMA = 1.5_RKIND
-      else
-         GAMMA = 2.0_RKIND
-      endif
+    REAL(RKIND), INTENT(IN) :: dt
 
-    ! Calculate the deliquescence relative humidity
-      DRH = exp(723.7_RKIND / t_phy(i,k,j) + 1.6954_RKIND)
+    REAL(RKIND), DIMENSION(ims:ime, kms:kme, jms:jme), &
+                           INTENT(IN) ::               &
+                           relhum, t_phy, dz8w,        &
+                           rho_phy, nifa, nwfa
 
-    ! Calculate some constants
-      RH1 = 1._RKIND - relhum(i,k,j)
-      p1  = exp(-135.94_RKIND + 8763._RKIND /t_phy(i,k,j) + 19.12_RKIND*log(t_phy(i,k,j)))
-      p2  = exp(-122.65_RKIND + 9969._RKIND /t_phy(i,k,j) + 16.22_RKIND*log(t_phy(i,k,j)))
-      p3  = exp(-182.61_RKIND + 13875._RKIND/t_phy(i,k,j) + 24.46_RKIND*log(t_phy(i,k,j)))
-      pc  = (p1 - p2*RH1 + p3*RH1**2._RKIND)*RH1**1.75_RKIND
+    REAL(RKIND), DIMENSION(ims:ime, jms:jme), INTENT(IN) :: &
+                           swdown, coszen
 
-    ! Deterimine the humidity dependent equilibrium constant 
-      Kp = exp(118.87_RKIND - 24084._RKIND/t_phy(i,k,j) - 6.025_RKIND*log(t_phy(i,k,j)))
-      if ( relhum(i,k,j) .ge. DRH ) then
-         Kp = KP * pc
-      endif
- 
-    ! Moles of NH3 after SO4 neutralization
-      TA_star = MAX(0._RKIND,TA - GAMMA*TS)
+    REAL(RKIND), DIMENSION(ims:ime, kms:kme, jms:jme), &
+                           INTENT(INOUT) ::               &
+                           hno3_bkgd
 
-    ! Set the initial conditions
-      TA_rem = TA
- 
-    ! Total NH4 associated with exisiting SO4
-      NH4SO4 = min(TA_rem,GAMMA*TS)    
+    REAL(RKIND), DIMENSION(ims:ime, kms:kme, jms:jme, &
+                           1:num_chem), INTENT(INOUT) :: chem
 
-    ! Where the amount reomoved is = 
-      TA_rem = max(0._RKIND,TA_rem-NH4SO4)
+    INTEGER :: i, j, k
 
-    ! Calculate
-      NH3SO4 = MAX(0._RKIND,NH4SO4 - nh4_a_fine_m)
-    
-    ! Equilibrium Concentration 
-      if ( TN*TA_star .le. Kp ) then 
-         NH4NO3 = 0._RKIND
-      else
-         NH4NO3 = 0.5_RKIND *  (TA_star + TN - sqrt((TA_star+TN)**2._RKIND - 4._RKIND*(TN*TA_star - Kp)))
-      endif
+    ! Term is from Mozurkewich 1993 equilibrium work (M. Mozurkewich et al 1993).
+    ! https://www.sciencedirect.com/science/article/abs/pii/0960168693903564
+    REAL(RKIND) :: ta, ts, tn
+    REAL(RKIND) :: drh, kp, rh, rh1
+    REAL(RKIND) :: p1, p2, p3, pc
+    REAL(RKIND) :: ta_star, gamma
+    REAL(RKIND) :: nh4_so4, nh3_so4
+    REAL(RKIND) :: nh4_no3
+    REAL(RKIND) :: nh3_u, nh3_eq, hno3_eq
+    REAL(RKIND) :: nh3_m, nh4_m, so4_m
+    REAL(RKIND) :: hno3_m, no3_m
+    REAL(RKIND) :: nh3_new, hno3_new
+    REAL(RKIND) :: relax, discriminant
+    REAL(RKIND) :: unspc_bulk, smoke_bulk
+    REAL(RKIND) :: light_frac, oh_eff, nox_aging_frac
+    REAL(RKIND) :: nox_old, nox_aged
+    REAL(RKIND) :: so2_aging_frac, so2_old, so2_aged
 
-    ! Updated NH3 from any SO4 neuralization
-      NH3_u = max(0._RKIND,nh3_m - NH3SO4)
+    REAL(RKIND), PARAMETER :: mw_nh3 = 17.031_RKIND
+    REAL(RKIND), PARAMETER :: mw_nh4 = 18.04_RKIND
+    REAL(RKIND), PARAMETER :: mw_so4 = 96.06_RKIND
+    REAL(RKIND), PARAMETER :: mw_so2 = 64.066_RKIND
+    REAL(RKIND), PARAMETER :: mw_no3 = 62.0049_RKIND
+    REAL(RKIND), PARAMETER :: mw_no2 = 46.0055_RKIND
+    REAL(RKIND), PARAMETER :: mw_air = 28.97_RKIND
 
-    ! Equillibrium concentrations
-      NH3_eq = max(0._RKIND,TA_star - NH4NO3)
-      HNO3_eq = max(0._RKIND,TN - NH4NO3)
+    ! Gas constant in nbar m3 umol-1 K-1 (8.3145 J mol-1 K-1).
+    ! Used to convert the Mozurkewich kp (nbar**2) to (umol m-3)**2.
+    REAL(RKIND), PARAMETER :: r_nbar = 0.083145_RKIND
 
-    ! Determine the time step
-      Dg     = (3._RKIND / (8._RKIND * Ac * rho_phy(i,k,j) * da**2._RKIND)) * &
-               (  ((ma*Ra*t_phy(i,k,j))/(2._RKIND*pi)) * ((ma+mhno3)/mhno3) )**0.5_RKIND
-      lambda = (3._RKIND*Dg)/sqrt((8._RKIND*Ra*t_phy(i,k,j))/(pi*mhno3))
-      Kn     = 2._RKIND * lambda / Dw
-      khno3  = (2._RKIND * pi * Dw * Dg) / &
-               (1._RKIND + ((4._RKIND*Kn)/(3._RKIND*lambda)) * &
-               (1._RKIND - (0.47_RKIND*lambda)/(1._RKIND + Kn)))
-!      if ( nifa(i,k,j) * khno3 .eq. 0. ) then
-!         tau = 1.e10_RKIND * khno3
-!         if ( tau .eq. 0._RKIND) tau = 1.e10
-!      else
-!         tau    = 1._RKIND / ( nifa(i,k,j) * khno3)
-!      endif
-      tau = 10._RKIND * 60._RKIND
+    ! HNO3 background in ppbv.
+    REAL(RKIND), PARAMETER :: hno3_bkgd_ppbv = 0.001_RKIND
 
-    ! Update the chemistry array, converting back to kg/kg
-      hno3_bkgd(i,k,j)         = mw_hno3/rho_phy(i,k,j) * &
-                                              (hno3_m - (1._RKIND - exp(dt/tau)) * &
-                                              (hno3_m - HNO3_eq))
-      chem(i,k,j,p_nh3)        = mw_nh3/rho_phy(i,k,j) * &
-                                              (NH3_u - (1._RKIND - exp(dt/tau)) * (NH3_u - NH3_eq))
-      chem(i,k,j,p_nh4_a_fine) = mw_nh4/rho_phy(i,k,j) * &
-                                             (TA_star - chem(i,k,j,p_nh3)*rho_phy(i,k,j)/mw_nh3)
-      chem(i,k,j,p_no3_a_fine) = mw_no3/rho_phy(i,k,j) * (TN - hno3_m)
-      chem(i,k,j,p_so4_a_fine) = (mw_nh4+mw_so4)/rho_phy(i,k,j)*NH4SO4 - chem(i,k,j,p_nh4_a_fine)
-      
-!      hno3_bkgd(i,k,j)         = max(0._RKIND,mw_hno3/rho_phy(i,k,j) * &
-!                                              (hno3_m - (1._RKIND - exp(dt/tau)) * &
-!                                              (hno3_m - HNO3_eq)))
-!      chem(i,k,j,p_nh3)        = max(0._RKIND,mw_nh3/rho_phy(i,k,j) * &
-!                                              (NH3_u - (1._RKIND - exp(dt/tau)) * (NH3_u - NH3_eq)))
-!      chem(i,k,j,p_nh4_a_fine) = max(0._RKIND,mw_nh4/rho_phy(i,k,j) * &
-!                                             (TA_star - chem(i,k,j,p_nh3)*rho_phy(i,k,j)/mw_nh3))
-!      chem(i,k,j,p_no3_a_fine) = max(0._RKIND,mw_no3/rho_phy(i,k,j) * (TN - hno3_m))
-!      chem(i,k,j,p_so4_a_fine) = (max(0._RKIND,mw_nh4+mw_so4)/rho_phy(i,k,j)*NH4SO4 - chem(i,k,j,p_nh4_a_fine))
+    ! Simple OH-dependent conversion of NOx to HNO3.
+    ! Same approach implemented in SOA module
+    ! Please visit module_simple_soa.F90 for more detail
+    REAL(RKIND), PARAMETER :: oh_ref = 1.5e6_RKIND
+    REAL(RKIND), PARAMETER :: oh_night = 1.3e4_RKIND
+    REAL(RKIND), PARAMETER :: k_no2_oh = 1.25e-11_RKIND
+    REAL(RKIND), PARAMETER :: sw_ref = 800._RKIND
 
-   enddo ! i
-   enddo ! k
-   enddo ! j
+    ! SO2 + OH -> (eventually) H2SO4, gas-phase pathway only.
+    ! JPL/IUPAC recommended effective bimolecular rate near the
+    ! surface (~9e-13 cm3 molecule-1 s-1); the true SO2+OH+M
+    ! reaction is pressure-dependent (three-body, low-pressure
+    ! falloff), so this fixed value is a near-surface approximation.
+    ! This captures only the gas-phase route: aqueous/in-cloud
+    ! oxidation (often the dominant SO4 source when cloud water is
+    ! present, e.g. GOCART's SO2+H2O2 term) is not represented here.
+    REAL(RKIND), PARAMETER :: k_so2_oh = 9.0e-13_RKIND
 
-  end subroutine mpas_smoke_tactic_sna_driver
+    REAL(RKIND), PARAMETER :: tau = 300._RKIND
+    REAL(RKIND), PARAMETER :: tiny_conc = 1.0e-30_RKIND
 
-end module module_tactic_sna
+    ! This is the part that we speciate primary inorgnics from
+    ! biomass burning, and anthropogenic emission using fractional
+    ! contribution from NEMO, and field campaign
+    REAL(RKIND), PARAMETER :: frac_unspc_no3 = 0.01_RKIND
+    REAL(RKIND), PARAMETER :: frac_unspc_so4 = 0.01_RKIND
+    REAL(RKIND), PARAMETER :: frac_unspc_nh4 = 0.01_RKIND
+    REAL(RKIND), PARAMETER :: frac_unspc =                  &
+                              1._RKIND - frac_unspc_no3 -   &
+                              frac_unspc_so4 - frac_unspc_nh4
+
+    REAL(RKIND), PARAMETER :: frac_bb_no3 = 0.03_RKIND
+    REAL(RKIND), PARAMETER :: frac_bb_so4 = 0.01_RKIND
+    REAL(RKIND), PARAMETER :: frac_bb_nh4 = 0.03_RKIND
+    REAL(RKIND), PARAMETER :: frac_bb_smoke =               &
+                              1._RKIND - frac_bb_no3 -      &
+                              frac_bb_so4 - frac_bb_nh4
+
+    if (p_nox        < 1 .or. p_nox        > num_chem) return
+    if (p_nh3        < 1 .or. p_nh3        > num_chem) return
+    if (p_nh4_a_fine < 1 .or. p_nh4_a_fine > num_chem) return
+    if (p_so4_a_fine < 1 .or. p_so4_a_fine > num_chem) return
+    if (p_no3_a_fine < 1 .or. p_no3_a_fine > num_chem) return
+
+    ! Bookkeeping array for the unspecified PM (see unspc_tmp above).
+    ! On (re)allocation it starts from the current field, so no mass is
+    ! speciated retroactively; at ktau==1 it is zeroed cell by cell below.
+    IF ( p_unspc_fine>=1 .AND. p_unspc_fine<=num_chem ) THEN
+      IF ( ALLOCATED(unspc_tmp) ) THEN
+        IF ( ANY(LBOUND(unspc_tmp)/=(/ims,kms,jms/)) .OR. &
+             ANY(UBOUND(unspc_tmp)/=(/ime,kme,jme/)) ) DEALLOCATE(unspc_tmp)
+      ENDIF
+      IF ( .NOT.ALLOCATED(unspc_tmp) ) THEN
+        ALLOCATE(unspc_tmp(ims:ime,kms:kme,jms:jme))
+        unspc_tmp = max(0._RKIND,chem(:,:,:,p_unspc_fine))
+      ENDIF
+    ENDIF
+
+    ! dz8w, nifa, and nwfa are retained for a future
+    ! aerosol-number-dependent relaxation timescale.
+    DO j = Jts , Jte
+       DO k = Kts , Kte
+          DO i = Its , Ite
+
+             IF ( Rho_phy(i,k,j)<=TINY_CONC .OR. T_phy(i,k,j)<=TINY_CONC ) CYCLE
+             IF ( i==Its .AND. k==Kts .AND. j==Jts ) WRITE (*,*) 'Debug:TACTIC, ktau = ' , Ktau
+        ! Initialize
+        ! Now, this version only has primary species from 0 tstep
+        ! Otherwise, SNA concentrations accumulated unrealistically from smoke_fine over tstep
+        ! This will be resolved when we put inline emission module for biomass burning
+             IF ( Ktau==1 ) Hno3_bkgd(i,k,j) = HNO3_BKGD_PPBV*1.0E-9_RKIND
+
+        ! Anthropogenic (unspecified) PM: speciate every step, but only the
+        ! mass added since the previous call (unspc_tmp), so SNA does not
+        ! accumulate from the remaining bulk. At ktau==1 this is the whole field.
+             IF ( p_unspc_fine>=1 .AND. p_unspc_fine<=Num_chem ) THEN
+               IF ( Ktau==1 ) Unspc_tmp(i,k,j) = 0._RKIND
+               unspc_bulk = max(0._RKIND,Chem(i,k,j,p_unspc_fine)-Unspc_tmp(i,k,j))
+               Chem(i,k,j,p_unspc_fine) = max(0._RKIND,Chem(i,k,j,p_unspc_fine)) - (1._RKIND-FRAC_UNSPC)*unspc_bulk
+               Chem(i,k,j,p_no3_a_fine) = max(0._RKIND,Chem(i,k,j,p_no3_a_fine)) + FRAC_UNSPC_NO3*unspc_bulk
+               Chem(i,k,j,p_so4_a_fine) = max(0._RKIND,Chem(i,k,j,p_so4_a_fine)) + FRAC_UNSPC_SO4*unspc_bulk
+               Chem(i,k,j,p_nh4_a_fine) = max(0._RKIND,Chem(i,k,j,p_nh4_a_fine)) + FRAC_UNSPC_NH4*unspc_bulk
+               Unspc_tmp(i,k,j) = Chem(i,k,j,p_unspc_fine)
+             ENDIF
+
+             IF ( Ktau==1 .AND. p_smoke_fine>=1 .AND. p_smoke_fine<=Num_chem ) THEN
+               smoke_bulk = max(0._RKIND,Chem(i,k,j,p_smoke_fine))
+               Chem(i,k,j,p_smoke_fine) = FRAC_BB_SMOKE*smoke_bulk
+               Chem(i,k,j,p_no3_a_fine) = max(0._RKIND,Chem(i,k,j,p_no3_a_fine)) + FRAC_BB_NO3*smoke_bulk
+               Chem(i,k,j,p_so4_a_fine) = max(0._RKIND,Chem(i,k,j,p_so4_a_fine)) + FRAC_BB_SO4*smoke_bulk
+               Chem(i,k,j,p_nh4_a_fine) = max(0._RKIND,Chem(i,k,j,p_nh4_a_fine)) + FRAC_BB_NH4*smoke_bulk
+             ENDIF
+
+        ! Use the same simple diagnostic OH field as the SOA module.
+             light_frac = max(0._RKIND,min(1._RKIND,Swdown(i,j)/SW_REF))
+
+             IF ( Coszen(i,j)>0._RKIND ) THEN
+               oh_eff = max(OH_NIGHT,OH_REF*light_frac)
+             ELSE
+               oh_eff = OH_NIGHT
+             ENDIF
+
+        ! Treat the lumped NOx tracer as NO2-equivalent for this
+        ! initial parameterization. NOx is stored in ug kg-1.
+        ! Transfer oxidized NOx to HNO3 on a one-to-one molar basis.
+        ! This need to be discussed further for NO,NO2 speciation
+             nox_aging_frac = 1._RKIND - exp(-K_NO2_OH*oh_eff*max(0._RKIND,Dt))
+
+             nox_old = max(0._RKIND,Chem(i,k,j,p_nox))
+             nox_aged = min(nox_old,nox_aging_frac*nox_old)
+
+             Chem(i,k,j,p_nox) = max(0._RKIND,nox_old-nox_aged)
+        ! hno3_bkgd is stored as mol mol-1. Convert the aged
+        ! NO2-equivalent mass mixing ratio to a molar mixing ratio.
+             Hno3_bkgd(i,k,j) = Hno3_bkgd(i,k,j) + nox_aged*1.0E-9_RKIND*MW_AIR/MW_NO2
+
+        ! SO2 + OH -> H2SO4, condensing directly onto fine SO4.
+        ! Same diagnostic OH proxy as the NOx aging term above.
+        ! H2SO4 has negligible vapor pressure, so unlike NH4NO3 no
+        ! equilibrium partitioning is needed: the oxidized mass is
+        ! simply moved from SO2 to fine SO4, done before so4_m is
+        ! read below so the added sulfate correctly competes for
+        ! NH3 in the same step's equilibrium.
+        ! Now keep in mind, gas-phase so2 chem not a significant contributor for SO4
+             IF ( p_so2>=1 .AND. p_so2<=Num_chem ) THEN
+               so2_aging_frac = 1._RKIND - exp(-K_SO2_OH*oh_eff*max(0._RKIND,Dt))
+
+               so2_old = max(0._RKIND,Chem(i,k,j,p_so2))
+               so2_aged = min(so2_old,so2_aging_frac*so2_old)
+
+               Chem(i,k,j,p_so2) = max(0._RKIND,so2_old-so2_aged)
+               Chem(i,k,j,p_so4_a_fine) = max(0._RKIND,Chem(i,k,j,p_so4_a_fine)) + (MW_SO4/MW_SO2)*so2_aged
+             ENDIF
+
+        ! NH3 is stored in ug kg-1. Convert it to numerical
+        ! umol m-3 using the same convention as the working
+        ! reference implementation.
+             nh3_m = max(0._RKIND,Chem(i,k,j,p_nh3))*Rho_phy(i,k,j)/MW_NH3
+
+        ! Persistent HNO3 is stored as mol mol-1. Convert it to
+        ! numerical umol m-3.
+             hno3_m = max(0._RKIND,Hno3_bkgd(i,k,j))*Rho_phy(i,k,j)*1.0E9_RKIND/MW_AIR
+
+        ! Aerosols are in ug kg-1. The resulting numerical
+        ! concentrations are umol m-3.
+             nh4_m = max(0._RKIND,Chem(i,k,j,p_nh4_a_fine))*Rho_phy(i,k,j)/MW_NH4
+
+             so4_m = max(0._RKIND,Chem(i,k,j,p_so4_a_fine))*Rho_phy(i,k,j)/MW_SO4
+
+             no3_m = max(0._RKIND,Chem(i,k,j,p_no3_a_fine))*Rho_phy(i,k,j)/MW_NO3
+
+        ! Total molar ammonia, sulfate, and nitrate.
+             ta = nh3_m + nh4_m
+             ts = so4_m
+             tn = hno3_m + no3_m
+
+             IF ( ts>ta ) THEN
+               gamma = 1._RKIND
+             ELSEIF ( 2._RKIND*ts>ta ) THEN
+               gamma = 1.5_RKIND
+             ELSE
+               gamma = 2._RKIND
+             ENDIF
+
+             ta_star = max(0._RKIND,ta-gamma*ts)
+
+             nh4_so4 = min(ta,gamma*ts)
+
+             nh3_so4 = max(0._RKIND,nh4_so4-nh4_m)
+             nh3_u = max(0._RKIND,nh3_m-nh3_so4)
+
+             rh = max(0._RKIND,min(1._RKIND,Relhum(i,k,j)))
+
+        ! Druge et al. give DRH in percent.
+             drh = 0.01_RKIND*exp(723.7_RKIND/T_phy(i,k,j)+1.6954_RKIND)
+
+             rh1 = 1._RKIND - rh
+
+        ! Dry equilibrium constant.
+             kp = exp(118.87_RKIND-24084._RKIND/T_phy(i,k,j)-6.025_RKIND*log(T_phy(i,k,j)))
+
+        ! Humidity correction above the deliquescence RH.
+             IF ( rh>=drh ) THEN
+               p1 = exp(-135.94_RKIND+8763._RKIND/T_phy(i,k,j)+19.12_RKIND*log(T_phy(i,k,j)))
+
+               p2 = exp(-122.65_RKIND+9969._RKIND/T_phy(i,k,j)+16.22_RKIND*log(T_phy(i,k,j)))
+
+               p3 = exp(-182.61_RKIND+13875._RKIND/T_phy(i,k,j)+24.46_RKIND*log(T_phy(i,k,j)))
+
+               pc = max(0._RKIND,(p1-p2*rh1+p3*rh1**2)*rh1**1.75_RKIND)
+
+               kp = kp*pc
+             ENDIF
+
+        ! kp is a partial-pressure product in nbar**2 (Mozurkewich 1993).
+        ! Convert it to (umol m-3)**2 so it matches tn*ta_star:
+        ! p [nbar] = C [umol m-3] * R_NBAR * T  ->  kp_conc = kp / (R_NBAR*T)**2
+             kp = kp/(R_NBAR*T_phy(i,k,j))**2
+
+        ! Equilibrium ammonium nitrate concentration.
+             IF ( tn*ta_star<=kp ) THEN
+               nh4_no3 = 0._RKIND
+             ELSE
+               discriminant = max(0._RKIND,(ta_star+tn)**2-4._RKIND*(tn*ta_star-kp))
+
+               nh4_no3 = 0.5_RKIND*(ta_star+tn-sqrt(discriminant))
+
+               nh4_no3 = min(ta_star,min(tn,max(0._RKIND,nh4_no3)))
+             ENDIF
+
+             nh3_eq = max(0._RKIND,ta_star-nh4_no3)
+             hno3_eq = max(0._RKIND,tn-nh4_no3)
+
+        ! First-order relaxation toward equilibrium.
+        ! This is a placeholder for future research
+        ! Purpose of this relaxation time is calcualte it from aerosol num. conc.
+        ! and also size, HNO3 uptake coefficient
+        ! thus we need aerosol dynamics.
+        ! With this  relaxation time, we should have more rapid equilibrium in highly polluted region
+        ! while slower equilibrium in less polluted region
+        ! Minsu Choi, CIRES/NOAA GSL
+             relax = 1.0_RKIND
+!             relax = 1._RKIND - exp(-max(0._RKIND,Dt)/TAU)
+
+             nh3_new = nh3_u + relax*(nh3_eq-nh3_u)
+             hno3_new = hno3_m + relax*(hno3_eq-hno3_m)
+
+        ! Convert NH3 from umol m-3 to ug kg-1.
+             Chem(i,k,j,p_nh3) = MW_NH3/Rho_phy(i,k,j)*nh3_new
+
+        ! Convert persistent HNO3 from numerical umol m-3
+        ! back to mol mol-1.
+             Hno3_bkgd(i,k,j) = hno3_new*MW_AIR/(Rho_phy(i,k,j)*1.0E9_RKIND)
+
+        ! Convert aerosol concentrations from umol m-3 to ug kg-1.
+             Chem(i,k,j,p_nh4_a_fine) = MW_NH4/Rho_phy(i,k,j)*max(0._RKIND,ta-nh3_new)
+
+             Chem(i,k,j,p_no3_a_fine) = MW_NO3/Rho_phy(i,k,j)*max(0._RKIND,tn-hno3_new)
+
+        ! Sulfate is conserved by the SNA partitioning.
+             Chem(i,k,j,p_so4_a_fine) = MW_SO4/Rho_phy(i,k,j)*ts
+          ENDDO
+       ENDDO
+    ENDDO
+
+   END SUBROUTINE mpas_smoke_tactic_sna_driver
+END MODULE module_tactic_sna
