@@ -203,12 +203,14 @@ module module_fire_emissions
     subroutine calculate_smoke_emissions(dt, julday, nlcat, EFs_map, fre_avg,       &
                                          ebb_dcycle, area, nblocks, ktau,           &
                                          bb_input_prevh, ebu, num_e_bb_in,          &
+                                         num_bb_pt,                                 &
+                                         myrank,bb_pt_rank,bb_pt_local_cell_idx,         &
                                          ids, ide, jds, jde, kds, kde,              &
                                          ims, ime, jms, jme, kms, kme,              &
                                          its, ite, jts, jte, kts, kte)
   
       implicit none
-      INTEGER, INTENT(IN) :: julday, nlcat, num_e_bb_in
+      INTEGER, INTENT(IN) :: julday, nlcat, num_e_bb_in, num_bb_pt, myrank
       INTEGER, INTENT(IN) :: ids, ide, jds, jde, kds, kde
       INTEGER, INTENT(IN) :: ims, ime, jms, jme, kms, kme
       INTEGER, INTENT(IN) :: its, ite, jts, jte, kts, kte
@@ -217,13 +219,14 @@ module module_fire_emissions
       integer,intent(in):: ktau
       INTEGER, INTENT(IN) :: ebb_dcycle, nblocks, bb_input_prevh
 
-      REAL(RKIND), INTENT(IN),   DIMENSION(ims:ime, jms:jme, nblocks)   :: fre_avg
+      INTEGER, INTENT(IN), DIMENSION(1:num_bb_pt) :: bb_pt_rank,bb_pt_local_cell_idx
+      REAL(RKIND), INTENT(IN),   DIMENSION(1:num_bb_pt,nblocks)         :: fre_avg
       REAL(RKIND), INTENT(IN),   DIMENSION(ims:ime, jms:jme)            :: EFs_map
       REAL(RKIND), INTENT(IN),   DIMENSION(ims:ime, jms:jme)            :: area !we need it for first v level 
-      REAL(RKIND), INTENT(INOUT),DIMENSION(ims:ime, kms:kme, jms:jme, num_e_bb_in)   :: ebu
+      REAL(RKIND), INTENT(INOUT),DIMENSION(1:num_bb_pt, kms:kme, num_e_bb_in)   :: ebu
 
       !Local variables
-      INTEGER :: i, j, blk, hour_int, nv
+      INTEGER :: i, j, blk, hour_int, nv, ii
       REAL(RKIND) ::  hour_tmp
       REAL(RKIND), PARAMETER :: fg_to_ug = 1.0e6
       REAL(RKIND), PARAMETER :: to_s = 3600.0
@@ -244,15 +247,20 @@ module module_fire_emissions
       ENDIF
     
       !if ebb_dcycle == 2 then ebb_dc1 do not use blocks? should be 24
+      j = 1
       DO nv = 1, num_e_bb_in
-      DO j = jts, jte
-        DO i = its, ite
-           IF (fre_avg(i,j,blk) > 0.0_RKIND) THEN
-              ebu(i,kts,j,nv) = (fre_avg(i,j,blk) * EFs_map(i,j) * fg_to_ug) / ( area(i,j) * to_s) !we need the area of the grids
-           ELSE
-              ebu(i,kts,j,nv) = 0.0_RKIND
-           END IF
-        END DO
+      DO ii = 1, num_bb_pt
+         ! Skip if we are on the wrong rank for this EGU
+         if (myrank /= bb_pt_rank(ii)) cycle
+         ! Otherwise the index is just the local index
+         i = bb_pt_local_cell_idx(ii)
+         ! Final check in case the cell wasn't actually on any rank
+         if ( i .le. 0 .or. i .gt. ite ) cycle
+         IF (fre_avg(ii,blk) > 0.0_RKIND) THEN
+            ebu(ii,kts,nv) = (fre_avg(ii,blk) * EFs_map(i,j) * fg_to_ug) / ( area(i,j) * to_s) !we need the area of the grids
+         ELSE
+            ebu(ii,kts,nv) = 0.0_RKIND
+         END IF
       END DO
       END DO
   
@@ -271,7 +279,9 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,          &
                            fire_hist,hwp,hwp_avg,hwp_prev_day,      &  !I think fire_hist replaced sc_factor
                            vegfrac, eco_id, nblocks,                &
                            lu_nofire, lu_qfire, lu_sfire,           &
-                           swdown,ebb_dcycle,ebu,num_e_bb_in,       &
+                           swdown,ebb_dcycle,ebu,                   &
+                           num_e_bb_in,num_bb_pt,                   &
+                           myrank,bb_pt_rank,bb_pt_local_cell_idx,  &
                            index_e_bb_in_smoke_fine,                &
                            fire_type,  q_vap, add_fire_moist_flux,  &
                            plume_beta_qv, hwp_alpha,                &
@@ -285,12 +295,15 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,          &
                                   ids,ide, jds,jde, kds,kde,        &
                                   ims,ime, jms,jme, kms,kme,        &
                                   its,ite, jts,jte, kts,kte
+  INTEGER, INTENT(IN) :: myrank, num_bb_pt
   INTEGER, INTENT(IN) :: index_e_bb_in_smoke_fine
+
+  INTEGER, DIMENSION(1:num_bb_pt), INTENT(IN) :: bb_pt_rank,bb_pt_local_cell_idx
 
   REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_chem ),                 &
          INTENT(INOUT ) ::                                   chem   ! shall we set num_chem=1 here?
 
-  REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_e_bb_in ),                 &
+  REAL(RKIND), DIMENSION( 1:num_bb_pt, kms:kme, num_e_bb_in ),                 &
          INTENT(INOUT ) ::                                   ebu
   REAL(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme), INTENT(INOUT) :: q_vap ! SRB: added q_vap
   INTEGER,      INTENT(IN), DIMENSION(ims:ime,jms:jme) :: eco_id
@@ -314,7 +327,7 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,          &
   
   !>--local 
   logical, intent(in)  :: add_fire_moist_flux
-  integer :: i,j,k,n,m, blk
+  integer :: i,j,k,n,m, blk, ii
   integer :: icall=0
   real(RKIND) :: conv_rho, conv, dm_smoke, dc_hwp, dc_gp, dc_fn !daero_num_wfa, daero_num_ifa !, lu_sum1_5, lu_sum12_14
 
@@ -350,10 +363,16 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,          &
 
   !RAR: change this to the fractional LU type; fire_type: 0- no fires, 1- Ag
   ! or urban fires, 2- prescribed fires in wooded area, 3- wildfires
+  j = 1
   if (ebb_dcycle==2) then
-    do j=jts,jte
-      do i=its,ite
-        if (ebu(i,kts,j,index_e_bb_in_smoke_fine)<ebb_min) then
+     do ii = 1, num_bb_pt
+        ! Skip if we are on the wrong rank for this EGU
+        if (myrank /= bb_pt_rank(ii)) cycle
+        ! Otherwise the index is just the local index
+        i = bb_pt_local_cell_idx(ii)
+        ! Final check in case the cell wasn't actually on any rank
+        if ( i .le. 0 .or. i .gt. ite ) cycle
+        if (ebu(ii,kts,index_e_bb_in_smoke_fine)<ebb_min) then
            fire_type(i,j) = 0
            lu_nofire(i,j) = 1.0
         else
@@ -369,7 +388,7 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,          &
           else if (eco_id(i,j)==8) then
             fire_type(i,j) = 2    ! slash burn and wildfires in the east, eastern temperate forest ecosystem
             ! SRB: Eastern wildland fires if FRE>1E6MJ and eco region is 8 and the fire is not older than 7 hrs
-            if ( ebu(i,kts,j,index_e_bb_in_smoke_fine)*3600*(1/0.416) .ge. 1.E6 .and. fire_end_hr(i,j) .le. 8 ) then
+            if ( ebu(ii,kts,index_e_bb_in_smoke_fine)*3600*(1/0.416) .ge. 1.E6 .and. fire_end_hr(i,j) .le. 8 ) then
               fire_type(i,j) = 4
             endif 
           else if (lu_sfire(i,j)>0.8) then
@@ -378,15 +397,19 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,          &
             fire_type(i,j) = 4    ! potential wildfires     
           end if
         end if
-      end do
-    end do
+     end do
   endif
 
 
   if (ebb_dcycle==2) then 
     !do blk = 1, nblocks
-     do j=jts,jte
-       do i=its,ite
+     do ii = 1, num_bb_pt
+        ! Skip if we are on the wrong rank for this EGU
+        if (myrank /= bb_pt_rank(ii)) cycle
+        ! Otherwise the index is just the local index
+        i = bb_pt_local_cell_idx(ii)
+        ! Final check in case the cell wasn't actually on any rank
+        if ( i .le. 0 .or. i .gt. ite ) cycle
         fire_age= MAX(0.01_RKIND,time_int/3600. + (fire_end_hr(i,j)-1.0))  !One hour delay is due to the latency of the RAVE files, hours
 
           SELECT CASE ( fire_type(i,j) )   !Ag, urban fires, bare land etc.
@@ -437,8 +460,7 @@ subroutine diurnal_cycle(  dtstep,dz8w,rho_phy,pi,ebb_min,          &
           CASE DEFAULT
           END SELECT
        !enddo
-      enddo
-    enddo
+     enddo
   endif
 end subroutine diurnal_cycle
 
