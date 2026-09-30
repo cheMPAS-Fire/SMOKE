@@ -55,7 +55,7 @@ module mpas_smoke_init
                                  index_ssalt_fine, index_ssalt_coarse,                &
                                  index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
                                  index_so2, index_nh3, index_ch4, index_nox, index_co, &
-                                 index_bact_fine                      )
+                                 index_bact_fine, index_mold_fine                      )
 
     implicit none
 
@@ -69,7 +69,7 @@ module mpas_smoke_init
                            index_ssalt_fine, index_ssalt_coarse,                &
                            index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,&
                            index_so2, index_nh3, index_ch4, index_nox, index_co, &
-                           index_bact_fine
+                           index_bact_fine, index_mold_fine
 
         if(present(index_smoke_ultrafine))  p_smoke_ultrafine  = index_smoke_ultrafine - chemistry_start + 1
         if(present(index_dust_ultrafine))   p_dust_ultrafine   = index_dust_ultrafine - chemistry_start + 1
@@ -99,6 +99,7 @@ module mpas_smoke_init
         if(present(index_nox))              p_nox              = index_nox - chemistry_start + 1
         if(present(index_co))               p_co               = index_co - chemistry_start + 1
         if(present(index_bact_fine))        p_bact_fine        = index_bact_fine - chemistry_start + 1
+        if(present(index_mold_fine))        p_mold_fine        = index_mold_fine - chemistry_start + 1
  
    end subroutine set_scalar_indices
 

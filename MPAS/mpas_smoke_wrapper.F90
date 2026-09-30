@@ -27,6 +27,7 @@ module mpas_smoke_wrapper
    use ssalt_mod
    use module_smoke_diagnostics
    use module_data_rrtmgaeropt
+   use module_mold_emissions only : calc_mold_emiss 
 
    implicit none
 
@@ -51,6 +52,7 @@ contains
            index_no3_a_fine      , index_so4_a_fine            , index_nh4_a_fine,           &
            index_nh3             , index_so2                   , index_ch4,                  &
            index_co              , index_nox                   , index_bact_fine,            &
+           index_mold_fine, &
            e_ant_pt_in        , num_e_ant_pt_in          , num_anthro_pt,                  &
            e_ant_stack_groups_in , num_e_ant_stack_groups_in   ,                             &
            index_STKHT, index_STKDM, index_STKTK, index_STKVE, index_STKLT, index_STKLG,     &
@@ -218,7 +220,7 @@ contains
                            index_ssalt_fine, index_ssalt_coarse,                    &
                            index_so4_a_fine, index_no3_a_fine, index_nh4_a_fine,    &
                            index_so2, index_nh3, index_ch4,                         &
-                           index_co,  index_nox, index_bact_fine    
+                           index_co,  index_nox, index_bact_fine, index_mold_fine 
     integer, intent(in),optional :: &
                            index_e_bb_in_smoke_ultrafine, index_e_bb_in_smoke_fine, index_e_bb_in_smoke_coarse, &
                            index_e_bb_in_co, index_e_bb_in_ch4, index_e_bb_in_nox, &
@@ -283,6 +285,7 @@ contains
      logical,intent(in)               :: do_mpas_methane
      logical,intent(in)               :: do_mpas_hab
      logical,intent(in)               :: do_mpas_rwc
+     logical,intent(in)               :: do_mpas_mold
      character(len=*),intent(in)      :: config_extra_chemical_tracers
      logical,intent(in)               :: config_ultrafine, config_coarse
      logical,intent(in)               :: do_mpas_anthro_pt
@@ -389,7 +392,7 @@ contains
          (.not. do_mpas_dust ) .and. (.not. do_mpas_anthro) .and. &
          (.not. do_mpas_ssalt) .and. (.not. do_mpas_sna)    .and. &
          (.not. do_mpas_methane) .and. (.not. do_mpas_hab)  .and. &
-         (.not. do_mpas_rwc) )  return
+         (.not. do_mpas_rwc)     .and. (.not. do_mpas_mold) )  return
 ! 
    if (ktau == 1) then
 !   Reorder chemistry indices
@@ -403,7 +406,7 @@ contains
                     index_ssalt_fine, index_ssalt_coarse,                          &
                     index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,          &
                     index_so2, index_nh3, index_ch4, index_nox, index_co,          &
-                    index_bact_fine                                                )
+                    index_bact_fine, index_mold_fine                               )
                                                                           
       call mpas_log_write( ' Initializing dry deposition parameterss ')
       call aero_dry_dep_init()
@@ -639,6 +642,14 @@ contains
        ims,ime, jms,jme, kms,kme,                                     &
        its,ite, jts,jte, kts,kte                                      )
     if  (do_timing) call mpas_timer_stop('pollen_driver')
+    endif
+
+
+    if (do_mpas_mold) then
+    call calc_mold_emiss(dt, nsoil, num_chem, chem,               &
+                           dz8w, t_phy, rho_phy, qv, lai, smois,  &
+                           ims, ime, jms, jme, kms, kme,          &
+                           its, ite, jts, jte, kts, kte           )
     endif
 
   ! -- add sea salt emissions
