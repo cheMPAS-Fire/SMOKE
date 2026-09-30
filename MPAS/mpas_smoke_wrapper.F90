@@ -168,7 +168,7 @@ contains
            swdown                , z0                    , snowh                ,            &
            julian                , rmol                  , raincv               ,            &
            rainncv               , dpt2m                 , znt                  ,            &
-           mavail                , g                     ,                                   &
+           mavail                , lai                   , g                    ,            &
            landusef              , cldfrac               , ktop_deep            ,            &
            refl10cm              ,                                                           &
            nwfa2d                , nifa2d                , config_mp_aero_emission  ,        &
@@ -213,7 +213,8 @@ contains
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: pblh              ! PBL height [m]
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: swdown, z0, snowh, znt
     real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: coszen
-    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: raincv, rainncv, mavail                    
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: raincv, rainncv, mavail                   
+    real(RKIND),intent(in), dimension(ims:ime, jms:jme)            :: lai 
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme)         :: rmol, ust
     real(RKIND),intent(inout), dimension(ims:ime, jms:jme),optional :: nwfa2d, nifa2d
 ! 2D Fire Input
