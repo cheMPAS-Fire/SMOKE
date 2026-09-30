@@ -118,7 +118,7 @@ contains
              !
              !  volumetric soil moisture over porosity
              !
-             gwet=smois(i,1,j)/porosity(isltyp(i,j))
+             gwet=(0.1*smois(i,1,j)+0.3*smois(i,2,j)+0.6*smois(i,3,j))/porosity(isltyp(i,j)) ! 0-1, 1-4, 4-10cm soil moisture average from RUC
              airden=rho_phy(i,kts,j)
              dz_lowest = dz8w(i,1,j)
 

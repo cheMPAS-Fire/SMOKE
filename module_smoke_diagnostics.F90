@@ -102,6 +102,7 @@ CONTAINS
       ! ---------------------------------------------------------
       select case (Id)
       case (ID_MIE_OFF)
+       Aod3d(:,:,:) = Aod3d_Simple(:,:,:)
 
       case (ID_MIE_SIMPLE)
         CALL optical_averaging(Id,Curr_secs,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
@@ -131,7 +132,7 @@ CONTAINS
    END SUBROUTINE mpas_aod_diag
 
    SUBROUTINE mpas_visibility_diag(Qcloud,Qrain,Qice,Qsnow,Qgrpl,Blcldw,Blcldi,Rho_phy,Wind10m,Wind,Rh2m,Rh,Qv,T2m,T,Coszen,       &
-                                 & Extcoef55,Vis,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
+                                 & Extcoef55,Dz8w,Vis,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
 
       REAL(rkind) , PARAMETER :: VISFACTOR = 3.912_RKIND , RH_THRESHOLD = 0.3_RKIND
       INTEGER , INTENT(IN) :: Ims
@@ -162,6 +163,7 @@ CONTAINS
       REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Jms:Jme) :: Coszen
       REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Extcoef55
       REAL(rkind) , INTENT(OUT) , DIMENSION(Ims:Ime,Jms:Jme) :: Vis
+      REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Dz8w
       INTEGER , INTENT(IN) :: Ids
       INTEGER , INTENT(IN) :: Ide
       INTEGER , INTENT(IN) :: Jds
@@ -195,18 +197,18 @@ CONTAINS
             extcoeff552 = 0._RKIND
       ! Follwowing UPP: CALVIS_GSD.f, take max of hydrometeors in lowest 3 levels
       ! - in UPP, only bottom rho_phy is used, shouldn't we use rho_phy from that level (as below)?
-            k = Kts
-!      do k = 1,3
-            qcloud2 = Qcloud(i,k,j)*Rho_phy(i,k,j)*1000._RKIND !max(qcloud2,qcloud(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
-            blcldw2 = Blcldw(i,k,j)*Rho_phy(i,k,j)*1000._RKIND !max(blcldw2,blcldw(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
-            qrain2 = Qrain(i,k,j)*Rho_phy(i,k,j)*1000._RKIND  !max(qrain2,qrain(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
-            qice2 = Qice(i,k,j)*Rho_phy(i,k,j)*1000._RKIND   ! max(qice2,qice(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
-            blcldi2 = Blcldi(i,k,j)*Rho_phy(i,k,j)*1000._RKIND !max(blcldi2,blcldi(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
-            qsnow2 = Qsnow(i,k,j)*Rho_phy(i,k,j)*1000._RKIND  !max(qsnow2,qsnow(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
-            qgrpl2 = Qgrpl(i,k,j)*Rho_phy(i,k,j)*1000._RKIND  !max(qgrpl2,qgrpl(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
-            extcoeff552 = Extcoef55(i,k,j)*1.E-3_RKIND
-                                                   !max(extcoeff552,extcoeff55(i,k,j)) ! JLS - EXT55 is in units = 1/km, covert to 1/m
-!      enddo
+      !      k = Kts
+      DO k = 1,3
+            qcloud2 = max(qcloud2, qcloud(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
+            blcldw2 = max(blcldw2, blcldw(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
+            qrain2  = max(qrain2,  qrain(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
+            qice2   = max(qice2,   qice(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
+            blcldi2 = max(blcldi2, blcldi(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
+            qsnow2  = max(qsnow2,  qsnow(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
+            qgrpl2  = max(qgrpl2,  qgrpl(i,k,j)*rho_phy(i,k,j)*1000._RKIND)
+
+            extcoeff552 = max(extcoeff552, extcoef55(i,k,j)/dz8w(i,k,j))
+      ENDDO
 
             bc = 144.7_RKIND*(qcloud2+blcldw2)**0.88_RKIND
             br = 2.24_RKIND*qrain2**0.75_RKIND
