@@ -18,9 +18,11 @@ OBJS = \
 	module_zero_plumegen_coms.o \
 	module_smoke_plumerise.o \
 	module_add_emiss_burn.o \
+	module_anthro_emissions.o \
 	module_plumerise.o \
 	dust_data_mod.o \
 	dust_fengsha_mod.o \
+	dust_gocart_simple_mod.o \
 	ssalt_mod.o \
 	mpas_smoke_wrapper.o \
 	mpas_smoke_init.o \
@@ -34,6 +36,15 @@ OBJS = \
         module_rwc_emissions.o \
         module_tactic_sna.o \
         module_mold_emissions.o
+        dep_dry_mod_wesley.o \
+        module_hab_emissions.o \
+        module_ltng_cpmpr92z.o \
+        module_ltng_crmpr92.o \
+        module_ltng_iccg.o \
+        module_ltng_lpi.o \
+        module_lightning_driver.o \
+	module_simple_soa.o \
+	module_mp_aero_emissions.o
    
 
 MPAS_SMOKE: $(OBJS)
@@ -47,6 +58,9 @@ module_fire_emissions.o: \
 
 mpas_smoke_init.o:
 
+module_hab_emissions.o: \
+        mpas_smoke_init.o
+
 module_tactic_sna.o: \
         mpas_smoke_init.o
 
@@ -58,11 +72,21 @@ dep_dry_mod_emerson.o: \
 dep_data_mod.o: \
 	mpas_smoke_init.o
 
+dep_dry_mod_wesley.o: \
+	dep_data_mod.o \
+	mpas_smoke_init.o \
+	mpas_smoke_config.o
+
 rad_data_mod.o: \
 	mpas_smoke_init.o \
 	mpas_mie_module.o
 
 dust_fengsha_mod.o: \
+	mpas_smoke_config.o \
+	dust_data_mod.o \
+	mpas_smoke_init.o
+
+dust_gocart_simple_mod.o: \
 	mpas_smoke_config.o \
 	dust_data_mod.o \
 	mpas_smoke_init.o
@@ -117,6 +141,11 @@ mpas_smoke_wrapper.o:      \
         module_data_rrtmgaeropt.o \
         mpas_mie_module.o \
         module_mold_emissions.o
+        dep_dry_mod_wesley.o \
+        module_hab_emissions.o \
+        module_lightning_driver.o \
+	module_simple_soa.o \
+	module_mp_aero_emissions.o
 
 module_zero_plumegen_coms.o: \
         mpas_smoke_config.o
@@ -159,6 +188,29 @@ module_mold_emissions.o: \
        mpas_smoke_init.o \
        dep_data_mod.o
 
+module_ltng_cpmpr92z.o:
+
+module_ltng_crmpr92.o:
+
+module_ltng_iccg.o:
+
+module_ltng_lpi.o:
+
+module_lightning_driver.o: \
+        mpas_smoke_config.o \
+        mpas_smoke_init.o \
+        module_ltng_cpmpr92z.o \
+        module_ltng_crmpr92.o \
+        module_ltng_iccg.o \
+        module_ltng_lpi.o \
+        module_peg_util.o
+
+module_simple_soa.o: \
+	mpas_smoke_config.o \
+	mpas_smoke_init.o
+
+
+module_mp_aero_emissions.o:
 
 #module_smoke_plumerise.o: module_smoke_plumerise.F90
 #	$(FC) $(CPPFLAGS) $(COREDEF) $(FFLAGS) -c module_smoke_plumerise.F90 $(CPPINCLUDES) $(FCINCLUDES) -I.. -I../../../framework -I../../../external/esmf_time_f90

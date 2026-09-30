@@ -20,6 +20,7 @@ CONTAINS
                            index_e_bb_in_co, index_e_bb_in_nh3,     &
                            index_e_bb_in_ch4,                       &
                            index_e_bb_in_nox, index_e_bb_in_so2,    &
+                           index_e_bb_in_voc,                       &
                            ids,ide, jds,jde, kds,kde,               &
                            ims,ime, jms,jme, kms,kme,               &
                            its,ite, jts,jte, kts,kte                )
@@ -36,7 +37,8 @@ CONTAINS
                            index_e_bb_in_smoke_coarse,              &
                            index_e_bb_in_co, index_e_bb_in_nh3,     &
                            index_e_bb_in_ch4,                       &
-                           index_e_bb_in_nox, index_e_bb_in_so2
+                           index_e_bb_in_nox, index_e_bb_in_so2,    &
+                           index_e_bb_in_voc
 
    real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, 1:num_chem ),                 &
          INTENT(INOUT ) ::                                   chem
@@ -61,7 +63,9 @@ CONTAINS
    logical, intent(in)  :: add_fire_moist_flux
    integer :: i,j,k,n,m
    integer :: icall=0
-   real(RKIND) :: conv_gas, conv_rho, conv, dm_smoke, dm_smoke_coarse, dm_ch4, dc_hwp, dc_gp, dc_fn, ext2 !daero_num_wfa, daero_num_ifa !, lu_sum1_5, lu_sum12_14
+   real(RKIND) :: conv_gas, conv_rho, conv, dm_smoke, dm_smoke_coarse
+   real(RKIND) :: dm_co, dm_nox, dm_so2, dm_nh3, dm_ch4, dm_bbvoc
+   real(RKIND) :: dc_hwp, dc_gp, dc_fn, ext2 !daero_num_wfa, daero_num_ifa !, lu_sum1_5, lu_sum12_14
    INTEGER, PARAMETER :: kfire_max=51    ! max vertical level for BB plume rise
    real(RKIND), PARAMETER :: ef_h2o=324.22  ! Emission factor for water vapor ! TODO, REFERENCE
    real(RKIND), PARAMETER :: sc_me= 4.0, ab_me=0.5     ! m2/g, scattering and absorption efficiency for smoke
@@ -83,8 +87,12 @@ CONTAINS
             conv_gas = dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
            elseif (ebb_dcycle==2) then
             conv= coef_bb_dc(i,j)*dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
+            conv_gas = coef_bb_dc(i,j)* dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
            endif
            
+           conv = conv*sc_factor
+           conv_gas = conv_gas*sc_factor
+
            dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_fine)
            chem(i,k,j,p_smoke_fine) = chem(i,k,j,p_smoke_fine) + dm_smoke
            chem(i,k,j,p_smoke_fine) = MIN(MAX(chem(i,k,j,p_smoke_fine),epsilc),5.e+3_RKIND)
@@ -107,33 +115,39 @@ CONTAINS
            endif 
           ! CO
            if (p_co > 0) then
-              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_co)
-              chem(i,k,j,p_co) = chem(i,k,j,p_co) + dm_smoke
+              dm_co = conv_gas*ebu(i,k,j,index_e_bb_in_co)
+              chem(i,k,j,p_co) = chem(i,k,j,p_co) + dm_co
               chem(i,k,j,p_co) = MIN(MAX(chem(i,k,j,p_co),epsilc),5.e+3_RKIND)          
            endif 
           ! NOx
            if (p_nox > 0) then
-              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_nox)
-              chem(i,k,j,p_nox) = chem(i,k,j,p_nox) + dm_smoke
+              dm_nox = conv_gas*ebu(i,k,j,index_e_bb_in_nox)
+              chem(i,k,j,p_nox) = chem(i,k,j,p_nox) + dm_nox
               chem(i,k,j,p_nox) = MIN(MAX(chem(i,k,j,p_nox),epsilc),5.e+3_RKIND)          
            endif 
           ! CH4
            if (p_ch4 > 0) then
-              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_ch4)
-              chem(i,k,j,p_ch4) = chem(i,k,j,p_ch4) + dm_smoke
+              dm_ch4 = conv_gas*ebu(i,k,j,index_e_bb_in_ch4)
+              chem(i,k,j,p_ch4) = chem(i,k,j,p_ch4) + dm_ch4
               chem(i,k,j,p_ch4) = MIN(MAX(chem(i,k,j,p_ch4),epsilc),5.e+3_RKIND)         
            endif 
           ! SO2
            if (p_so2 > 0) then
-              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_so2)
-              chem(i,k,j,p_so2) = chem(i,k,j,p_so2) + dm_smoke
+              dm_so2 = conv_gas*ebu(i,k,j,index_e_bb_in_so2)
+              chem(i,k,j,p_so2) = chem(i,k,j,p_so2) + dm_so2
               chem(i,k,j,p_so2) = MIN(MAX(chem(i,k,j,p_so2),epsilc),5.e+3_RKIND)         
            endif 
-          ! SO2
+          ! NH3
            if (p_nh3 > 0) then
-              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_nh3)
-              chem(i,k,j,p_nh3) = chem(i,k,j,p_nh3) + dm_smoke
+              dm_nh3 = conv_gas*ebu(i,k,j,index_e_bb_in_nh3)
+              chem(i,k,j,p_nh3) = chem(i,k,j,p_nh3) + dm_nh3
               chem(i,k,j,p_nh3) = MIN(MAX(chem(i,k,j,p_nh3),epsilc),5.e+3_RKIND)
+           endif 
+          ! VOC
+           if (p_bbvoc > 0) then
+              dm_bbvoc = conv_gas*ebu(i,k,j,index_e_bb_in_voc)
+              chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + dm_smoke
+              chem(i,k,j,p_bbvoc) = MIN(MAX(chem(i,k,j,p_bbvoc),epsilc),5.e+3_RKIND)
            endif 
             
 

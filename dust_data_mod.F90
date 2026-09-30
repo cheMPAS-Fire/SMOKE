@@ -16,13 +16,17 @@ module dust_data_mod
   real(RKIND),    parameter :: dyn_visc = 1.5E-5
 
   ! -- dust parameters
-  ! never used: integer,         dimension(ndust), parameter :: ipoint    = (/ 3, 2, 2, 2, 2 /)
   real(RKIND), dimension(ndust), parameter :: den_dust  = (/   2500.,  2650.,  2650.,  2650.,  2650. /)
   real(RKIND), dimension(ndust), parameter :: reff_dust = (/ 0.73D-6, 1.4D-6, 2.4D-6, 4.5D-6, 8.0D-6 /)
   real(RKIND), dimension(ndust), parameter :: frac_s    = (/     0.1,   0.25,   0.25,   0.25,   0.25 /)
   real(RKIND), dimension(ndust), parameter :: lo_dust   = (/  0.1D-6, 1.0D-6, 1.8D-6, 3.0D-6, 6.0D-6 /)
   real(RKIND), dimension(ndust), parameter :: up_dust   = (/  1.0D-6, 1.8D-6, 3.0D-6, 6.0D-6,10.0D-6 /)
-  ! never used: real(RKIND), dimension(ndust, 12)        :: ch_dust   = 0.8e-09_RKIND
+  ! -- GOCART Simple
+  real(RKIND), dimension(19), parameter :: porosity=(/0.339, 0.421, 0.434, 0.476, 0.476, 0.439, &
+                                                      0.404, 0.464, 0.465, 0.406, 0.468, 0.468, &
+                                                      0.439, 1.000, 0.200, 0.421, 0.468, 0.200, &
+                                                      0.339/)
+  integer,     dimension(ndust), parameter :: ipoint    = (/ 3, 2, 2, 2, 2 /)
 
   ! -- default dust parameters
   ! -- AFWA & GOCART

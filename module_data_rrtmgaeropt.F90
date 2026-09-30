@@ -30,92 +30,107 @@ MODULE module_data_rrtmgaeropt
    USE mpas_kind_types
    USE module_peg_util , only:peg_error_fatal
    IMPLICIT NONE
- 
-   INTEGER , PARAMETER :: NSWBANDS = 4
-   INTEGER , PARAMETER :: NLWBANDS = 16
- 
-   TYPE :: aer_opt_type
-      CHARACTER(LEN=64) :: name      ! e.g., "WATER", "DUST"
-      REAL , DIMENSION(NSWBANDS) :: sw_real , sw_imag
-      REAL , DIMENSION(NLWBANDS) :: lw_real , lw_imag
-   END TYPE aer_opt_type
- 
-   TYPE(aer_opt_type) , ALLOCATABLE , SAVE :: aer_optics(:)
-   INTEGER , SAVE :: num_aer_species
- 
-   INTEGER , PARAMETER :: ID_WATER = 1
-   INTEGER , PARAMETER :: ID_DUST = 2
-   INTEGER , PARAMETER :: ID_SMOKE = 3
-   INTEGER , PARAMETER :: ID_NH4SO4 = 4
-   INTEGER , PARAMETER :: ID_NO3 = 5
-   INTEGER , PARAMETER :: ID_UNSPC = 6
 
-   ! Option for Mie optics calculation
-   ! Should go to registry.chemistry.xml (nml) for future development
-   ! This is controlled by nml, config_mie_aod_opt
-   INTEGER , PARAMETER :: ID_MIE_OFF = 0 
-   INTEGER , PARAMETER :: ID_MIE_SIMPLE = 1 
-   INTEGER , PARAMETER :: ID_MIE_CS = 2 !Core-Shell
-   INTEGER , PARAMETER :: NBIN_O = 2
+   INTEGER, PARAMETER :: NSWBANDS = 14
+   INTEGER, PARAMETER :: NLWBANDS = 16
+   
+   TYPE :: aer_opt_type
+      CHARACTER(LEN=64) :: name
+      REAL, DIMENSION(NSWBANDS) :: sw_real, sw_imag
+      REAL, DIMENSION(NLWBANDS) :: lw_real, lw_imag
+   END TYPE aer_opt_type
+   
+   TYPE(aer_opt_type), ALLOCATABLE, SAVE :: aer_optics(:)
+   INTEGER, SAVE :: num_aer_species
+   
+   INTEGER, PARAMETER :: ID_WATER = 1
+   INTEGER, PARAMETER :: ID_DUST = 2
+   INTEGER, PARAMETER :: ID_SMOKE = 3
+   INTEGER, PARAMETER :: ID_NH4SO4 = 4
+   INTEGER, PARAMETER :: ID_NO3 = 5
+   INTEGER, PARAMETER :: ID_UNSPC = 6
+   INTEGER, PARAMETER :: ID_BC = 7
+
+   
+   INTEGER, PARAMETER :: ID_MIE_OFF = 0
+   INTEGER, PARAMETER :: ID_MIE_SIMPLE = 1
+   INTEGER, PARAMETER :: ID_MIE_CS = 2
+   INTEGER, PARAMETER :: NBIN_O = 2
+   
+   REAL, DIMENSION(NSWBANDS), SAVE :: refrwsw, refiwsw
+   REAL, DIMENSION(NLWBANDS), SAVE :: refrwlw, refiwlw
+   
+   ! Shortwave wavelength limits in micrometers.
+   ! Array indices 1:14 correspond to RRTMG-SW bands 16:29.
+   REAL, SAVE :: wavmin(NSWBANDS)
+   DATA wavmin / &
+      3.076923077, 2.500000000, 2.150537634, 1.941747573, &
+      1.626016260, 1.298701299, 1.242236025, 0.778210117, &
+      0.625000000, 0.441501104, 0.344827586, 0.263157895, &
+      0.200000000, 3.846153846 /
+   
+   REAL, SAVE :: wavmax(NSWBANDS)
+   DATA wavmax / &
+      3.846153846, 3.076923077, 2.500000000, 2.150537634, &
+      1.941747573, 1.626016260, 1.298701299, 1.242236025, &
+      0.778210117, 0.625000000, 0.441501104, 0.344827586, &
+      0.263157895, 12.195121951 /
+   
+   REAL, SAVE :: wavenumber1_longwave(NLWBANDS)
+   DATA wavenumber1_longwave / &
+      10., 350., 500., 630., 700., 820., 980., 1080., &
+      1180., 1390., 1480., 1800., 2080., 2250., 2390., 2600. /
+   
+   REAL, SAVE :: wavenumber2_longwave(NLWBANDS)
+   DATA wavenumber2_longwave / &
+      350., 500., 630., 700., 820., 980., 1080., 1180., &
+      1390., 1480., 1800., 2080., 2250., 2390., 2600., 3250. /
+   
+   INTEGER, PARAMETER :: MAXD_AMODE = 3
+   INTEGER, PARAMETER :: NTOT_AMODE = 3
+   INTEGER, PARAMETER :: MAXD_BIN = 8
+   INTEGER, PARAMETER :: NTOT_BIN = 8
+   
+   INTEGER, PARAMETER :: PREFR = 7, PREFI = 7
+   INTEGER, PARAMETER :: NCOEF = 50
+   REAL, PARAMETER :: RMMIN = 0.005E-4, RMMAX = 50.E-4
+   
+   REAL, SAVE :: refrtabsw(PREFR,NSWBANDS)
+   REAL, SAVE :: refitabsw(PREFI,NSWBANDS)
+   REAL, SAVE :: refrtablw(PREFR,NLWBANDS)
+   REAL, SAVE :: refitablw(PREFI,NLWBANDS)
+   
+   REAL, SAVE :: extpsw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: abspsw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: ascatpsw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: asmpsw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: sbackpsw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: pmom2psw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: pmom3psw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: pmom4psw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: pmom5psw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: pmom6psw(NCOEF,PREFR,PREFI,NSWBANDS)
+   REAL, SAVE :: pmom7psw(NCOEF,PREFR,PREFI,NSWBANDS)
+   
+   REAL, SAVE :: extplw(NCOEF,PREFR,PREFI,NLWBANDS)
+   REAL, SAVE :: absplw(NCOEF,PREFR,PREFI,NLWBANDS)
+   REAL, SAVE :: ascatplw(NCOEF,PREFR,PREFI,NLWBANDS)
+   REAL, SAVE :: asmplw(NCOEF,PREFR,PREFI,NLWBANDS)
+   
+   ! Geometric band-center wavelengths in centimeters, as expected by Mie code.
+   REAL, SAVE :: wavmidsw(NSWBANDS)
+   DATA wavmidsw / &
+      3.440104581E-04, 2.773500981E-04, 2.318694479E-04, &
+      2.043477730E-04, 1.776882981E-04, 1.453172195E-04, &
+      1.270154927E-04, 9.832195288E-05, 6.974104408E-05, &
+      5.252981914E-05, 3.901817012E-05, 3.012376166E-05, &
+      2.294157339E-05, 6.848672513E-04 /
+   
+   REAL, SAVE :: wavmidlw(NLWBANDS)
+   COMPLEX, SAVE :: crefwsw(NSWBANDS)
+   COMPLEX, SAVE :: crefwlw(NLWBANDS)
+   
  
-   REAL , DIMENSION(NSWBANDS) , SAVE :: refrwsw , refiwsw
-   REAL , DIMENSION(NLWBANDS) , SAVE :: refrwlw , refiwlw
- 
- 
-!*************************************************************
-      !wavelength
-   REAL , SAVE :: wavmin(NSWBANDS)   ! Min wavelength (um) of interval
-      !data wavmin /3.077,2.500,2.150,1.942,1.626,1.299, &
-   DATA wavmin/0.25 , 0.35 , 0.55 , 0.998/
-   REAL , SAVE :: wavmax(NSWBANDS)   ! Max wavelength (um) of interval
-      !data wavmax/3.846,3.077,2.500,2.150,1.942,1.626, &
-   DATA wavmax/0.35 , 0.45 , 0.65 , 1.000/
-   REAL , SAVE :: wavenumber1_longwave(NLWBANDS)   !Longwave limits (cm-1)
-   DATA wavenumber1_longwave/10. , 350. , 500. , 630. , 700. , 820. , 980. , 1080. , 1180. , 1390. , 1480. , 1800. , 2080. ,       &
-      & 2250. , 2390. , 2600./
-   REAL , SAVE :: wavenumber2_longwave(NLWBANDS)   !Longwave limits (cm-1)
-   DATA wavenumber2_longwave/350. , 500. , 630. , 700. , 820. , 980. , 1080. , 1180. , 1390. , 1480. , 1800. , 2080. , 2250. ,     &
-      & 2390. , 2600. , 3250./
- 
-      !mode or size bin
-   INTEGER , PARAMETER :: MAXD_AMODE = 3
-   INTEGER , PARAMETER :: NTOT_AMODE = 3
-   INTEGER , PARAMETER :: MAXD_BIN = 8
-   INTEGER , PARAMETER :: NTOT_BIN = 8
- 
-      !Chebychev polynomial
-      !integer,parameter :: prefr=7,prefi=10
-   INTEGER , PARAMETER :: PREFR = 7 , PREFI = 7
-   INTEGER , PARAMETER :: NCOEF = 50
-   REAL , PARAMETER :: RMMIN = 0.005E-4 , RMMAX = 50.E-4
-                                                     ! cm
-   REAL , SAVE :: refrtabsw(PREFR,NSWBANDS)
-   REAL , SAVE :: refitabsw(PREFI,NSWBANDS)
-   REAL , SAVE :: refrtablw(PREFR,NLWBANDS)
-   REAL , SAVE :: refitablw(PREFI,NLWBANDS)
-      !coefficients for parameterizing aerosol radiative properties
-      !in terms of refractive index and wet radius
-   REAL , SAVE :: extpsw(NCOEF,PREFR,PREFI,NSWBANDS) !specific extinction
-   REAL , SAVE :: abspsw(NCOEF,PREFR,PREFI,NSWBANDS) !specific absorption
-   REAL , SAVE :: ascatpsw(NCOEF,PREFR,PREFI,NSWBANDS) !specific scattering
-   REAL , SAVE :: asmpsw(NCOEF,PREFR,PREFI,NSWBANDS) !asymmetry factor
-   REAL , SAVE :: sbackpsw(NCOEF,PREFR,PREFI,NSWBANDS)
-   REAL , SAVE :: pmom2psw(NCOEF,PREFR,PREFI,NSWBANDS)
-   REAL , SAVE :: pmom3psw(NCOEF,PREFR,PREFI,NSWBANDS)
-   REAL , SAVE :: pmom4psw(NCOEF,PREFR,PREFI,NSWBANDS)
-   REAL , SAVE :: pmom5psw(NCOEF,PREFR,PREFI,NSWBANDS)
-   REAL , SAVE :: pmom6psw(NCOEF,PREFR,PREFI,NSWBANDS)
-   REAL , SAVE :: pmom7psw(NCOEF,PREFR,PREFI,NSWBANDS)
-   REAL , SAVE :: extplw(NCOEF,PREFR,PREFI,NLWBANDS) !specific extinction
-   REAL , SAVE :: absplw(NCOEF,PREFR,PREFI,NLWBANDS) !specific absorption
-   REAL , SAVE :: ascatplw(NCOEF,PREFR,PREFI,NLWBANDS) !specific scattering
-   REAL , SAVE :: asmplw(NCOEF,PREFR,PREFI,NLWBANDS) !asymmetry factor
- 
-   REAL , SAVE :: wavmidsw(NSWBANDS)
-   DATA wavmidsw/0.30E-4 , 0.40E-4 , 0.60E-4 , 0.999E-04/
-   REAL , SAVE :: wavmidlw(NLWBANDS)
-   COMPLEX , SAVE :: crefwsw(NSWBANDS)   ! complex refractive index fro water
-   COMPLEX , SAVE :: crefwlw(NLWBANDS)
  
 CONTAINS
  

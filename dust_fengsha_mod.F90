@@ -12,7 +12,6 @@ module dust_fengsha_mod
   use mpas_kind_types
   use dust_data_mod
   use mpas_smoke_init, only: p_dust_fine, p_dust_coarse
-  use mpas_timer, only : mpas_timer_start, mpas_timer_stop
 
   implicit none
 
@@ -87,8 +86,6 @@ contains
     real(RKIND), dimension (3) :: massfrac
     real(RKIND) :: erodtot
     real(RKIND) :: moist_volumetric, reason_nodust
-
-    logical, parameter ::  do_timing = .true.
 
     ! conversion values
     conver=1.e-9
@@ -199,20 +196,18 @@ contains
              ! soil moisture correction factor 
              moist_volumetric = dust_moist_correction * smois(i,2,j) 
 
-             if  (do_timing) call mpas_timer_start('source_dust')
              ! Call dust emission routine.
              bems(:) = 0._RKIND
              call source_dust(imx,jmx, lmx, nmx, dt, tc, ustar, massfrac, & 
                   erodtot, dxy, moist_volumetric, airden, airmas, bems, g, dust_alpha, dust_gamma, &
                   R, uthr(i,j),reason_nodust,dust_drylimit_factor)
-             if  (do_timing) call mpas_timer_stop('source_dust')
 
              ! convert back to concentration
              
              chem(i,kts,j,p_dust_fine)  = chem(i,kts,j,p_dust_fine) + tc(1)*converi
              chem(i,kts,j,p_dust_coarse)= chem(i,kts,j,p_dust_coarse) + tc(5)*converi
 
-             e_dust_out(i,kts,j,index_e_dust_out_dust_fine  ) = reason_nodust !bems(1)
+             e_dust_out(i,kts,j,index_e_dust_out_dust_fine  ) = bems(1) !reason_nodust
              e_dust_out(i,kts,j,index_e_dust_out_dust_coarse) = bems(5)
           endif
        enddo
@@ -332,17 +327,13 @@ contains
     REAL(RKIND), PARAMETER :: cv=12.62E-6_RKIND      ! normalization constant
     REAL(RKIND), PARAMETER :: RHOSOIL=2650._RKIND
 
-    logical, parameter :: do_timing = .true.
-
     ! calculate the total vertical dust flux 
 
     emit = 0._RKIND
 
-    if  (do_timing) call mpas_timer_start('dust_emissio_fengsha')
     call DustEmissionFENGSHA(smois,massfrac(1),massfrac(3), massfrac(2), &
                                 erod, R, airden, ustar, uthres, alpha, gamma, kvhmax, &
                                 g0, RHOSOIL, emit,reason,dust_drylimit_factor)
-    if  (do_timing) call mpas_timer_stop('dust_emissio_fengsha')
 
     ! Now that we have the total dust emission, distribute into dust bins using
     ! lognormal distribution (Dr. Jasper Kok, in press), and

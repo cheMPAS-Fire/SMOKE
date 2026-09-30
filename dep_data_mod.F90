@@ -7,7 +7,7 @@ module dep_data_mod
 
   implicit none
 
-  public :: aero_dry_dep_init, aero_wet_dep_init
+  public :: aero_dry_dep_init, aero_wet_dep_init, gas_dry_dep_init, ialpha_read_LUT
 
   real(RKIND), parameter :: max_dep_vel = 0.005                   ! m/s (may need to set per species)
   real(RKIND), parameter :: dep_ref_hgt = 2.0                     ! Meters 
@@ -53,8 +53,25 @@ module dep_data_mod
 
 ! Arrays to hold density and diameters of aerosols
   real(RKIND), dimension(1000), save :: aero_dens, aero_diam, ls_frac
+! For AERSETT Settling
+  real(RKIND), dimension(:), allocatable, save :: alpha_ar, ialpha_ar
+  real(RKIND), SAVE :: alpha_min, alpha_max, alpha_step
+  real(RKIND), PARAMETER :: Re_0 = 0.0232_RKIND
+  REAL(KIND=RKIND), DIMENSION(1000), save :: henry_const  ! Effective Henry's Law Constant (M/atm)
+  REAL(KIND=RKIND), DIMENSION(1000), save :: reactivity   ! Reactivity factor for Wesely Rc (f0)
+  REAL(KIND=RKIND), DIMENSION(1000), save :: diff_ratio   ! Ratio of molecular diffusivity to H2O
+! ====================================================================
+  ! MODIS Land-Use Lookup Tables (Midsummer/Active Vegetation mapping)
+  ! ====================================================================
+  INTEGER, PARAMETER :: max_modis = 21
+  INTEGER, PARAMETER :: max_season = 5
+  INTEGER            :: s
+  REAL(KIND=RKIND), DIMENSION(max_modis,max_season) :: rs_min_tbl ! Min Stomatal Resistance (s/m)
+  REAL(KIND=RKIND), DIMENSION(max_modis,max_season) :: rcut_tbl   ! Base Cuticular Resistance (s/m)
+  REAL(KIND=RKIND), DIMENSION(max_modis,max_season) :: rgrnd_tbl  ! Base Ground/Soil Resistance (s/m)
 
   contains
+
    subroutine aero_wet_dep_init
 
       implicit none
@@ -86,6 +103,14 @@ module dep_data_mod
       if (p_pols_tree>0)         ls_frac(p_pols_tree)        = 0.5_RKIND
       if (p_pols_grass>0)        ls_frac(p_pols_grass)       = 0.5_RKIND
       if (p_pols_weed>0)         ls_frac(p_pols_weed)        = 0.5_RKIND
+!
+      if (p_soa>0)               ls_frac(p_soa)              = 0.5_RKIND
+      if (p_antsoa>0)            ls_frac(p_antsoa)           = 0.5_RKIND
+      if (p_bbsoa>0)             ls_frac(p_bbsoa)            = 0.5_RKIND
+!
+      if (p_bc>0)                ls_frac(p_bc)       = 0.5_RKIND
+      if (p_oc>0)                ls_frac(p_oc)       = 0.5_RKIND
+      if (p_brc>0)               ls_frac(p_brc)      = 0.5_RKIND
 
    end subroutine aero_wet_dep_init
 
@@ -123,6 +148,14 @@ module dep_data_mod
       if (p_pols_tree>0)         aero_dens(p_pols_tree)        = 1.425E3_RKIND
       if (p_pols_grass>0)        aero_dens(p_pols_grass)       = 1.425E3_RKIND
       if (p_pols_weed>0)         aero_dens(p_pols_weed)        = 1.425E3_RKIND
+
+      if (p_soa>0)               aero_dens(p_soa)              = 1.3E3_RKIND
+      if (p_antsoa>0)            aero_dens(p_antsoa)           = 1.3E3_RKIND
+      if (p_bbsoa>0)             aero_dens(p_bbsoa)            = 1.3E3_RKIND
+!
+      if (p_bc>0)                aero_dens(p_bc)               = 1.4E3_RKIND
+      if (p_oc>0)                aero_dens(p_oc)               = 1.4E3_RKIND
+      if (p_brc>0)               aero_dens(p_brc)              = 1.4E3_RKIND
     ! Aerosol diameters (m)
       if (p_smoke_ultrafine>0)   aero_diam(p_smoke_ultrafine)   = 4E-9_RKIND    ! JLS, check
       if (p_smoke_fine>0)        aero_diam(p_smoke_fine)        = 4E-8_RKIND    ! JLS, check
@@ -140,7 +173,6 @@ module dep_data_mod
       if (p_ssalt_coarse>0)      aero_diam(p_ssalt_coarse)      = 5.632E-6_RKIND
 !
       if (p_bact_fine>0)         aero_diam(p_bact_fine)         = 5.E-6_RKIND
-
 !
       if (p_polp_all>0)          aero_diam(p_polp_all)          = 30E-6_RKIND
       if (p_polp_tree>0)         aero_diam(p_polp_tree)         = 35E-6_RKIND
@@ -151,7 +183,397 @@ module dep_data_mod
       if (p_pols_tree>0)         aero_diam(p_pols_tree)         = 1.5E-7_RKIND
       if (p_pols_grass>0)        aero_diam(p_pols_grass)        = 1.5E-7_RKIND
       if (p_pols_weed>0)         aero_diam(p_pols_weed)         = 1.5E-7_RKIND
+! 
+      if (p_soa>0)               aero_diam(p_soa)               = 1.E-8_RKIND
+      if (p_antsoa>0)            aero_diam(p_antsoa)            = 1.E-8_RKIND
+      if (p_bbsoa>0)             aero_diam(p_bbsoa)             = 1.E-8_RKIND
+!
+      if (p_bc>0)                aero_diam(p_bc)                = 4E-8_RKIND
+      if (p_oc>0)                aero_diam(p_oc)                = 4E-8_RKIND
+      if (p_brc>0)               aero_diam(p_brc)               = 4E-8_RKIND
 
    end subroutine aero_dry_dep_init
+
+
+   subroutine ialpha_read_LUT
+    ! read the values of I(alpha) in ialpha.txt. Function I(alpha) is described in MaMa25
+    integer :: unit, n_alpha_values, i
+    real(RKIND) :: alpha, ialpha
+    real(RKIND) :: alpha_min, alpha_max, alpha_step
+
+    character(len=128), parameter :: aersett_data_path = "/scratch4/BMC/acomp/cheMPAS-Fire/input/aux/aersett/"
+
+    unit = 20
+
+    ! First count lines
+    open(unit, file=trim(aersett_data_path)//"/ialpha.txt",status="old",action="read")
+    read(unit,*)
+    read(unit,*)
+    read(unit,*)
+    n_alpha_values=0
+    do
+       read(unit,*,end=1) alpha, ialpha
+       n_alpha_values=n_alpha_values+1
+    end do
+1   close(unit)
+
+    ! Allocate arrays
+    allocate(alpha_ar(n_alpha_values))
+    allocate(ialpha_ar(n_alpha_values))
+
+    ! read again and store values
+    open(unit, file=trim(aersett_data_path)//"/ialpha.txt",status="old",action="read")
+    read(unit,*)
+    read(unit,*)
+    read(unit,*)
+    do i=1, n_alpha_values
+       read(unit,*) alpha_ar(i), ialpha_ar(i)
+    end do
+    close(unit)
+
+    ! Calculate the min value and the step for the alpha array
+    alpha_min = alpha_ar(1)
+    alpha_max = alpha_ar(n_alpha_values)
+    alpha_step = (alpha_max - alpha_min) / (n_alpha_values - 1)
+    print*, 'First alpha value in LUT:', alpha_min
+    print*, 'Last alpha value in LUT:', alpha_max
+    print*, 'Step of ialpha LUT:', alpha_step
+ end subroutine ialpha_read_LUT
+
+   subroutine gas_dry_dep_init
+
+      implicit none
+
+    
+
+      henry_const(:) = -999._RKIND  ! Effective Henry's Law Constant (M/atm)
+      reactivity(:) = -999._RKIND   ! Reactivity factor for Wesely Rc (f0)
+      diff_ratio(:) = -999._RKIND   ! Ratio of molecular diffusivity to H2O
+
+! --- Inorganics ---
+    
+    ! SO2
+    ! Ref: Wesely (1989) Table 1 & 2; Sander (2015) for H*
+    if ( p_so2 > 0) then
+       henry_const(p_so2) = 1.0e5_RKIND
+       reactivity(p_so2)  = 1.0_RKIND
+       diff_ratio(p_so2)  = 0.53_RKIND
+    endif
+
+    ! CO
+    ! Ref: Massman (1998) for diffusivity; Sander (2015) for low H*
+    if ( p_co > 0 ) then
+       henry_const(p_co)  = 1.0e-3_RKIND
+       reactivity(p_co)   = 0.0_RKIND
+       diff_ratio(p_co)   = 0.80_RKIND
+    endif
+ 
+    ! NH3
+    ! Ref: Zhang et al. (2003) for NH3 specific parameterizations; Sander (2015)
+    if ( p_nh3 > 0 ) then
+       henry_const(p_nh3) = 7.4e1_RKIND
+       reactivity(p_nh3)  = 1.0_RKIND
+       diff_ratio(p_nh3)  = 0.90_RKIND
+    endif
+
+    ! NO
+    ! Ref: Wesely (1989) Table 2; Sander (2015)
+    !henry_const(p_no)  = 2.0e-3_RKIND
+    !reactivity(p_no)   = 0.1_RKIND
+    !diff_ratio(p_no)   = 0.80_RKIND
+
+    ! NO2
+    ! Ref: Wesely (1989) Table 2; Sander (2015)
+    !henry_const(p_no2) = 1.0e-2_RKIND
+    !reactivity(p_no2)  = 0.1_RKIND
+    !diff_ratio(p_no2)  = 0.60_RKIND
+
+    ! NOX Tracer
+    ! Ref: Treating identically to NO2 for bulk modeling purposes
+    if ( p_nox > 0 ) then 
+       henry_const(p_nox) = 1.0e-2_RKIND
+       reactivity(p_nox)  = 0.1_RKIND
+       diff_ratio(p_nox)  = 0.60_RKIND
+    endif
+
+    ! HNO3
+    ! Ref: Wesely (1989) Table 2; Sander (2015) - effectively infinite H*
+    !henry_const(p_hno3)= 1.0e14_RKIND
+    !reactivity(p_hno3) = 1.0_RKIND
+    !diff_ratio(p_hno3) = 0.53_RKIND
+
+    ! H2O2
+    ! Ref: Wesely (1989) Table 2; Sander (2015)
+    !henry_const(p_h2o2)= 1.0e5_RKIND
+    !reactivity(p_h2o2) = 1.0_RKIND
+    
+
+! Bulk VOCs (Bulk, Anthropogenic, Biomass Burning)
+    ! Ref: Generic CTM approximations for unspeciated non-methane hydrocarbons (NMHCs).
+    ! Representative of a mix of oxygenated and non-oxygenated heavier species.
+    !if (p_voc > 0 ) then
+    !   henry_const(p_voc)    = 1.0_RKIND
+    !   reactivity(p_voc)     = 0.5_RKIND
+    !   diff_ratio(p_voc)     = 0.40_RKIND
+    !endif
+    if ( p_antvoc > 0 ) then
+       henry_const(p_antvoc) = 1.0_RKIND
+       reactivity(p_antvoc)  = 0.5_RKIND
+       diff_ratio(p_antvoc)  = 0.40_RKIND
+    endif
+    if ( p_bbvoc > 0 ) then
+       henry_const(p_bbvoc)  = 1.0_RKIND
+       reactivity(p_bbvoc)   = 0.5_RKIND
+       diff_ratio(p_bbvoc)   = 0.40_RKIND
+    endif
+
+! ====================================================================
+    ! 3. Populate MODIS Land-Use Parameters
+    ! 
+    ! PRIMARY REFERENCES:
+    ! - Base mappings derived from Wesely (1989) Table 1 (Land-use categories 
+    !   and seasonal categories) mapped to MODIS 21-category definitions 
+    !   commonly used in standard WRF-Chem implementations.
+
+! ====================================================================
+    ! 2. Populate Seasonal MODIS Land-Use Parameters
+    ! PRIMARY REFERENCES: Wesely (1989) Table 1.
+    ! Seasons: 1=Summer, 2=Autumn, 3=Late Autumn, 4=Winter, 5=Spring
+    ! ====================================================================
+    
+    ! --------------------------------------------------------------------
+    ! SEASON 1: MIDSUMMER (Active, Lush Vegetation)
+    ! --------------------------------------------------------------------
+    ! Evergreen Needleleaf / Broadleaf
+    rs_min_tbl(1:2, 1) =  130.0_RKIND
+    rcut_tbl(1:2, 1)   = 2000.0_RKIND
+    rgrnd_tbl(1:2, 1)  =  200.0_RKIND
+    
+    ! Deciduous Needleleaf / Broadleaf / Mixed Forest
+    rs_min_tbl(3:5, 1) =   70.0_RKIND
+    rcut_tbl(3:5, 1)   = 2000.0_RKIND
+    rgrnd_tbl(3:5, 1)  =  200.0_RKIND
+    
+    ! Shrublands, Savannas, Grasslands
+    rs_min_tbl(6:10, 1) =  120.0_RKIND
+    rcut_tbl(6:10, 1)   = 2000.0_RKIND
+    rgrnd_tbl(6:10, 1)  =  200.0_RKIND
+    
+    ! Wetlands
+    rs_min_tbl(11, 1) =   80.0_RKIND
+    rcut_tbl(11, 1)   = 2000.0_RKIND
+    rgrnd_tbl(11, 1)  =  100.0_RKIND
+    
+    ! Croplands & Mosaics
+    rs_min_tbl(12, 1) =   70.0_RKIND
+    rs_min_tbl(14, 1) =   70.0_RKIND
+    rcut_tbl(12, 1)   = 2000.0_RKIND
+    rcut_tbl(14, 1)   = 2000.0_RKIND
+    rgrnd_tbl(12, 1)  =  150.0_RKIND
+    rgrnd_tbl(14, 1)  =  150.0_RKIND
+    
+    ! Tundra
+    rs_min_tbl(18:19, 1) =  150.0_RKIND
+    rcut_tbl(18:19, 1)   = 2000.0_RKIND
+    rgrnd_tbl(18:19, 1)  =  300.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! SEASON 2: AUTUMN (Unharvested, Senescence)
+    ! --------------------------------------------------------------------
+    ! Evergreen types maintain stomata
+    rs_min_tbl(1:2, 2) =  130.0_RKIND
+    rcut_tbl(1:2, 2)   = 2000.0_RKIND
+    rgrnd_tbl(1:2, 2)  =  200.0_RKIND
+    
+    ! Deciduous & Mixed Forest (Leaves dying, resistance up)
+    rs_min_tbl(3:5, 2) =  120.0_RKIND
+    rcut_tbl(3:5, 2)   = 3000.0_RKIND
+    rgrnd_tbl(3:5, 2)  =  200.0_RKIND
+    
+    ! Shrublands, Savannas, Grasslands
+    rs_min_tbl(6:10, 2) =  150.0_RKIND
+    rcut_tbl(6:10, 2)   = 3000.0_RKIND
+    rgrnd_tbl(6:10, 2)  =  300.0_RKIND
+    
+    ! Wetlands
+    rs_min_tbl(11, 2) =  120.0_RKIND
+    rcut_tbl(11, 2)   = 3000.0_RKIND
+    rgrnd_tbl(11, 2)  =  100.0_RKIND
+    
+    ! Croplands & Mosaics
+    rs_min_tbl(12, 2) =  120.0_RKIND
+    rs_min_tbl(14, 2) =  120.0_RKIND
+    rcut_tbl(12, 2)   = 3000.0_RKIND
+    rcut_tbl(14, 2)   = 3000.0_RKIND
+    rgrnd_tbl(12, 2)  =  200.0_RKIND
+    rgrnd_tbl(14, 2)  =  200.0_RKIND
+    
+    ! Tundra
+    rs_min_tbl(18:19, 2) =  200.0_RKIND
+    rcut_tbl(18:19, 2)   = 3000.0_RKIND
+    rgrnd_tbl(18:19, 2)  =  300.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! SEASON 3: LATE AUTUMN (Post-frost, dormant, no snow)
+    ! --------------------------------------------------------------------
+    ! Evergreen
+    rs_min_tbl(1:2, 3) =  130.0_RKIND
+    rcut_tbl(1:2, 3)   = 2000.0_RKIND
+    rgrnd_tbl(1:2, 3)  =  200.0_RKIND
+    
+    ! Deciduous (Leaves gone, stomatal resistance infinite)
+    rs_min_tbl(3:5, 3) = 9999.0_RKIND
+    rcut_tbl(3:5, 3)   = 4000.0_RKIND
+    rgrnd_tbl(3:5, 3)  =  200.0_RKIND
+    
+    ! Grass/Shrubs (Dormant)
+    rs_min_tbl(6:10, 3) = 9999.0_RKIND
+    rcut_tbl(6:10, 3)   = 4000.0_RKIND
+    rgrnd_tbl(6:10, 3)  =  300.0_RKIND
+    
+    ! Wetlands
+    rs_min_tbl(11, 3) = 9999.0_RKIND
+    rcut_tbl(11, 3)   = 4000.0_RKIND
+    rgrnd_tbl(11, 3)  =  100.0_RKIND
+    
+    ! Croplands & Mosaics (Harvested)
+    rs_min_tbl(12, 3) = 9999.0_RKIND
+    rs_min_tbl(14, 3) = 9999.0_RKIND
+    rcut_tbl(12, 3)   = 4000.0_RKIND
+    rcut_tbl(14, 3)   = 4000.0_RKIND
+    rgrnd_tbl(12, 3)  =  300.0_RKIND
+    rgrnd_tbl(14, 3)  =  300.0_RKIND
+    
+    ! Tundra
+    rs_min_tbl(18:19, 3) = 9999.0_RKIND
+    rcut_tbl(18:19, 3)   = 4000.0_RKIND
+    rgrnd_tbl(18:19, 3)  =  300.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! SEASON 4: WINTER (Snow on ground, subfreezing)
+    ! --------------------------------------------------------------------
+    ! Evergreen (Stomata severely restricted by cold, ground covered in snow)
+    rs_min_tbl(1:2, 4) =  250.0_RKIND
+    rcut_tbl(1:2, 4)   = 4000.0_RKIND
+    rgrnd_tbl(1:2, 4)  = 1000.0_RKIND
+    
+    ! Deciduous (No leaves, snow ground)
+    rs_min_tbl(3:5, 4) = 9999.0_RKIND
+    rcut_tbl(3:5, 4)   = 9999.0_RKIND
+    rgrnd_tbl(3:5, 4)  = 1000.0_RKIND
+    
+    ! Grass/Shrubs (Buried in snow)
+    rs_min_tbl(6:10, 4) = 9999.0_RKIND
+    rcut_tbl(6:10, 4)   = 9999.0_RKIND
+    rgrnd_tbl(6:10, 4)  = 1000.0_RKIND
+    
+    ! Wetlands (Frozen)
+    rs_min_tbl(11, 4) = 9999.0_RKIND
+    rcut_tbl(11, 4)   = 9999.0_RKIND
+    rgrnd_tbl(11, 4)  = 1000.0_RKIND
+    
+    ! Croplands & Mosaics
+    rs_min_tbl(12, 4) = 9999.0_RKIND
+    rs_min_tbl(14, 4) = 9999.0_RKIND
+    rcut_tbl(12, 4)   = 9999.0_RKIND
+    rcut_tbl(14, 4)   = 9999.0_RKIND
+    rgrnd_tbl(12, 4)  = 1000.0_RKIND
+    rgrnd_tbl(14, 4)  = 1000.0_RKIND
+    
+    ! Tundra
+    rs_min_tbl(18:19, 4) = 9999.0_RKIND
+    rcut_tbl(18:19, 4)   = 9999.0_RKIND
+    rgrnd_tbl(18:19, 4)  = 1000.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! SEASON 5: TRANSITIONAL SPRING (Emerging vegetation)
+    ! --------------------------------------------------------------------
+    ! Evergreen 
+    rs_min_tbl(1:2, 5) =  130.0_RKIND
+    rcut_tbl(1:2, 5)   = 2000.0_RKIND
+    rgrnd_tbl(1:2, 5)  =  200.0_RKIND
+    
+    ! Deciduous (Buds opening)
+    rs_min_tbl(3:5, 5) =  120.0_RKIND
+    rcut_tbl(3:5, 5)   = 2000.0_RKIND
+    rgrnd_tbl(3:5, 5)  =  200.0_RKIND
+    
+    ! Shrublands, Savannas, Grasslands
+    rs_min_tbl(6:10, 5) =  150.0_RKIND
+    rcut_tbl(6:10, 5)   = 2000.0_RKIND
+    rgrnd_tbl(6:10, 5)  =  200.0_RKIND
+    
+    ! Wetlands
+    rs_min_tbl(11, 5) =  120.0_RKIND
+    rcut_tbl(11, 5)   = 2000.0_RKIND
+    rgrnd_tbl(11, 5)  =  100.0_RKIND
+    
+    ! Croplands & Mosaics
+    rs_min_tbl(12, 5) =  120.0_RKIND
+    rs_min_tbl(14, 5) =  120.0_RKIND
+    rcut_tbl(12, 5)   = 2000.0_RKIND
+    rcut_tbl(14, 5)   = 2000.0_RKIND
+    rgrnd_tbl(12, 5)  =  200.0_RKIND
+    rgrnd_tbl(14, 5)  =  200.0_RKIND
+    
+    ! Tundra
+    rs_min_tbl(18:19, 5) =  200.0_RKIND
+    rcut_tbl(18:19, 5)   = 2000.0_RKIND
+    rgrnd_tbl(18:19, 5)  =  300.0_RKIND
+
+
+    ! --------------------------------------------------------------------
+    ! NON-VEGETATED TYPES (Constant across all 5 Seasons)
+    ! --------------------------------------------------------------------
+    DO s = 1, max_season
+       ! Urban and Built-Up (13)
+       rs_min_tbl(13, s) = 9999.0_RKIND
+       rcut_tbl(13, s)   = 9999.0_RKIND
+       
+       ! Snow and Ice (15)
+       rs_min_tbl(15, s) = 9999.0_RKIND
+       rcut_tbl(15, s)   = 9999.0_RKIND
+       rgrnd_tbl(15, s)  = 1000.0_RKIND
+       
+       ! Barren or Sparsely Vegetated (16)
+       rs_min_tbl(16, s) = 9999.0_RKIND
+       rcut_tbl(16, s)   = 9999.0_RKIND
+       
+       ! Water (Oceans, Lakes) (17)
+       rs_min_tbl(17, s) = 9999.0_RKIND
+       rcut_tbl(17, s)   = 9999.0_RKIND
+       rgrnd_tbl(17, s)  =   10.0_RKIND
+       
+       ! Bare Ground Tundra (20)
+       rs_min_tbl(20, s) = 9999.0_RKIND
+       rcut_tbl(20, s)   = 9999.0_RKIND
+       
+       ! Unclassified/Missing (21)
+       rs_min_tbl(21, s) = 9999.0_RKIND
+       rcut_tbl(21, s)   = 9999.0_RKIND
+    END DO
+
+    ! Ground resistance specific adjustments for non-vegetated types in winter (S4)
+    rgrnd_tbl(13, 1:3) = 400.0_RKIND
+    rgrnd_tbl(13, 4)   = 1000.0_RKIND
+    rgrnd_tbl(13, 5)   = 400.0_RKIND
+    
+    rgrnd_tbl(16, 1:3) = 500.0_RKIND
+    rgrnd_tbl(16, 4)   = 1000.0_RKIND
+    rgrnd_tbl(16, 5)   = 500.0_RKIND
+    
+    rgrnd_tbl(20, 1:3) = 400.0_RKIND
+    rgrnd_tbl(20, 4)   = 1000.0_RKIND
+    rgrnd_tbl(20, 5)   = 400.0_RKIND
+    
+    rgrnd_tbl(21, 1:3) = 400.0_RKIND
+    rgrnd_tbl(21, 4)   = 1000.0_RKIND
+    rgrnd_tbl(21, 5)   = 400.0_RKIND
+
+   end subroutine gas_dry_dep_init
 
 end module dep_data_mod

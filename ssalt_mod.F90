@@ -132,10 +132,12 @@ CONTAINS
           tc   = tc1(1,1,1,:)
           bems = bems1(1,1,:)
 
+          if ((p_ssalt_fine.ne.-1).and.(p_ssalt_coarse.ne.-1)) then
           chem(i,kts,j,p_ssalt_fine)   = chem(i,kts,j,p_ssalt_fine) + &
                                           (tc(1) + 0.286*tc(2)) * converi
           chem(i,kts,j,p_ssalt_coarse) = chem(i,kts,j,p_ssalt_coarse) + &
                                           (0.714*tc(2) + tc(3) + tc(4)) * converi
+          endif
           ! for output diagnostics
 !           [ ug/m2/s ]
            e_ss_out(i,1,j,index_e_ss_out_ssalt_fine) = converi *( bems(1) + 0.286*bems(2) )
