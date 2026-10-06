@@ -13,7 +13,8 @@ CONTAINS
                            coef_bb_dc, fire_hist, hwp, hwp_prevd,   &
                            swdown,ebb_dcycle, ebu, num_e_bb_in,     &
                            fire_type, q_vap, add_fire_moist_flux,   &
-                           sc_factor, aod3d,                        &
+                           do_mpas_sna,                             &
+                           sc_factor,                               &
                            index_e_bb_in_smoke_ultrafine,           &
                            index_e_bb_in_smoke_fine,                &
                            index_e_bb_in_smoke_coarse,              &
@@ -56,25 +57,39 @@ CONTAINS
    real(RKIND), INTENT(IN) ::  dtstep, gmt
    real(RKIND), INTENT(IN) ::  time_int, pi, ebb_min       ! RAR: time in seconds since start of simulation
    INTEGER, DIMENSION(ims:ime,jms:jme), INTENT(IN) :: fire_type
-   integer, INTENT(IN) ::  ebb_dcycle     ! RAR: this is going to be namelist dependent, ebb_dcycle=means 
+   integer, INTENT(IN) ::  ebb_dcycle     ! RAR: this is going to be namelist dependent, ebb_dcycle=means
    real(RKIND), DIMENSION(ims:ime,jms:jme), INTENT(INOUT) :: fire_hist
-   real, DIMENSION(ims:ime,kms:kme,jms:jme), INTENT(OUT) ::  aod3d
-!>--local 
-   logical, intent(in)  :: add_fire_moist_flux
+!   real, DIMENSION(ims:ime,kms:kme,jms:jme), INTENT(OUT) ::  aod3d
+!>--local
+   logical, intent(in)  :: add_fire_moist_flux, do_mpas_sna
+   logical :: do_bb_sna_speciation
    integer :: i,j,k,n,m
    integer :: icall=0
-   real(RKIND) :: conv_gas, conv_rho, conv, dm_smoke, dm_smoke_coarse
+   real(RKIND) :: conv_gas, conv_rho, conv
+   real(RKIND) :: dm_smoke_fine, dm_smoke_ultrafine
+   real(RKIND) :: dm_smoke_coarse
    real(RKIND) :: dm_co, dm_nox, dm_so2, dm_nh3, dm_ch4, dm_bbvoc
-   real(RKIND) :: dc_hwp, dc_gp, dc_fn, ext2 !daero_num_wfa, daero_num_ifa !, lu_sum1_5, lu_sum12_14
+   real(RKIND) :: dc_hwp, dc_gp, dc_fn, ext2
    INTEGER, PARAMETER :: kfire_max=51    ! max vertical level for BB plume rise
    real(RKIND), PARAMETER :: ef_h2o=324.22  ! Emission factor for water vapor ! TODO, REFERENCE
    real(RKIND), PARAMETER :: sc_me= 4.0, ab_me=0.5     ! m2/g, scattering and absorption efficiency for smoke
+   real(RKIND), PARAMETER :: frac_bb_no3 = 0.03_RKIND
+   real(RKIND), PARAMETER :: frac_bb_so4 = 0.01_RKIND
+   real(RKIND), PARAMETER :: frac_bb_nh4 = 0.03_RKIND
+   real(RKIND), PARAMETER :: frac_bb_smoke =               &
+                             1._RKIND - frac_bb_no3 -       &
+                             frac_bb_so4 - frac_bb_nh4
 
 ! For Gaussian diurnal cycle
 
      if (mod(int(time_int),1800) .eq. 0) then
         icall = 0
      endif
+
+     do_bb_sna_speciation = do_mpas_sna .and.              &
+                             p_no3_a_fine > 0 .and.          &
+                             p_so4_a_fine > 0 .and.          &
+                             p_nh4_a_fine > 0
 
      ext2= sc_me + ab_me
      do j=jts,jte
@@ -84,76 +99,108 @@ CONTAINS
 
            if (ebb_dcycle==1 .or. ebb_dcycle==-1) then
             conv= dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
-            conv_gas = dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
+            conv_gas = dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j))
            elseif (ebb_dcycle==2) then
             conv= coef_bb_dc(i,j)*dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
-            conv_gas = coef_bb_dc(i,j)* dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j)) 
+            conv_gas = coef_bb_dc(i,j)* dtstep * 0.02897 / (rho_phy(i,k,j)* dz8w(i,k,j))
            endif
-           
+
            conv = conv*sc_factor
            conv_gas = conv_gas*sc_factor
 
-           dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_fine)
-           chem(i,k,j,p_smoke_fine) = chem(i,k,j,p_smoke_fine) + dm_smoke
+           dm_smoke_fine = conv*ebu(i,k,j,index_e_bb_in_smoke_fine)
+
+           if (do_bb_sna_speciation) then
+              chem(i,k,j,p_smoke_fine) =                       &
+                   chem(i,k,j,p_smoke_fine) +                   &
+                   frac_bb_smoke*dm_smoke_fine
+
+              chem(i,k,j,p_no3_a_fine) =                       &
+                   chem(i,k,j,p_no3_a_fine) +                   &
+                   frac_bb_no3*dm_smoke_fine
+
+              chem(i,k,j,p_so4_a_fine) =                       &
+                   chem(i,k,j,p_so4_a_fine) +                   &
+                   frac_bb_so4*dm_smoke_fine
+
+              chem(i,k,j,p_nh4_a_fine) =                       &
+                   chem(i,k,j,p_nh4_a_fine) +                   &
+                   frac_bb_nh4*dm_smoke_fine
+
+              chem(i,k,j,p_no3_a_fine) =                       &
+                   MIN(MAX(chem(i,k,j,p_no3_a_fine),epsilc),    &
+                       5.e+3_RKIND)
+              chem(i,k,j,p_so4_a_fine) =                       &
+                   MIN(MAX(chem(i,k,j,p_so4_a_fine),epsilc),    &
+                       5.e+3_RKIND)
+              chem(i,k,j,p_nh4_a_fine) =                       &
+                   MIN(MAX(chem(i,k,j,p_nh4_a_fine),epsilc),    &
+                       5.e+3_RKIND)
+           else
+              chem(i,k,j,p_smoke_fine) =                       &
+                   chem(i,k,j,p_smoke_fine) + dm_smoke_fine
+           endif
+
            chem(i,k,j,p_smoke_fine) = MIN(MAX(chem(i,k,j,p_smoke_fine),epsilc),5.e+3_RKIND)
 
-           aod3d(i,k,j)= 1.e-6* ext2* chem(i,k,j,p_smoke_fine)*rho_phy(i,k,j)*dz8w(i,k,j)
+!           aod3d(i,k,j)= 1.e-6* ext2* chem(i,k,j,p_smoke_fine)*rho_phy(i,k,j)*dz8w(i,k,j)
 
           ! Update AOD for each species?
           !
           ! ultrafine smoke
            if (p_smoke_ultrafine > 0) then
-              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_ultrafine)
-              chem(i,k,j,p_smoke_ultrafine) = chem(i,k,j,p_smoke_ultrafine) + dm_smoke
+              dm_smoke_ultrafine = conv*ebu(i,k,j,index_e_bb_in_smoke_ultrafine)
+              chem(i,k,j,p_smoke_ultrafine) = chem(i,k,j,p_smoke_ultrafine) + dm_smoke_ultrafine
               chem(i,k,j,p_smoke_ultrafine) = MIN(MAX(chem(i,k,j,p_smoke_ultrafine),epsilc),5.e+3_RKIND)
-           endif 
+           endif
           ! coarse smoke
            if (p_smoke_coarse > 0) then
-              dm_smoke = conv*ebu(i,k,j,index_e_bb_in_smoke_coarse)
-              chem(i,k,j,p_smoke_coarse) = chem(i,k,j,p_smoke_coarse) + dm_smoke
-              chem(i,k,j,p_smoke_coarse) = MIN(MAX(chem(i,k,j,p_smoke_coarse),epsilc),5.e+3_RKIND)   
-           endif 
+              dm_smoke_coarse = conv*ebu(i,k,j,index_e_bb_in_smoke_coarse)
+              chem(i,k,j,p_smoke_coarse) = chem(i,k,j,p_smoke_coarse) + dm_smoke_coarse
+              chem(i,k,j,p_smoke_coarse) = MIN(MAX(chem(i,k,j,p_smoke_coarse),epsilc),5.e+3_RKIND)
+           endif
           ! CO
            if (p_co > 0) then
               dm_co = conv_gas*ebu(i,k,j,index_e_bb_in_co)
               chem(i,k,j,p_co) = chem(i,k,j,p_co) + dm_co
-              chem(i,k,j,p_co) = MIN(MAX(chem(i,k,j,p_co),epsilc),5.e+3_RKIND)          
-           endif 
+              chem(i,k,j,p_co) = MIN(MAX(chem(i,k,j,p_co),epsilc),5.e+3_RKIND)
+           endif
           ! NOx
            if (p_nox > 0) then
               dm_nox = conv_gas*ebu(i,k,j,index_e_bb_in_nox)
               chem(i,k,j,p_nox) = chem(i,k,j,p_nox) + dm_nox
-              chem(i,k,j,p_nox) = MIN(MAX(chem(i,k,j,p_nox),epsilc),5.e+3_RKIND)          
-           endif 
+              chem(i,k,j,p_nox) = MIN(MAX(chem(i,k,j,p_nox),epsilc),5.e+3_RKIND)
+           endif
           ! CH4
            if (p_ch4 > 0) then
               dm_ch4 = conv_gas*ebu(i,k,j,index_e_bb_in_ch4)
               chem(i,k,j,p_ch4) = chem(i,k,j,p_ch4) + dm_ch4
-              chem(i,k,j,p_ch4) = MIN(MAX(chem(i,k,j,p_ch4),epsilc),5.e+3_RKIND)         
-           endif 
+              chem(i,k,j,p_ch4) = MIN(MAX(chem(i,k,j,p_ch4),epsilc),5.e+3_RKIND)
+           endif
           ! SO2
            if (p_so2 > 0) then
               dm_so2 = conv_gas*ebu(i,k,j,index_e_bb_in_so2)
               chem(i,k,j,p_so2) = chem(i,k,j,p_so2) + dm_so2
-              chem(i,k,j,p_so2) = MIN(MAX(chem(i,k,j,p_so2),epsilc),5.e+3_RKIND)         
-           endif 
+              chem(i,k,j,p_so2) = MIN(MAX(chem(i,k,j,p_so2),epsilc),5.e+3_RKIND)
+           endif
           ! NH3
            if (p_nh3 > 0) then
               dm_nh3 = conv_gas*ebu(i,k,j,index_e_bb_in_nh3)
               chem(i,k,j,p_nh3) = chem(i,k,j,p_nh3) + dm_nh3
               chem(i,k,j,p_nh3) = MIN(MAX(chem(i,k,j,p_nh3),epsilc),5.e+3_RKIND)
-           endif 
+           endif
           ! VOC
            if (p_bbvoc > 0) then
               dm_bbvoc = conv_gas*ebu(i,k,j,index_e_bb_in_voc)
-              chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + dm_smoke
+              chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + dm_bbvoc
               chem(i,k,j,p_bbvoc) = MIN(MAX(chem(i,k,j,p_bbvoc),epsilc),5.e+3_RKIND)
-           endif 
-            
+           endif
+
 
            ! SRB: Modifying Water Vapor content based on Emissions
            if (add_fire_moist_flux) then
-             q_vap(i,k,j) = q_vap(i,k,j) + (dm_smoke * ef_h2o * 1.e-9)  ! kg/kg:used 1.e-9 as dm_smoke is in ug/kg
+             q_vap(i,k,j) = q_vap(i,k,j) +             &
+                            (dm_smoke_fine * ef_h2o * 1.e-9)
              q_vap(i,k,j) = MIN(MAX(q_vap(i,k,j),0._RKIND),1.e+3_RKIND)
            endif
 
@@ -167,4 +214,3 @@ CONTAINS
     END subroutine add_emis_burn
 
 END module module_add_emiss_burn
-
