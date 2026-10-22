@@ -1261,7 +1261,7 @@ contains
     do j=jts,jte
     do k=kts,kte
     do i=its,ite
-      theta_phy(i,k,j) = t_phy(i,k,j)/pi_phy(i,k,j)*cp
+      theta_phy(i,k,j) = t_phy(i,k,j)/pi_phy(i,k,j)
       wind_phy(i,k,j) = sqrt(u_phy(i,k,j)**2. + v_phy(i,k,j)**2.)
       rri(i,k,j) = 1._RKIND/rho_phy(i,k,j)
     enddo
