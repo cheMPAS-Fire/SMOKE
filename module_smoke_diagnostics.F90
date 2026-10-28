@@ -15,121 +15,146 @@ MODULE module_smoke_diagnostics
 
    PRIVATE
 
-   PUBLIC :: mpas_aod_diag , mpas_visibility_diag
+   PUBLIC :: mpas_aod_simple, mpas_aod_mie , mpas_visibility_diag
 
 CONTAINS
 
-   SUBROUTINE mpas_aod_diag(Id,Curr_secs,Chem,Aod3d,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem,Tauaersw,Extaersw,Gaersw,Waersw,    &
-                          & Bscoefsw,L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,&
-                          & Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)
-
-      INTEGER , INTENT(IN) :: Num_chem
-      INTEGER , INTENT(IN) :: Ims
-      INTEGER , INTENT(IN) :: Ime
-      INTEGER , INTENT(IN) :: Jms
-      INTEGER , INTENT(IN) :: Jme
-      INTEGER , INTENT(IN) :: Kms
-      INTEGER , INTENT(IN) :: Kme
-      INTEGER , INTENT(IN) :: Id
-      REAL(rkind) , INTENT(IN) :: Curr_secs
-      REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:Num_chem) :: Chem
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d_Simple
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d
-      REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Rho_phy
-      REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Relhum
-      REAL(rkind) , INTENT(IN) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Dz8w
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Tauaersw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Extaersw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Gaersw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Waersw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: Bscoefsw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L2aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L3aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L4aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L5aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L6aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: L7aer
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NLWBANDS) :: Tauaerlw
-      REAL(rkind) , INTENT(INOUT) , DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NLWBANDS) :: Extaerlw
-      INTEGER , INTENT(IN) :: Ids
-      INTEGER , INTENT(IN) :: Ide
-      INTEGER , INTENT(IN) :: Jds
-      INTEGER , INTENT(IN) :: Jde
-      INTEGER , INTENT(IN) :: Kds
-      INTEGER , INTENT(IN) :: Kde
-      INTEGER , INTENT(IN) :: Its
-      INTEGER , INTENT(IN) :: Ite
-      INTEGER , INTENT(IN) :: Jts
-      INTEGER , INTENT(IN) :: Jte
-      INTEGER , INTENT(IN) :: Kts
-      INTEGER , INTENT(IN) :: Kte
-!
-! Local variable declarations
-!
-      REAL(rkind) :: alpha , ext , tau390 , tau550 , tau525, y_factor
-      INTEGER :: i , j , k , nv
-
-! New AOD implemented here, Minsu Choi CIRES/NOAA GSL
-      Aod3d(:,:,:)        = 0._RKIND
-      Aod3d_Simple(:,:,:) = 0._RKIND
-      
-      ! ---------------------------------------------------------
-      ! Method 1: simple AOD diagnostic
-      ! This does not require Mie calculation.
-      ! ---------------------------------------------------------
-      DO nv = 1 , Num_chem
-         IF ( nv==p_ch4 ) CYCLE
+   SUBROUTINE mpas_aod_simple(Chem,Aod3d_Simple,Rho_phy,Relhum,Dz8w,Num_chem, &
+                              Ims,Ime,Jms,Jme,Kms,Kme,                     &
+                              Its,Ite,Jts,Jte,Kts,Kte)
+   
+      INTEGER, INTENT(IN) :: Num_chem
+      INTEGER, INTENT(IN) :: Ims,Ime,Jms,Jme,Kms,Kme
+      INTEGER, INTENT(IN) :: Its,Ite,Jts,Jte,Kts,Kte
+   
+      REAL(RKIND), INTENT(IN), &
+         DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:Num_chem) :: Chem
+   
+      REAL(RKIND), INTENT(IN), &
+         DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Rho_phy,Relhum,Dz8w
+   
+      REAL(RKIND), INTENT(INOUT), &
+         DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d_Simple
+   
+      REAL(RKIND) :: ext,y_factor
+      INTEGER :: i,j,k,nv
+   
+      Aod3d_Simple(Its:Ite,Kts:Kte,Jts:Jte) = 0._RKIND
+   
+      DO nv = 1, Num_chem
+         IF (nv == p_ch4) CYCLE
+   
          ext = sc_eff(nv) + ab_eff(nv)
-         DO j = Jts , Jte
-           DO k = Kts , Kte
-             DO i = Its , Ite
-               IF ( Relhum(i,k,j) > 0.3_RKIND ) THEN
-                  y_factor = ((1.0_RKIND - 0.3_RKIND) / &
-                             (1.0_RKIND - MIN(0.99_RKIND, Relhum(i,k,j))))**0.18_RKIND
-               ELSE
-                  y_factor = 1.0_RKIND
-               ENDIF
-               Aod3d_Simple(i,k,j) = Aod3d_Simple(i,k,j) + &
-                    1.e-6_RKIND * (ext * y_factor) * &
-                    Chem(i,k,j,nv) * Rho_phy(i,k,j) * Dz8w(i,k,j)
-             ENDDO
-           ENDDO
+   
+         DO j = Jts, Jte
+            DO k = Kts, Kte
+               DO i = Its, Ite
+   
+                  IF (Relhum(i,k,j) > 0.3_RKIND) THEN
+                     y_factor = ((1.0_RKIND - 0.3_RKIND) / &
+                        (1.0_RKIND - MIN(0.99_RKIND,Relhum(i,k,j))))**0.18_RKIND
+                  ELSE
+                     y_factor = 1.0_RKIND
+                  ENDIF
+   
+                  Aod3d_Simple(i,k,j) = Aod3d_Simple(i,k,j) + &
+                     1.e-6_RKIND * ext * y_factor *           &
+                     Chem(i,k,j,nv) * Rho_phy(i,k,j) * Dz8w(i,k,j)
+   
+               ENDDO
+            ENDDO
          ENDDO
       ENDDO
-      ! ---------------------------------------------------------
-      ! Method 2: Mie optical properties and Mie-derived AOD
-      ! This is controlled by config_mie_aod_opt passed as Id.
-      ! ---------------------------------------------------------
-      select case (Id)
-      case (ID_MIE_OFF)
-       Aod3d(:,:,:) = Aod3d_Simple(:,:,:)
-
-      case (ID_MIE_SIMPLE)
-        CALL optical_averaging(Id,Curr_secs,Chem,Num_chem,Dz8w,Rho_phy,Relhum,Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,&
-                           & L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,Tauaerlw,Extaerlw,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,&
-                           & Its,Ite,Jts,Jte,Kts,Kte)
-        DO j = Jts , Jte
-          DO k = Kts , Kte
-            DO i = Its , Ite
-              tau390 = Tauaersw(i,k,j,11)
-              tau525 = Tauaersw(i,k,j,10)
-              IF ( tau390 > 1.E-23_RKIND .AND. tau525 > 1.E-23_RKIND ) THEN
-                alpha = LOG(tau390 / tau525) / LOG(525.298_RKIND / 390.182_RKIND)
-                tau550 = tau390 * (390.182_RKIND / 550.0_RKIND)**alpha
-              ELSE
-                tau550 = 0.0_RKIND
-              ENDIF
-              Aod3d(i,k,j) = MAX(tau550, 0.0_RKIND)
+   
+   END SUBROUTINE mpas_aod_simple
+   
+   
+   SUBROUTINE mpas_aod_mie(Id,Curr_secs,Chem,Aod3d,Rho_phy,Relhum,Dz8w,Num_chem, &
+                           Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,           &
+                           L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,               &
+                           Tauaerlw,Extaerlw,                                &
+                           Ids,Ide,Jds,Jde,Kds,Kde,                          &
+                           Ims,Ime,Jms,Jme,Kms,Kme,                          &
+                           Its,Ite,Jts,Jte,Kts,Kte)
+   
+      INTEGER, INTENT(IN) :: Id,Num_chem
+      INTEGER, INTENT(IN) :: Ids,Ide,Jds,Jde,Kds,Kde
+      INTEGER, INTENT(IN) :: Ims,Ime,Jms,Jme,Kms,Kme
+      INTEGER, INTENT(IN) :: Its,Ite,Jts,Jte,Kts,Kte
+   
+      REAL(RKIND), INTENT(IN) :: Curr_secs
+   
+      REAL(RKIND), INTENT(IN), &
+         DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:Num_chem) :: Chem
+   
+      REAL(RKIND), INTENT(IN), &
+         DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Rho_phy,Relhum,Dz8w
+   
+      REAL(RKIND), INTENT(INOUT), &
+         DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme) :: Aod3d
+   
+      REAL(RKIND), INTENT(INOUT), &
+         DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NSWBANDS) :: &
+         Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,       &
+         L2aer,L3aer,L4aer,L5aer,L6aer,L7aer
+   
+      REAL(RKIND), INTENT(INOUT), &
+         DIMENSION(Ims:Ime,Kms:Kme,Jms:Jme,1:NLWBANDS) :: &
+         Tauaerlw,Extaerlw
+   
+      REAL(RKIND) :: alpha,tau390,tau525,tau550
+      INTEGER :: i,j,k
+   
+      SELECT CASE (Id)
+   
+      CASE (ID_MIE_SIMPLE)
+   
+         CALL optical_averaging( &
+            Id,Curr_secs,Chem,Num_chem,Dz8w,Rho_phy,Relhum, &
+            Tauaersw,Extaersw,Gaersw,Waersw,Bscoefsw,       &
+            L2aer,L3aer,L4aer,L5aer,L6aer,L7aer,           &
+            Tauaerlw,Extaerlw,                            &
+            Ids,Ide,Jds,Jde,Kds,Kde,                      &
+            Ims,Ime,Jms,Jme,Kms,Kme,                      &
+            Its,Ite,Jts,Jte,Kts,Kte)
+   
+         DO j = Jts, Jte
+            DO k = Kts, Kte
+               DO i = Its, Ite
+   
+                  tau390 = Tauaersw(i,k,j,11)
+                  tau525 = Tauaersw(i,k,j,10)
+   
+                  IF (tau390 > 1.E-23_RKIND .AND. &
+                      tau525 > 1.E-23_RKIND) THEN
+                     alpha = LOG(tau390/tau525) / &
+                             LOG(525.298_RKIND/390.182_RKIND)
+   
+                     tau550 = tau390 * &
+                              (390.182_RKIND/550.0_RKIND)**alpha
+                  ELSE
+                     tau550 = 0._RKIND
+                  ENDIF
+   
+                  Aod3d(i,k,j) = MAX(tau550,0._RKIND)
+   
+               ENDDO
             ENDDO
-          ENDDO
-        ENDDO
-      case (ID_MIE_CS)
-        CALL peg_error_fatal(6,'config_mie_aod_opt=2 core-shell Mie is not implemented yet')
-      case default
-        CALL peg_error_fatal(6,'Invalid config_mie_aod_opt value in mpas_aod_diag')
-      end select
-
-   END SUBROUTINE mpas_aod_diag
+         ENDDO
+   
+      CASE (ID_MIE_CS)
+   
+         CALL peg_error_fatal(6, &
+            'config_mie_aod_opt=2 core-shell Mie is not implemented yet')
+   
+      CASE DEFAULT
+   
+         CALL peg_error_fatal(6, &
+            'Invalid config_mie_aod_opt value in mpas_aod_mie')
+   
+      END SELECT
+   
+   END SUBROUTINE mpas_aod_mie
 
    SUBROUTINE mpas_visibility_diag(Qcloud,Qrain,Qice,Qsnow,Qgrpl,Blcldw,Blcldi,Rho_phy,Wind10m,Wind,Rh2m,Rh,Qv,T2m,T,Coszen,       &
                                  & Extcoef55,Dz8w,Vis,Ids,Ide,Jds,Jde,Kds,Kde,Ims,Ime,Jms,Jme,Kms,Kme,Its,Ite,Jts,Jte,Kts,Kte)

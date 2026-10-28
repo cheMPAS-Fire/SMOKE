@@ -990,29 +990,41 @@ contains
     if  (do_timing) call mpas_timer_stop('wetdep_ls')
     endif
 
-! Adding aerosol optics tstep
+    ! Simple AOD diagnostic at every chemistry timestep
+    call mpas_aod_simple( &
+         chem, aod3d_simple, rho_phy, relhum, dz8w, num_chem, &
+         ims,ime, jms,jme, kms,kme,                           &
+         its,ite, jts,jte, kts,kte )
+
+    ! Mie calculation schedule
     do_mie   = (config_mie_aod_opt > 0)
     call_mie = do_mie .and. (mie_frq > 0)
-    
+
     if (call_mie) then
       mie_interval_secs = 60.0_RKIND*real(mie_frq,RKIND)
-      
+
       call_mie =                                         &
            (int((curr_secs - dt) / mie_interval_secs) <  &
-            int((curr_secs) / mie_interval_secs)) .or.   &
-           (ktau == 2)
+            int(curr_secs / mie_interval_secs)) .or.    &
+           (ktau == 1) .or. (ktau == 2)
     endif
 
-    call_aod = call_mie .or. (.not. do_mie)
+    ! Use simple AOD when Mie is disabled
+    ! This code written with its own purpose
+    ! for UPP
+    if (.not. do_mie) then
+      aod3d(its:ite,kts:kte,jts:jte) = &
+           aod3d_simple(its:ite,kts:kte,jts:jte)
+    endif
 
-    if (call_aod) then
+    if (call_mie) then
       allocate(tauaersw(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(gaersw  (ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(waersw  (ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(tauaerlw(ims:ime,kms:kme,jms:jme,1:NLWBANDS))
       allocate(extaersw(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(bscoefsw(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
-      
+
       allocate(l2aer(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(l3aer(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(l4aer(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
@@ -1020,7 +1032,7 @@ contains
       allocate(l6aer(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(l7aer(ims:ime,kms:kme,jms:jme,1:NSWBANDS))
       allocate(extaerlw(ims:ime,kms:kme,jms:jme,1:NLWBANDS))
-      
+
       tauaer_lw_p = 0.0_RKIND
       tauaer_sw_p = 0.0_RKIND
       ssaaer_sw_p = 1.0_RKIND
@@ -1037,18 +1049,17 @@ contains
       l6aer    = 0.0_RKIND
       l7aer    = 0.0_RKIND
       extaerlw = 0.0_RKIND
-      
-      
-      call mpas_log_write( ' Calling Aerosol Optical Properties Calculation')
-      call mpas_aod_diag( config_mie_aod_opt, curr_secs, &
-                    chem, aod3d, aod3d_simple, rho_phy, relhum, dz8w, num_chem,  &
+
+      call mpas_log_write(' Calling Aerosol Optical Properties Calculation')
+      call mpas_aod_mie( config_mie_aod_opt, curr_secs, &
+                    chem, aod3d, rho_phy, relhum, dz8w, num_chem, &
                     tauaer_sw_p, extaersw, asyaer_sw_p, ssaaer_sw_p, bscoefsw, &
                     l2aer, l3aer, l4aer, l5aer, l6aer, l7aer,      &
                     tauaer_lw_p, extaerlw,                         &
                     ids,ide, jds,jde, kds,kde,                     &
                     ims,ime, jms,jme, kms,kme,                     &
                     its,ite, jts,jte, kts,kte )
-      
+
       deallocate(tauaersw)
       deallocate(extaersw)
       deallocate(gaersw)
