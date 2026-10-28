@@ -104,6 +104,8 @@ module dep_data_mod
       if (p_pols_grass>0)        ls_frac(p_pols_grass)       = 0.5_RKIND
       if (p_pols_weed>0)         ls_frac(p_pols_weed)        = 0.5_RKIND
 !
+      if (p_polp_tree_numb>0)    ls_frac(p_polp_tree_numb)   = 0.5_RKIND
+!
       if (p_soa>0)               ls_frac(p_soa)              = 0.5_RKIND
       if (p_antsoa>0)            ls_frac(p_antsoa)           = 0.5_RKIND
       if (p_bbsoa>0)             ls_frac(p_bbsoa)            = 0.5_RKIND
