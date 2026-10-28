@@ -26,7 +26,8 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
                              curr_secs,xlat, xlong , uspdavg2d,      &
                              hpbl2d,  alpha,                         &
                              frp_min, frp_wthreshold,zpbl_lim,uspd_lim,   &
-                             ebu_in, ebu, num_e_bb_in,               &
+                             ebu_in, ebu, num_e_bb_in,num_bb_pt,     &
+                             myrank,bb_pt_rank,bb_pt_local_cell_idx, & 
                              ids,ide, jds,jde, kds,kde,              &
                              ims,ime, jms,jme, kms,kme,              &
                              its,ite, jts,jte, kts,kte,              & 
@@ -39,6 +40,8 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
 
    REAL(RKIND), intent(in) :: frp_min, frp_wthreshold, zpbl_lim, uspd_lim
    integer, intent(in) :: kfire, num_e_bb_in
+   integer, intent(in) :: myrank, num_bb_pt
+   integer, dimension(1:num_bb_pt),intent(in) :: bb_pt_rank,bb_pt_local_cell_idx
     
    real(kind=RKIND), DIMENSION( ims:ime, jms:jme), INTENT(IN ) :: frp_inst         ! RAR: FRP array
 
@@ -56,15 +59,15 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
    real(RKIND) :: curr_secs
    INTEGER,      INTENT(IN   ) :: wind_eff_opt, plumerise_opt !SRB
    REAL(RKIND), INTENT(IN)    :: alpha !  SRB: Enrainment constant for plumerise scheme
-   real(kind=RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_e_bb_in ), INTENT(INOUT ) ::  ebu
+   real(kind=RKIND), DIMENSION( 1:num_bb_pt, kms:kme, num_e_bb_in ), INTENT(INOUT ) ::  ebu
    real(kind=RKIND), INTENT(IN )  :: g, con_cp, con_rd
-   real(kind=RKIND), DIMENSION( ims:ime, 1:kfire, jms:jme, num_e_bb_in ), INTENT(IN )  :: ebu_in
+   real(kind=RKIND), DIMENSION( 1:num_bb_pt, 1:kfire, num_e_bb_in ), INTENT(IN )  :: ebu_in
    real(kind=RKIND), DIMENSION( ims:ime, jms:jme ), INTENT(OUT ) :: flam_frac
    real(kind=RKIND), DIMENSION( ims:ime , kms:kme , jms:jme )         ,               &
           INTENT(IN   ) ::   z,z_at_w,vvel,u_phy,v_phy,rho_phy,pi_phy,q_vap,theta_phy,wind_phy                     ! RAR, SRB
 
 ! Local variables...
-      INTEGER :: nv, i, j, k,  kp1, kp2
+      INTEGER :: nv, i, j, k,  kp1, kp2, ii
       INTEGER :: icall
       INTEGER, DIMENSION(ims:ime, jms:jme), INTENT (INOUT) :: k_min, k_max      ! Min and max ver. levels for BB injection spread
       REAL, DIMENSION(ims:ime, jms:jme), INTENT (IN) :: uspdavg2d, hpbl2d ! SRB
@@ -81,14 +84,15 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
         if ( dbg_opt .and. (mod(int(curr_secs),1800) .eq. 0) ) then
             icall = 0
         endif
+     
+        j = 1
 
 ! RAR: setting to zero the ebu emissions at the levels k>1, this is necessary when the plumerise is called, so the emissions at k>1 are updated
-        do nv=1,num_e_bb_in
-          do j=jts,jte
+        do ii=1,num_bb_pt
+          if (myrank /= bb_pt_rank(ii)) cycle
+          do nv=1,num_e_bb_in
             do k=kts,kte
-               do i=its,ite
-                 ebu(i,k,j,nv)=0._RKIND
-               enddo
+                 ebu(ii,k,nv)=0._RKIND
             enddo
           enddo
         enddo
@@ -96,9 +100,13 @@ subroutine ebu_driver (      flam_frac,kfire,                        &
 ! RAR: new FRP based approach
 ! Haiqin: do_plumerise is added to the namelist options
 check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumerise
-       do j=jts,jte
-          do i=its,ite
-
+       do ii=1,num_bb_pt
+           ! Skip if we are on the wrong rank for this EGU
+           if (myrank /= bb_pt_rank(ii)) cycle
+           ! Otherwise the index is just the local index
+           i = bb_pt_local_cell_idx(ii)
+           ! Final check in case the cell wasn't actually on any rank
+           if ( i .le. 0 .or. i .gt. ite ) cycle
                do k=kts,kte
                   u_in(k)=  u_phy(i,k,j)
                   v_in(k)=  v_phy(i,k,j)
@@ -182,9 +190,9 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                dz_plume= z_at_w(i,kp2,j) - z_at_w(i,kp1,j)
                do nv=1,num_e_bb_in
                do k=kp1,kp2-1
-                     ebu(i,k,j,nv)=flam_frac(i,j)*ebu_in(i,kts,j,nv)*(z_at_w(i,k+1,j)-z_at_w(i,k,j))/dz_plume
+                     ebu(ii,k,nv)=flam_frac(i,j)*ebu_in(ii,kts,nv)*(z_at_w(i,k+1,j)-z_at_w(i,k,j))/dz_plume
                enddo
-               ebu(i,kts,j,nv)= (1._RKIND - flam_frac(i,j))* ebu_in(i,kts,j,nv)
+               ebu(ii,kts,nv)= (1._RKIND - flam_frac(i,j))* ebu_in(ii,kts,nv)
                enddo
 
                ! For output diagnostic
@@ -198,7 +206,6 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                END IF
 !              endif check_frp
 !              icall = icall + 1
-            enddo
           enddo
 
         ENDIF check_pl

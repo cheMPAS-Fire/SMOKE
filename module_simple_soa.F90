@@ -15,7 +15,6 @@ module module_simple_soa
 contains
 
   subroutine simple_soa(dtstep, chem, num_chem, swdown, coszen, &
-                               p_co, p_soa, &
                                ids, ide, jds, jde, kds, kde,           &
                                ims, ime, jms, jme, kms, kme,           &
                                its, ite, jts, jte, kts, kte)
@@ -26,8 +25,6 @@ contains
     integer, intent(in) :: ids, ide, jds, jde, kds, kde
     integer, intent(in) :: ims, ime, jms, jme, kms, kme
     integer, intent(in) :: its, ite, jts, jte, kts, kte
-    integer, intent(in) :: p_co
-    integer, intent(in) :: p_soa
     integer, intent(in) :: num_chem
     real(RKIND), intent(in) :: dtstep
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem), intent(inout) :: chem
@@ -122,8 +119,7 @@ contains
   subroutine simple_soa_voc(dtstep, chem, num_chem, swdown, coszen, &
                           rho_phy, dz8w,                         &
                           e_bb_co, e_ant_co,                     &
-                          p_bbvoc, p_antvoc,                     &
-                          p_bbsoa, p_antsoa,                     &
+                          num_bb_pt,myrank,bb_pt_rank,bb_pt_local_cell_idx, &
                           ids, ide, jds, jde, kds, kde,          &
                           ims, ime, jms, jme, kms, kme,          &
                           its, ite, jts, jte, kts, kte)
@@ -134,8 +130,8 @@ contains
   integer, intent(in) :: ims, ime, jms, jme, kms, kme
   integer, intent(in) :: its, ite, jts, jte, kts, kte
   integer, intent(in) :: num_chem
-  integer, intent(in) :: p_bbvoc, p_antvoc
-  integer, intent(in) :: p_bbsoa, p_antsoa
+  integer, intent(in) :: myrank, num_bb_pt
+  integer, dimension(1:num_bb_pt), intent(in) :: bb_pt_rank,bb_pt_local_cell_idx
 
   real(RKIND), intent(in) :: dtstep
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme,1:num_chem), intent(inout) :: chem
@@ -143,11 +139,11 @@ contains
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: rho_phy, dz8w
 
   ! BB CO emission flux: mol m-2 s-1
-  real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: e_bb_co
+  real(RKIND), dimension(1:num_bb_pt,kms:kme), intent(in) :: e_bb_co
   ! Anthropogenic CO emission increment from e_ant_out: ppmv
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: e_ant_co
 
-  integer :: i, j, k
+  integer :: i, j, k, ii
 
   real(RKIND), parameter :: oh_ref      = 1.5e6_RKIND
   real(RKIND), parameter :: oh_night    = 1.3e4_RKIND  ! molecules/cm3, Y Lu et al. 1992. Chemical and Physical Meteorology
@@ -170,8 +166,14 @@ contains
   if (p_bbvoc  < 1 .or. p_bbvoc  > num_chem) return
   if (p_bbsoa  < 1 .or. p_bbsoa  > num_chem) return
 
-  do j = jts, jte
-  do i = its, ite
+  j = 1
+  do ii = 1, num_bb_pt
+     ! Skip if we are on the wrong rank for this EGU
+     if (myrank /= bb_pt_rank(ii)) cycle
+     ! Otherwise the index is just the local index
+     i = bb_pt_local_cell_idx(ii)
+     ! Final check in case the cell wasn't actually on any rank
+     if ( i .le. 0 .or. i .gt. ite ) cycle
 
      light_frac = max(0.0_RKIND, &
              min(1.0_RKIND, swdown(i,j) / sw_ref))
@@ -189,8 +191,8 @@ contains
 !     endif
      do k = kts, kte
         ! Wildfire CO emission -> transported bbVOC precursor
-        if (e_bb_co(i,k,j) > 0.0_RKIND) then
-           co_add = dtstep * mw_air * e_bb_co(i,k,j) / &
+        if (e_bb_co(ii,k) > 0.0_RKIND) then
+           co_add = dtstep * mw_air * e_bb_co(ii,k) / &
                     (rho_phy(i,k,j) * dz8w(i,k,j))
 
            voc_add = soa_co_yld * co_add * &
@@ -210,6 +212,10 @@ contains
            chem(i,k,j,p_bbsoa) = chem(i,k,j,p_bbsoa) + soa_add
            chem(i,k,j,p_bbsoa) = min(max(chem(i,k,j,p_bbsoa), epsilc), soa_max)
         endif
+  enddo
+
+  do j = jts, jte
+  do i = its, ite
 
         ! Anthropogenic CO increment is already in ppmv
         if (p_antvoc > 0 .and. p_antvoc <= num_chem .and. &

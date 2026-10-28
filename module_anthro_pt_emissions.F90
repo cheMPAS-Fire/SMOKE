@@ -34,7 +34,6 @@ contains
                            index_e_ant_pt_in_nox, index_e_ant_pt_in_co,                    &
                            index_e_ant_pt_in_voc,                                       &
                            index_STKHT, index_STKDM, index_STKTK, index_STKVE,       &
-                           index_STKLT, index_STKLG,                                 &
                            ant_pt_local_cell_idx,ant_pt_rank,myrank,                 &
                            ids,ide, jds,jde, kds,kde,                                &
                            ims,ime, jms,jme, kms,kme,                                &
@@ -56,8 +55,7 @@ contains
                                   num_e_ant_pt_in, num_anthro_pt,     &
                                   num_e_ant_stack_groups_in,         &
                                   index_STKHT, index_STKDM,          &
-                                  index_STKTK, index_STKVE,          &
-                                  index_STKLT, index_STKLG
+                                  index_STKTK, index_STKVE
 
    REAL(RKIND), INTENT(IN    ) :: dt,gmt
    REAL(RKIND), INTENT(IN    ) :: anthro_pt_emis_scale_factor
@@ -90,9 +88,6 @@ contains
       i = ant_pt_local_cell_idx(ii)
 ! Final check in case the cell wasn't actually on any rank
       if ( i .le. 0 .or. i .gt. ite ) cycle
-! Get the locations of this stack
-      STACK_LAT  = e_ant_stack_groups_in(ii,index_STKLT)
-      STACK_LON  = e_ant_stack_groups_in(ii,index_STKLG)
 ! Set the stack parameters
       STACK_HT   = e_ant_stack_groups_in(ii,index_STKHT)
       STACK_DIA  = e_ant_stack_groups_in(ii,index_STKDM)

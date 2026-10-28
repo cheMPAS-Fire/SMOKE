@@ -12,6 +12,7 @@ CONTAINS
                            fire_end_hr, peak_hr,time_int,           &
                            coef_bb_dc, fire_hist, hwp, hwp_prevd,   &
                            swdown,ebb_dcycle, ebu, num_e_bb_in,     &
+                           num_bb_pt,myrank,bb_pt_rank,bb_pt_local_cell_idx, &
                            fire_type, q_vap, add_fire_moist_flux,   &
                            do_mpas_sna,                             &
                            sc_factor,                               &
@@ -32,6 +33,8 @@ CONTAINS
                                   ids,ide, jds,jde, kds,kde,        &
                                   ims,ime, jms,jme, kms,kme,        &
                                   its,ite, jts,jte, kts,kte
+   INTEGER, INTENT(IN) :: myrank, num_bb_pt
+   INTEGER, DIMENSION(1:num_bb_pt), INTENT(IN) :: bb_pt_rank,bb_pt_local_cell_idx
    INTEGER,      INTENT(IN) :: &
                            index_e_bb_in_smoke_ultrafine,           &
                            index_e_bb_in_smoke_fine,                &
@@ -44,7 +47,7 @@ CONTAINS
    real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, 1:num_chem ),                 &
          INTENT(INOUT ) ::                                   chem
 
-   real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme, num_e_bb_in ),                 &
+   real(RKIND), DIMENSION( 1:num_bb_pt, kms:kme, num_e_bb_in ),                 &
          INTENT(INOUT ) ::                                   ebu
    real(RKIND), DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(INOUT ) :: q_vap ! SRB: added q_vap
 
@@ -63,7 +66,7 @@ CONTAINS
 !>--local
    logical, intent(in)  :: add_fire_moist_flux, do_mpas_sna
    logical :: do_bb_sna_speciation
-   integer :: i,j,k,n,m
+   integer :: i,j,k,n,m,ii
    integer :: icall=0
    real(RKIND) :: conv_gas, conv_rho, conv
    real(RKIND) :: dm_smoke_fine, dm_smoke_ultrafine
@@ -86,16 +89,26 @@ CONTAINS
         icall = 0
      endif
 
+<<<<<<< HEAD
+     j = 1
+=======
      do_bb_sna_speciation = do_mpas_sna .and.              &
                              p_no3_a_fine > 0 .and.          &
                              p_so4_a_fine > 0 .and.          &
                              p_nh4_a_fine > 0
+>>>>>>> origin/main
 
      ext2= sc_me + ab_me
-     do j=jts,jte
-      do i=its,ite
+   do ii=1,num_bb_pt
+        ! Skip if we are on the wrong rank for this EGU
+        if (myrank /= bb_pt_rank(ii)) cycle
+        ! Otherwise the index is just the local index
+        i = bb_pt_local_cell_idx(ii)
+        ! Final check in case the cell wasn't actually on any rank
+        if ( i .le. 0 .or. i .gt. ite ) cycle
+
        do k=kts,kfire_max
-          if (ebu(i,k,j,index_e_bb_in_smoke_fine)<ebb_min) cycle
+          if (ebu(ii,k,index_e_bb_in_smoke_fine)<ebb_min) cycle
 
            if (ebb_dcycle==1 .or. ebb_dcycle==-1) then
             conv= dtstep/(rho_phy(i,k,j)* dz8w(i,k,j))
@@ -108,6 +121,10 @@ CONTAINS
            conv = conv*sc_factor
            conv_gas = conv_gas*sc_factor
 
+<<<<<<< HEAD
+           dm_smoke = conv*ebu(ii,k,index_e_bb_in_smoke_fine)
+           chem(i,k,j,p_smoke_fine) = chem(i,k,j,p_smoke_fine) + dm_smoke
+=======
            dm_smoke_fine = conv*ebu(i,k,j,index_e_bb_in_smoke_fine)
 
            if (do_bb_sna_speciation) then
@@ -141,6 +158,7 @@ CONTAINS
                    chem(i,k,j,p_smoke_fine) + dm_smoke_fine
            endif
 
+>>>>>>> origin/main
            chem(i,k,j,p_smoke_fine) = MIN(MAX(chem(i,k,j,p_smoke_fine),epsilc),5.e+3_RKIND)
 
 !           aod3d(i,k,j)= 1.e-6* ext2* chem(i,k,j,p_smoke_fine)*rho_phy(i,k,j)*dz8w(i,k,j)
@@ -149,50 +167,67 @@ CONTAINS
           !
           ! ultrafine smoke
            if (p_smoke_ultrafine > 0) then
+<<<<<<< HEAD
+              dm_smoke = conv*ebu(ii,k,index_e_bb_in_smoke_ultrafine)
+              chem(i,k,j,p_smoke_ultrafine) = chem(i,k,j,p_smoke_ultrafine) + dm_smoke
+=======
               dm_smoke_ultrafine = conv*ebu(i,k,j,index_e_bb_in_smoke_ultrafine)
               chem(i,k,j,p_smoke_ultrafine) = chem(i,k,j,p_smoke_ultrafine) + dm_smoke_ultrafine
+>>>>>>> origin/main
               chem(i,k,j,p_smoke_ultrafine) = MIN(MAX(chem(i,k,j,p_smoke_ultrafine),epsilc),5.e+3_RKIND)
            endif
           ! coarse smoke
            if (p_smoke_coarse > 0) then
+<<<<<<< HEAD
+              dm_smoke = conv*ebu(ii,k,index_e_bb_in_smoke_coarse)
+              chem(i,k,j,p_smoke_coarse) = chem(i,k,j,p_smoke_coarse) + dm_smoke
+              chem(i,k,j,p_smoke_coarse) = MIN(MAX(chem(i,k,j,p_smoke_coarse),epsilc),5.e+3_RKIND)   
+           endif 
+=======
               dm_smoke_coarse = conv*ebu(i,k,j,index_e_bb_in_smoke_coarse)
               chem(i,k,j,p_smoke_coarse) = chem(i,k,j,p_smoke_coarse) + dm_smoke_coarse
               chem(i,k,j,p_smoke_coarse) = MIN(MAX(chem(i,k,j,p_smoke_coarse),epsilc),5.e+3_RKIND)
            endif
+>>>>>>> origin/main
           ! CO
            if (p_co > 0) then
-              dm_co = conv_gas*ebu(i,k,j,index_e_bb_in_co)
+              dm_co = conv_gas*ebu(ii,k,index_e_bb_in_co)
               chem(i,k,j,p_co) = chem(i,k,j,p_co) + dm_co
               chem(i,k,j,p_co) = MIN(MAX(chem(i,k,j,p_co),epsilc),5.e+3_RKIND)
            endif
           ! NOx
            if (p_nox > 0) then
-              dm_nox = conv_gas*ebu(i,k,j,index_e_bb_in_nox)
+              dm_nox = conv_gas*ebu(ii,k,index_e_bb_in_nox)
               chem(i,k,j,p_nox) = chem(i,k,j,p_nox) + dm_nox
               chem(i,k,j,p_nox) = MIN(MAX(chem(i,k,j,p_nox),epsilc),5.e+3_RKIND)
            endif
           ! CH4
            if (p_ch4 > 0) then
-              dm_ch4 = conv_gas*ebu(i,k,j,index_e_bb_in_ch4)
+              dm_ch4 = conv_gas*ebu(ii,k,index_e_bb_in_ch4)
               chem(i,k,j,p_ch4) = chem(i,k,j,p_ch4) + dm_ch4
               chem(i,k,j,p_ch4) = MIN(MAX(chem(i,k,j,p_ch4),epsilc),5.e+3_RKIND)
            endif
           ! SO2
            if (p_so2 > 0) then
-              dm_so2 = conv_gas*ebu(i,k,j,index_e_bb_in_so2)
+              dm_so2 = conv_gas*ebu(ii,k,index_e_bb_in_so2)
               chem(i,k,j,p_so2) = chem(i,k,j,p_so2) + dm_so2
               chem(i,k,j,p_so2) = MIN(MAX(chem(i,k,j,p_so2),epsilc),5.e+3_RKIND)
            endif
           ! NH3
            if (p_nh3 > 0) then
-              dm_nh3 = conv_gas*ebu(i,k,j,index_e_bb_in_nh3)
+              dm_nh3 = conv_gas*ebu(ii,k,index_e_bb_in_nh3)
               chem(i,k,j,p_nh3) = chem(i,k,j,p_nh3) + dm_nh3
               chem(i,k,j,p_nh3) = MIN(MAX(chem(i,k,j,p_nh3),epsilc),5.e+3_RKIND)
            endif
           ! VOC
            if (p_bbvoc > 0) then
+<<<<<<< HEAD
+              dm_bbvoc = conv_gas*ebu(ii,k,index_e_bb_in_voc)
+              chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + dm_smoke
+=======
               dm_bbvoc = conv_gas*ebu(i,k,j,index_e_bb_in_voc)
               chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + dm_bbvoc
+>>>>>>> origin/main
               chem(i,k,j,p_bbvoc) = MIN(MAX(chem(i,k,j,p_bbvoc),epsilc),5.e+3_RKIND)
            endif
 
@@ -208,7 +243,6 @@ CONTAINS
            !endif
        enddo
        icall = icall + 1
-      enddo
      enddo
 
     END subroutine add_emis_burn
