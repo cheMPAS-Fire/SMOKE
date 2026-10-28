@@ -104,7 +104,7 @@ check_pl:  IF (do_plumerise) THEN    ! if the namelist option is set for plumeri
                   v_in(k)=  v_phy(i,k,j)
                   w_in(k)=  vvel(i,k,j)
                   qv_in(k)= q_vap(i,k,j)
-                  pi_in(k)= pi_phy(i,k,j)
+                  pi_in(k)= con_cp*pi_phy(i,k,j)
                   zmid(k)=  z(i,k,j)-z_at_w(i,kts,j)
                   z_lev(k)= z_at_w(i,k,j)-z_at_w(i,kts,j)
                   rho_phyin(k)= rho_phy(i,k,j)
