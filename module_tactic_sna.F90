@@ -157,7 +157,7 @@ CONTAINS
           DO i = Its , Ite
 
              IF ( Rho_phy(i,k,j)<=TINY_CONC .OR. T_phy(i,k,j)<=TINY_CONC ) CYCLE
-             IF ( i==Its .AND. k==Kts .AND. j==Jts ) WRITE (*,*) 'Debug:TACTIC, ktau = ' , Ktau
+!             IF ( i==Its .AND. k==Kts .AND. j==Jts ) WRITE (*,*) 'Debug:TACTIC, ktau = ' , Ktau
         ! Initialize
         ! Now, this version only has primary species from 0 tstep
         ! Otherwise, SNA concentrations accumulated unrealistically from smoke_fine over tstep

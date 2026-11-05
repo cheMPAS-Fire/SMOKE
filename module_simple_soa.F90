@@ -120,12 +120,18 @@ contains
   ! Mainly designed for separately tracking Anthropogenic SOA, and Biomass Burning SOA
   ! This subroutine needs more version update as AC branch at NOAA GSL adding explicit VOCs from emission
   subroutine simple_soa_voc(dtstep, chem, num_chem, swdown, coszen, &
-                          rho_phy, dz8w,                         &
-                          e_bb_co, e_ant_co,                     &
-                          p_bbvoc, p_antvoc,                     &
-                          p_bbsoa, p_antsoa,                     &
-                          ids, ide, jds, jde, kds, kde,          &
-                          ims, ime, jms, jme, kms, kme,          &
+                          xlat, area, rho_phy, dz8w,                &
+                          e_bb_co, e_ant_co,                        &
+                          p_bbvoc, p_antvoc,                        &
+                          p_bbsoa, p_antsoa,                        &
+                          e_bio_in, kbio, num_e_bio_in,             &
+                          index_e_bio_in_ISOP,                      &
+                          index_e_bio_in_TERP,                      &
+                          index_e_bio_in_SESQ,                      &
+                          p_biovoc, p_biosoa,                       &
+                          julday,                                   &
+                          ids, ide, jds, jde, kds, kde,             &
+                          ims, ime, jms, jme, kms, kme,             &
                           its, ite, jts, jte, kts, kte)
 
   implicit none
@@ -137,20 +143,33 @@ contains
   integer, intent(in) :: p_bbvoc, p_antvoc
   integer, intent(in) :: p_bbsoa, p_antsoa
 
+  integer, intent(in) :: p_biovoc, p_biosoa
+  integer, intent(in) :: kbio, num_e_bio_in
+  integer, intent(in) :: index_e_bio_in_ISOP
+  integer, intent(in) :: index_e_bio_in_TERP
+  integer, intent(in) :: index_e_bio_in_SESQ
+  integer, intent(in) :: julday
+
   real(RKIND), intent(in) :: dtstep
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme,1:num_chem), intent(inout) :: chem
   real(RKIND), dimension(ims:ime,jms:jme), intent(in) :: swdown, coszen
+  real(RKIND), dimension(ims:ime,jms:jme), intent(in) :: xlat, area
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: rho_phy, dz8w
 
   ! BB CO emission flux: mol m-2 s-1
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: e_bb_co
+
   ! Anthropogenic CO emission increment from e_ant_out: ppmv
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: e_ant_co
+
+  ! Packed biogenic reference emissions: mol s-1 per MPAS grid cell
+  real(RKIND), dimension(ims:ime,1:kbio,jms:jme,1:num_e_bio_in), &
+       intent(in) :: e_bio_in
 
   integer :: i, j, k
 
   real(RKIND), parameter :: oh_ref      = 1.5e6_RKIND
-  real(RKIND), parameter :: oh_night    = 1.3e4_RKIND  ! molecules/cm3, Y Lu et al. 1992. Chemical and Physical Meteorology
+  real(RKIND), parameter :: oh_night    = 1.3e4_RKIND  ! molecules/cm3
   real(RKIND), parameter :: koh         = 1.25e-11_RKIND
   real(RKIND), parameter :: soa_co_yld  = 0.08_RKIND
   real(RKIND), parameter :: sw_ref      = 800.0_RKIND
@@ -160,6 +179,22 @@ contains
   real(RKIND), parameter :: mw_co       = 28.0_RKIND      ! g mol-1
   real(RKIND), parameter :: mw_air      = 0.02897_RKIND   ! kg mol-1
 
+  ! Initial biogenic test: 1:1 mass yield
+  real(RKIND), parameter :: soa_bio_yld = 1.0_RKIND
+
+  ! Biogenic molecular weights: g mol-1
+  real(RKIND), parameter :: mw_isop = 68.12_RKIND
+  real(RKIND), parameter :: mw_terp = 136.24_RKIND
+  real(RKIND), parameter :: mw_sesq = 204.36_RKIND
+
+  ! MEGAN light-dependent fractions
+  real(RKIND), parameter :: ldf_isop = 0.9999_RKIND
+  real(RKIND), parameter :: ldf_terp = 0.10_RKIND
+  real(RKIND), parameter :: ldf_sesq = 0.50_RKIND
+
+  real(RKIND), parameter :: pi = 3.14159265358979323846_RKIND
+  real(RKIND), parameter :: deg2rad = pi / 180.0_RKIND
+
   real(RKIND) :: light_frac
   real(RKIND) :: oh_eff
   real(RKIND) :: aging_frac
@@ -167,8 +202,29 @@ contains
   real(RKIND) :: voc_add
   real(RKIND) :: soa_add
 
+  real(RKIND) :: solar_decl
+  real(RKIND) :: lat_rad
+  real(RKIND) :: sunset_arg
+  real(RKIND) :: sunset_angle
+  real(RKIND) :: solar_daily_mean
+  real(RKIND) :: solar_norm
+
+  real(RKIND) :: d_isop
+  real(RKIND) :: d_terp
+  real(RKIND) :: d_sesq
+
+  real(RKIND) :: bio_isop
+  real(RKIND) :: bio_terp
+  real(RKIND) :: bio_sesq
+  real(RKIND) :: bio_flux
+
   if (p_bbvoc  < 1 .or. p_bbvoc  > num_chem) return
   if (p_bbsoa  < 1 .or. p_bbsoa  > num_chem) return
+
+  ! Solar declination angle for current Julian day
+  solar_decl = 23.44_RKIND * deg2rad * &
+               sin(2.0_RKIND * pi * &
+                   (284.0_RKIND + real(julday,RKIND)) / 365.0_RKIND)
 
   do j = jts, jte
   do i = its, ite
@@ -181,15 +237,97 @@ contains
      else
        oh_eff = oh_night
      endif
+
      aging_frac = 1.0_RKIND - exp(-koh * oh_eff * dtstep)
-!     if (swdown(i,j) > sw_min .and. coszen(i,j) > 0.0_RKIND) then
-!        oh_eff = oh_ref * min(1.0_RKIND, swdown(i,j) / sw_ref)
-!     else
-!        oh_eff = 0.0_RKIND
-!     endif
+
+     if (p_biovoc > 0 .and. p_biovoc <= num_chem .and. &
+         p_biosoa > 0 .and. p_biosoa <= num_chem) then
+
+        if (kbio >= 1 .and. &
+            index_e_bio_in_ISOP >= 1 .and. &
+            index_e_bio_in_ISOP <= num_e_bio_in .and. &
+            index_e_bio_in_TERP >= 1 .and. &
+            index_e_bio_in_TERP <= num_e_bio_in .and. &
+            index_e_bio_in_SESQ >= 1 .and. &
+            index_e_bio_in_SESQ <= num_e_bio_in) then
+
+           ! ---------------------------------------------------------
+           ! Normalized solar-zenith diurnal distribution
+           !
+           ! e_bio_in contains monthly mean emissions.
+           ! solar_norm has a 24-h mean of approximately 1.0,
+           ! preserving the prescribed daily mean emission.
+           ! Yes, TERP, SESQ emitted during nighttime
+           ! ---------------------------------------------------------
+
+           lat_rad = xlat(i,j) * deg2rad
+
+           sunset_arg = -tan(lat_rad) * tan(solar_decl)
+
+           if (sunset_arg <= -1.0_RKIND) then
+              sunset_angle = pi
+
+           else if (sunset_arg >= 1.0_RKIND) then
+              sunset_angle = 0.0_RKIND
+
+           else
+              sunset_angle = acos(sunset_arg)
+           endif
+
+           solar_daily_mean = ( &
+                sunset_angle * sin(lat_rad) * sin(solar_decl) + &
+                cos(lat_rad) * cos(solar_decl) * sin(sunset_angle) ) / pi
+
+           solar_daily_mean = max(solar_daily_mean, 0.0_RKIND)
+
+           if (solar_daily_mean > 1.0e-6_RKIND) then
+              solar_norm = max(coszen(i,j), 0.0_RKIND) / &
+                           solar_daily_mean
+           else
+              solar_norm = 1.0_RKIND
+           endif
+
+           ! Species-specific normalized diurnal factors
+           d_isop = (1.0_RKIND - ldf_isop) + &
+                    ldf_isop * solar_norm
+
+           d_terp = (1.0_RKIND - ldf_terp) + &
+                    ldf_terp * solar_norm
+
+           d_sesq = (1.0_RKIND - ldf_sesq) + &
+                    ldf_sesq * solar_norm
+
+           bio_isop = max( &
+                e_bio_in(i,1,j,index_e_bio_in_ISOP), 0.0_RKIND) * &
+                d_isop
+
+           bio_terp = max( &
+                e_bio_in(i,1,j,index_e_bio_in_TERP), 0.0_RKIND) * &
+                d_terp
+
+           bio_sesq = max( &
+                e_bio_in(i,1,j,index_e_bio_in_SESQ), 0.0_RKIND) * &
+                d_sesq
+
+           bio_flux = ( &
+                0.05_RKIND * bio_isop * mw_isop + &
+                0.10_RKIND * bio_terp * mw_terp + &
+                0.10_RKIND * bio_sesq * mw_sesq) / 3600.0_RKIND
+
+           voc_add = dtstep * bio_flux / &
+                     (rho_phy(i,kts,j) * dz8w(i,kts,j))
+
+           chem(i,kts,j,p_biovoc) = &
+                chem(i,kts,j,p_biovoc) + voc_add
+
+        endif
+     endif
+
      do k = kts, kte
+
         ! Wildfire CO emission -> transported bbVOC precursor
         if (e_bb_co(i,k,j) > 0.0_RKIND) then
+
            co_add = dtstep * mw_air * e_bb_co(i,k,j) / &
                     (rho_phy(i,k,j) * dz8w(i,k,j))
 
@@ -198,10 +336,12 @@ contains
 
            chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + voc_add
            chem(i,k,j,p_bbvoc) = min(max(chem(i,k,j,p_bbvoc), epsilc), voc_max)
+
         endif
 
         ! Transported bbVOC precursor -> bbSOA
         if (aging_frac > 0.0_RKIND .and. chem(i,k,j,p_bbvoc) > epsilc) then
+
            soa_add = aging_frac * chem(i,k,j,p_bbvoc)
 
            chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) - soa_add
@@ -209,36 +349,59 @@ contains
 
            chem(i,k,j,p_bbsoa) = chem(i,k,j,p_bbsoa) + soa_add
            chem(i,k,j,p_bbsoa) = min(max(chem(i,k,j,p_bbsoa), epsilc), soa_max)
+
         endif
 
         ! Anthropogenic CO increment is already in ppmv
         if (p_antvoc > 0 .and. p_antvoc <= num_chem .and. &
             e_ant_co(i,k,j) > 0.0_RKIND) then
-        
+
            ! ppmv -> mol/mol
            co_add = e_ant_co(i,k,j) * 1.0e-6_RKIND
-        
+
            ! mol/mol CO -> ug/kg CO-equivalent SOA precursor
            voc_add = soa_co_yld * co_add * &
                      ((mw_co * 1.0e-3_RKIND) / mw_air) * 1.0e9_RKIND
-        
+
            chem(i,k,j,p_antvoc) = chem(i,k,j,p_antvoc) + voc_add
            chem(i,k,j,p_antvoc) = min(max(chem(i,k,j,p_antvoc), epsilc), voc_max)
-        
+
         endif
 
         ! Transported antVOC precursor -> antSOA
         if (p_antvoc > 0 .and. p_antvoc <= num_chem .and. &
             p_antsoa > 0 .and. p_antsoa <= num_chem) then
 
-           if (aging_frac > 0.0_RKIND .and. chem(i,k,j,p_antvoc) > epsilc) then
+           if (aging_frac > 0.0_RKIND .and. &
+               chem(i,k,j,p_antvoc) > epsilc) then
+
               soa_add = aging_frac * chem(i,k,j,p_antvoc)
 
               chem(i,k,j,p_antvoc) = chem(i,k,j,p_antvoc) - soa_add
               chem(i,k,j,p_antvoc) = max(chem(i,k,j,p_antvoc), epsilc)
 
               chem(i,k,j,p_antsoa) = chem(i,k,j,p_antsoa) + soa_add
-              chem(i,k,j,p_antsoa) = min(max(chem(i,k,j,p_antsoa), epsilc), soa_max)
+              chem(i,k,j,p_antsoa) = &
+                   min(max(chem(i,k,j,p_antsoa), epsilc), soa_max)
+
+           endif
+        endif
+
+        ! Transported bioVOC precursor -> bioSOA
+        if (p_biovoc > 0 .and. p_biovoc <= num_chem .and. &
+            p_biosoa > 0 .and. p_biosoa <= num_chem) then
+
+           if (aging_frac > 0.0_RKIND .and. &
+               chem(i,k,j,p_biovoc) > epsilc) then
+
+              soa_add = aging_frac * chem(i,k,j,p_biovoc)
+
+              chem(i,k,j,p_biovoc) = &
+                   chem(i,k,j,p_biovoc) - soa_add
+
+              chem(i,k,j,p_biosoa) = &
+                   chem(i,k,j,p_biosoa) + soa_add
+
            endif
         endif
 
@@ -246,8 +409,7 @@ contains
   enddo
   enddo
 
-  end subroutine simple_soa_voc
-
+  end subroutine simple_soa_voc  
   !-----------------------------------------------------------------------
   ! Reduced two-product SOA scheme,
   ! Odum's 2p model for Secondary Organic Aerosols
