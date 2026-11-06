@@ -175,6 +175,24 @@ contains
      ! Final check in case the cell wasn't actually on any rank
      if ( i .le. 0 .or. i .gt. ite ) cycle
 
+     do k = kts, kte
+        ! Wildfire CO emission -> transported bbVOC precursor
+        if (e_bb_co(ii,k) > 0.0_RKIND) then
+           co_add = dtstep * mw_air * e_bb_co(ii,k) / &
+                    (rho_phy(i,k,j) * dz8w(i,k,j))
+
+           voc_add = soa_co_yld * co_add * &
+                     ((mw_co * 1.0e-3_RKIND) / mw_air) * 1.0e9_RKIND
+
+           chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + voc_add
+           chem(i,k,j,p_bbvoc) = min(max(chem(i,k,j,p_bbvoc), epsilc), voc_max)
+        endif
+     enddo
+  enddo
+
+  do j = jts, jte
+  do i = its, ite
+
      light_frac = max(0.0_RKIND, &
              min(1.0_RKIND, swdown(i,j) / sw_ref))
 
@@ -189,18 +207,8 @@ contains
 !     else
 !        oh_eff = 0.0_RKIND
 !     endif
+
      do k = kts, kte
-        ! Wildfire CO emission -> transported bbVOC precursor
-        if (e_bb_co(ii,k) > 0.0_RKIND) then
-           co_add = dtstep * mw_air * e_bb_co(ii,k) / &
-                    (rho_phy(i,k,j) * dz8w(i,k,j))
-
-           voc_add = soa_co_yld * co_add * &
-                     ((mw_co * 1.0e-3_RKIND) / mw_air) * 1.0e9_RKIND
-
-           chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + voc_add
-           chem(i,k,j,p_bbvoc) = min(max(chem(i,k,j,p_bbvoc), epsilc), voc_max)
-        endif
 
         ! Transported bbVOC precursor -> bbSOA
         if (aging_frac > 0.0_RKIND .and. chem(i,k,j,p_bbvoc) > epsilc) then
@@ -212,25 +220,21 @@ contains
            chem(i,k,j,p_bbsoa) = chem(i,k,j,p_bbsoa) + soa_add
            chem(i,k,j,p_bbsoa) = min(max(chem(i,k,j,p_bbsoa), epsilc), soa_max)
         endif
-  enddo
-
-  do j = jts, jte
-  do i = its, ite
 
         ! Anthropogenic CO increment is already in ppmv
         if (p_antvoc > 0 .and. p_antvoc <= num_chem .and. &
             e_ant_co(i,k,j) > 0.0_RKIND) then
-        
+
            ! ppmv -> mol/mol
            co_add = e_ant_co(i,k,j) * 1.0e-6_RKIND
-        
+
            ! mol/mol CO -> ug/kg CO-equivalent SOA precursor
            voc_add = soa_co_yld * co_add * &
                      ((mw_co * 1.0e-3_RKIND) / mw_air) * 1.0e9_RKIND
-        
+
            chem(i,k,j,p_antvoc) = chem(i,k,j,p_antvoc) + voc_add
            chem(i,k,j,p_antvoc) = min(max(chem(i,k,j,p_antvoc), epsilc), voc_max)
-        
+
         endif
 
         ! Transported antVOC precursor -> antSOA
