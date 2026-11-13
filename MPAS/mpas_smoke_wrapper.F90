@@ -44,18 +44,20 @@ module mpas_smoke_wrapper
 contains
 
     subroutine mpas_smoke_driver(                                                            &
-           configs, num_chem              , chemistry_start             , chem           ,            &
+           configs, num_chem              , chemistry_start             , chem           ,   &
            config_extra_chemical_tracers,                                                    &
            kanthro    , kbio, kfire, kvol, num_soil_types,                                   &
            config_ultrafine, config_coarse,                                                  &
            index_smoke_ultrafine , index_smoke_fine            , index_smoke_coarse,         &
-           index_soa, index_bbsoa, index_antsoa, index_bbvoc, index_antvoc,  config_soa_scheme, &
+           index_soa, index_bbsoa, index_antsoa, index_bbvoc, index_antvoc, index_biovoc,    &
+           index_biosoa,  config_soa_scheme,                                                 &
            index_bc, index_oc, index_brc,                                                    &
            index_dust_ultrafine  , index_dust_fine             , index_dust_coarse,          &
            index_ssalt_fine      , index_ssalt_coarse          ,                             &
            index_polp_tree       , index_polp_grass            , index_polp_weed,            &
            index_polp_all        , index_pols_all              ,                             &
            index_pols_tree       , index_pols_grass            , index_pols_weed,            &
+           index_ISOP            , index_TERP                  , index_SESQ,                 &
            index_unspc_ultrafine , index_unspc_fine            , index_unspc_coarse,         &
            index_no3_a_fine      , index_so4_a_fine            , index_nh4_a_fine,           &
            index_nh3             , index_so2                   , index_ch4,                  &
@@ -80,10 +82,11 @@ contains
            index_e_ant_pt_in_smoke_ultrafine,index_e_ant_pt_in_smoke_fine, index_e_ant_pt_in_smoke_coarse,   &
            index_e_ant_pt_in_no3_a_fine, index_e_ant_pt_in_so4_a_fine, &
            index_e_ant_pt_in_nh4_a_fine, index_e_ant_pt_in_so2, &
-           index_e_ant_pt_in_nh3, index_e_ant_pt_in_ch4,                                           &
-           index_e_ant_pt_in_co, index_e_ant_pt_in_nox, index_e_ant_pt_in_voc,                        &
+           index_e_ant_pt_in_nh3, index_e_ant_pt_in_ch4,                                     &
+           index_e_ant_pt_in_co, index_e_ant_pt_in_nox, index_e_ant_pt_in_voc,               &
            index_e_ant_pt_in_bc, index_e_ant_pt_in_oc,                                       &
            index_e_bio_in_polp_tree, index_e_bio_in_polp_grass, index_e_bio_in_polp_weed,    &
+           index_e_bio_in_ISOP, index_e_bio_in_TERP, index_e_bio_in_SESQ,                    &
            index_e_vol_in_vash_fine, index_e_vol_in_vash_coarse,                             &
            index_e_bb_out_smoke_ultrafine, index_e_bb_out_smoke_fine, index_e_bb_out_smoke_coarse, & 
            index_e_bb_out_nox, index_e_bb_out_ch4,index_e_bb_out_co,                         &
@@ -97,6 +100,7 @@ contains
            index_e_ant_out_co, index_e_ant_out_nox, index_e_ant_out_voc,                     &
            index_e_ant_out_bc, index_e_ant_out_oc,                                           &
            index_e_bio_out_polp_tree, index_e_bio_out_polp_grass, index_e_bio_out_polp_weed, &
+           index_e_bio_out_ISOP, index_e_bio_out_TERP, index_e_bio_out_SESQ,                 &
            index_e_vol_out_vash_fine,  index_e_vol_out_vash_coarse,                          &
            index_e_dust_out_dust_ultrafine, index_e_dust_out_dust_fine, index_e_dust_out_dust_coarse,  &
            index_e_ss_out_ssalt_fine, index_e_ss_out_ssalt_coarse,                           &
@@ -257,11 +261,13 @@ contains
     integer, intent(in),optional :: &
                            index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse,&
                            index_soa, index_bbsoa, index_antsoa, index_bbvoc, index_antvoc, &
+                           index_biovoc, index_biosoa, &
                            index_dust_ultrafine, index_dust_fine,  index_dust_coarse,               &
                            index_polp_tree,  index_polp_grass,   index_polp_weed,   &
                            index_pols_tree,  index_pols_grass,   index_pols_weed,   &
                            index_pols_all,   index_polp_all,                        &
-                           index_unspc_ultrafine, index_unspc_fine, index_unspc_coarse,                    &
+                           index_ISOP, index_TERP, index_SESQ,                      &
+                           index_unspc_ultrafine, index_unspc_fine, index_unspc_coarse,  &
                            index_ssalt_fine, index_ssalt_coarse,                    &
                            index_so4_a_fine, index_no3_a_fine, index_nh4_a_fine,    &
                            index_so2, index_nh3, index_ch4,                         &
@@ -292,7 +298,8 @@ contains
                            index_e_ant_pt_in_bc, index_e_ant_pt_in_oc
    integer, intent(in),optional :: &
                            index_e_bio_in_polp_tree, index_e_bio_in_polp_grass, index_e_bio_in_polp_weed, &
-                           index_e_vol_in_vash_fine,  index_e_vol_in_vash_coarse
+                           index_e_vol_in_vash_fine,  index_e_vol_in_vash_coarse, &
+                           index_e_bio_in_ISOP, index_e_bio_in_TERP, index_e_bio_in_SESQ
    integer, intent(in),optional :: &
                            index_e_bb_out_smoke_ultrafine, index_e_bb_out_smoke_fine, index_e_bb_out_smoke_coarse, &
                            index_e_bb_out_ch4, index_e_bb_out_co, index_e_bb_out_nox, index_e_bb_out_nh3, index_e_bb_out_so2, &
@@ -310,7 +317,8 @@ contains
                            index_e_bio_out_polp_tree, index_e_bio_out_polp_grass, index_e_bio_out_polp_weed, &
                            index_e_vol_out_vash_fine,  index_e_vol_out_vash_coarse, &
                            index_e_dust_out_dust_ultrafine, index_e_dust_out_dust_fine, index_e_dust_out_dust_coarse, &
-                           index_e_ss_out_ssalt_fine, index_e_ss_out_ssalt_coarse
+                           index_e_ss_out_ssalt_fine, index_e_ss_out_ssalt_coarse, &
+                           index_e_bio_out_ISOP, index_e_bio_out_TERP, index_e_bio_out_SESQ
     integer, intent(in),optional ::  index_STKHT, index_STKDM, index_STKTK, index_STKVE
 ! 2D dust input arrays 
     real(RKIND),intent(in), dimension(ims:ime, jms:jme),optional  :: sandfrac_in, clayfrac_in, uthres_in, &        ! dust (FENGSHA) input
@@ -484,10 +492,12 @@ contains
       call set_scalar_indices(chemistry_start,                                     &
                     index_smoke_ultrafine, index_smoke_fine, index_smoke_coarse,   &
                     index_soa, index_bbsoa, index_antsoa, index_bbvoc,index_antvoc,&
+                    index_biovoc, index_biosoa, &
                     index_dust_ultrafine, index_dust_fine, index_dust_coarse,      &
                     index_polp_tree, index_polp_grass, index_polp_weed,            &
                     index_pols_tree, index_pols_grass, index_pols_weed,            &
                     index_pols_all,  index_polp_all,                               &
+                    index_ISOP, index_TERP, index_SESQ,                            &
                     index_unspc_ultrafine, index_unspc_fine, index_unspc_coarse,   &
                     index_ssalt_fine, index_ssalt_coarse,                          &
                     index_no3_a_fine, index_so4_a_fine, index_nh4_a_fine,          &
@@ -1174,11 +1184,19 @@ contains
               its, ite, jts, jte, kts, kte                  )
        case (2)
          call mpas_log_write('Calling simple SOA driver: BB-SOA, Ant-SOA')
-         call simple_soa_voc(dt, chem, num_chem, swdown, coszen, &
-              rho_phy, dz8w,                                      &
-              ebu(:,:,index_e_bb_in_co),                        &
+         call simple_soa_voc(dt, chem, num_chem, swdown, coszen,  &
+              num_bb_pt,myrank,bb_pt_rank,bb_pt_local_cell_idx,   &
+              xlat, area, rho_phy, dz8w,                          &
+              ebu(:,:,index_e_bb_in_co),                          &
               e_ant_out(:,:,:,index_e_ant_out_co),                &               
-              num_bb_pt,myrank,bb_pt_rank,bb_pt_local_cell_idx, &
+              p_bbvoc, p_antvoc,                                  &
+              p_bbsoa, p_antsoa,                                  &
+              e_bio_in, kbio, num_e_bio_in,                       &
+              index_e_bio_in_ISOP,                                &
+              index_e_bio_in_TERP,                                &
+              index_e_bio_in_SESQ,                                &
+              p_biovoc, p_biosoa,                                 &
+              julday,                                             &
               ids, ide, jds, jde, kds, kde,                       &
               ims, ime, jms, jme, kms, kme,                       &
               its, ite, jts, jte, kts, kte                              )
@@ -1308,7 +1326,7 @@ contains
     do j=jts,jte
     do k=kts,kte
     do i=its,ite
-      theta_phy(i,k,j) = t_phy(i,k,j)/pi_phy(i,k,j)
+      theta_phy(i,k,j) = t_phy(i,k,j)/pi_phy(i,k,j)*cp
       wind_phy(i,k,j) = sqrt(u_phy(i,k,j)**2. + v_phy(i,k,j)**2.)
       rri(i,k,j) = 1._RKIND/rho_phy(i,k,j)
     enddo

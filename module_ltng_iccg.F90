@@ -280,7 +280,7 @@
  IMPLICIT NONE
 !-----------------------------------------------------------------
 ! Inputs
- REAL(RKIND),    DIMENSION( ims:ims, kms:kme, jms:jme ), INTENT(IN   ) :: refl, t, z
+ REAL(RKIND),    DIMENSION( ims:ime, kms:kme, jms:jme ), INTENT(IN   ) :: refl, t, z
  REAL(RKIND),                                            INTENT(IN   ) :: reflthreshold
 
 ! Order dependent args for domain, mem, and tile dims
