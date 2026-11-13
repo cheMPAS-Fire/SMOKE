@@ -15,7 +15,6 @@ module module_simple_soa
 contains
 
   subroutine simple_soa(dtstep, chem, num_chem, swdown, coszen, &
-                               p_co, p_soa, &
                                ids, ide, jds, jde, kds, kde,           &
                                ims, ime, jms, jme, kms, kme,           &
                                its, ite, jts, jte, kts, kte)
@@ -26,8 +25,6 @@ contains
     integer, intent(in) :: ids, ide, jds, jde, kds, kde
     integer, intent(in) :: ims, ime, jms, jme, kms, kme
     integer, intent(in) :: its, ite, jts, jte, kts, kte
-    integer, intent(in) :: p_co
-    integer, intent(in) :: p_soa
     integer, intent(in) :: num_chem
     real(RKIND), intent(in) :: dtstep
     real(RKIND), dimension(ims:ime, kms:kme, jms:jme, 1:num_chem), intent(inout) :: chem
@@ -120,6 +117,7 @@ contains
   ! Mainly designed for separately tracking Anthropogenic SOA, and Biomass Burning SOA
   ! This subroutine needs more version update as AC branch at NOAA GSL adding explicit VOCs from emission
   subroutine simple_soa_voc(dtstep, chem, num_chem, swdown, coszen, &
+                          num_bb_pt,myrank,bb_pt_rank,bb_pt_local_cell_idx, &
                           xlat, area, rho_phy, dz8w,                &
                           e_bb_co, e_ant_co,                        &
                           p_bbvoc, p_antvoc,                        &
@@ -132,7 +130,7 @@ contains
                           julday,                                   &
                           ids, ide, jds, jde, kds, kde,             &
                           ims, ime, jms, jme, kms, kme,             &
-                          its, ite, jts, jte, kts, kte)
+                          its, ite, jts, jte, kts, kte              )
 
   implicit none
 
@@ -140,9 +138,11 @@ contains
   integer, intent(in) :: ims, ime, jms, jme, kms, kme
   integer, intent(in) :: its, ite, jts, jte, kts, kte
   integer, intent(in) :: num_chem
-  integer, intent(in) :: p_bbvoc, p_antvoc
-  integer, intent(in) :: p_bbsoa, p_antsoa
+  integer, intent(in) :: myrank, num_bb_pt
+  integer, dimension(1:num_bb_pt), intent(in) :: bb_pt_rank,bb_pt_local_cell_idx
 
+  integer, intent(in) :: p_bbvoc, p_bbsoa
+  integer, intent(in) :: p_antvoc, p_antsoa
   integer, intent(in) :: p_biovoc, p_biosoa
   integer, intent(in) :: kbio, num_e_bio_in
   integer, intent(in) :: index_e_bio_in_ISOP
@@ -157,16 +157,14 @@ contains
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: rho_phy, dz8w
 
   ! BB CO emission flux: mol m-2 s-1
-  real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: e_bb_co
-
+  real(RKIND), dimension(1:num_bb_pt,kms:kme), intent(in) :: e_bb_co
   ! Anthropogenic CO emission increment from e_ant_out: ppmv
   real(RKIND), dimension(ims:ime,kms:kme,jms:jme), intent(in) :: e_ant_co
-
   ! Packed biogenic reference emissions: mol s-1 per MPAS grid cell
   real(RKIND), dimension(ims:ime,1:kbio,jms:jme,1:num_e_bio_in), &
        intent(in) :: e_bio_in
 
-  integer :: i, j, k
+  integer :: i, j, k, ii
 
   real(RKIND), parameter :: oh_ref      = 1.5e6_RKIND
   real(RKIND), parameter :: oh_night    = 1.3e4_RKIND  ! molecules/cm3
@@ -217,6 +215,30 @@ contains
 
   if (p_bbvoc  < 1 .or. p_bbvoc  > num_chem) return
   if (p_bbsoa  < 1 .or. p_bbsoa  > num_chem) return
+  
+  j = 1
+  do ii = 1, num_bb_pt
+     ! Skip if we are on the wrong rank for this EGU
+     if (myrank /= bb_pt_rank(ii)) cycle
+     ! Otherwise the index is just the local index
+     i = bb_pt_local_cell_idx(ii)
+     ! Final check in case the cell wasn't actually on any rank
+     if ( i .le. 0 .or. i .gt. ite ) cycle
+
+     do k = kts, kte
+        ! Wildfire CO emission -> transported bbVOC precursor
+        if (e_bb_co(ii,k) > 0.0_RKIND) then
+           co_add = dtstep * mw_air * e_bb_co(ii,k) / &
+                    (rho_phy(i,k,j) * dz8w(i,k,j))
+
+           voc_add = soa_co_yld * co_add * &
+                     ((mw_co * 1.0e-3_RKIND) / mw_air) * 1.0e9_RKIND
+
+           chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + voc_add
+           chem(i,k,j,p_bbvoc) = min(max(chem(i,k,j,p_bbvoc), epsilc), voc_max)
+        endif
+     enddo
+  enddo
 
   ! Solar declination angle for current Julian day
   solar_decl = 23.44_RKIND * deg2rad * &
@@ -320,21 +342,7 @@ contains
      endif
 
      do k = kts, kte
-
-        ! Wildfire CO emission -> transported bbVOC precursor
-        if (e_bb_co(i,k,j) > 0.0_RKIND) then
-
-           co_add = dtstep * mw_air * e_bb_co(i,k,j) / &
-                    (rho_phy(i,k,j) * dz8w(i,k,j))
-
-           voc_add = soa_co_yld * co_add * &
-                     ((mw_co * 1.0e-3_RKIND) / mw_air) * 1.0e9_RKIND
-
-           chem(i,k,j,p_bbvoc) = chem(i,k,j,p_bbvoc) + voc_add
-           chem(i,k,j,p_bbvoc) = min(max(chem(i,k,j,p_bbvoc), epsilc), voc_max)
-
-        endif
-
+        
         ! Transported bbVOC precursor -> bbSOA
         if (aging_frac > 0.0_RKIND .and. chem(i,k,j,p_bbvoc) > epsilc) then
 
@@ -385,6 +393,12 @@ contains
      enddo
   enddo
   enddo
+
+
+
+
+
+
   end subroutine simple_soa_voc  
   !-----------------------------------------------------------------------
   ! Reduced two-product SOA scheme,
