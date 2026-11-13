@@ -103,6 +103,10 @@ contains
          emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_unspc_coarse)
          chem(i,k,j,p_unspc_coarse)   = chem(i,k,j,p_unspc_coarse) + emis
          e_ant_out(i,k,j,index_e_ant_out_unspc_coarse) = e_ant_out(i,k,j,index_e_ant_out_unspc_coarse) + emis
+      elseif (p_dust_coarse .gt. 0 .and. index_e_ant_in_unspc_coarse .gt. 0 ) then
+         emis = conv_aer*e_ant_in(i,k,j,index_e_ant_in_unspc_coarse)
+         chem(i,k,j,p_dust_coarse)   = chem(i,k,j,p_dust_coarse) + emis
+!         e_ant_out(i,k,j,index_e_ant_out_unspc_coarse) = e_ant_out(i,k,j,index_e_ant_out_unspc_coarse) + emis
       endif
       if (p_ch4 .gt. 0 .and. index_e_ant_in_ch4 .gt. 0 ) then
         emis = conv_gas*e_ant_in(i,k,j,index_e_ant_in_ch4)
