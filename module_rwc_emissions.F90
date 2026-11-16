@@ -138,8 +138,8 @@ contains
              chem(i,kemit,j,p_smoke_coarse) = chem(i,kemit,j,p_smoke_coarse) + emis
          elseif ( p_unspc_coarse .gt. 0 ) then
              chem(i,kemit,j,p_unspc_coarse) = chem(i,kemit,j,p_unspc_coarse) + emis
-         elseif ( p_dust_coarse .gt. 0 ) then
-             chem(i,kemit,j,p_dust_coarse) = chem(i,kemit,j,p_dust_coarse) + emis
+        ! elseif ( p_dust_coarse .gt. 0 ) then
+        !     chem(i,kemit,j,p_dust_coarse) = chem(i,kemit,j,p_dust_coarse) + emis
          endif
          if ( index_e_ant_out_unspc_coarse.gt. 0 ) then
                  e_ant_out(i,kemit,j,index_e_ant_out_unspc_coarse) = e_ant_out(i,kemit,j,index_e_ant_out_unspc_coarse) + emis

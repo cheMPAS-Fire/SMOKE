@@ -143,6 +143,7 @@ mpas_smoke_wrapper.o:      \
         module_hab_emissions.o \
         module_lightning_driver.o \
 	module_simple_soa.o \
+	module_fire_emissions.o \
 	module_mp_aero_emissions.o
 
 module_zero_plumegen_coms.o: \

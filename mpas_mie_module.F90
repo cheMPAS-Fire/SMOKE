@@ -161,7 +161,7 @@ CONTAINS
             & ss3 , vbar_cm3 , vol_ac , vol_aj , vol_dry_a , vol_dust , vol_h2o , vol_oc , vol_smoke , vol_wet_a, &
             & vol_unspc, vol_nh4so4, vol_no3 ,dens_unspc, dens_sna, mass_unspc, mass_nh4so4, mass_no3, &
             & mass_unspc_f , mass_nh4so4_f , mass_no3_f, mass_soa, dens_soa, vol_soa, mass_bbsoa_f, mass_antsoa_f, &
-            & mass_antsoa, mass_bbsoa, vol_antsoa, vol_bbsoa
+            & mass_antsoa, mass_bbsoa, vol_antsoa, vol_bbsoa, mass_biosoa_f, mass_biosoa, vol_biosoa
 
       INTEGER :: i , iflag , isize , j , k , ns
       COMPLEX , DIMENSION(1:NLWBANDS) :: lwref_index_dust , lwref_index_h2o , lwref_index_smoke, lwref_index_unspc, &
@@ -245,6 +245,7 @@ CONTAINS
                mass_smoke_f = 0.0
                mass_bbsoa_f = 0.0
                mass_antsoa_f = 0.0
+               mass_biosoa_f = 0.0
                mass_smoke_c = 0.0
                mass_dust_f = 0.0
                mass_dust_c = 0.0
@@ -298,22 +299,26 @@ CONTAINS
                   mass_antsoa_f = MAX(0._RKIND, Chem(i,k,j,p_antsoa)) * conv1a
                ENDIF
 
+               IF (valid_chem_idx(p_biosoa, Num_chem)) THEN
+                  mass_biosoa_f = MAX(0._RKIND, Chem(i,k,j,p_biosoa)) * conv1a
+               ENDIF
+
                vol_aj = (mass_smoke_f/dens_smoke) + (mass_dust_f/dens_dust) + &
                         (mass_unspc_f/dens_unspc) + (mass_no3_f/dens_sna) +   &
                         (mass_nh4so4_f/dens_sna) + (mass_antsoa_f/dens_soa) + &
-                        (mass_bbsoa_f/dens_soa)
+                        (mass_bbsoa_f/dens_soa) + (mass_biosoa_f/dens_soa)
 
                vol_ac = (mass_smoke_c/dens_smoke) + (mass_dust_c/dens_dust)
  
                rho_eff = (mass_smoke_f+mass_dust_f+mass_nh4so4_f+mass_no3_f + &
-                       mass_unspc_f+mass_antsoa_f+mass_bbsoa_f)/max(TINY,vol_aj)
+                       mass_unspc_f+mass_antsoa_f+mass_bbsoa_f+mass_biosoa_f)/max(TINY,vol_aj)
                lnsg = log(max(1.01,sginia))
                vbar_cm3 = (PI/6.0)*(max(1.0E-12,dg_f_cm)**3)*exp(4.5*lnsg*lnsg)
                mp_g = rho_eff*vbar_cm3
  
                IF ( mp_g>TINY ) THEN
                   num_aj = (mass_smoke_f+mass_dust_f+mass_nh4so4_f+mass_bbsoa_f+mass_antsoa_f+&
-                            mass_no3_f+mass_unspc_f)/mp_g
+                            mass_no3_f+mass_unspc_f+mass_biosoa_f)/mp_g
                ELSE
                   num_aj = 0.0
                ENDIF
@@ -362,6 +367,7 @@ CONTAINS
                   mass_unspc = mass_unspc_f*xmas_sectj(isize)
                   mass_antsoa = mass_antsoa_f*xmas_sectj(isize)
                   mass_bbsoa = mass_bbsoa_f*xmas_sectj(isize)
+                  mass_biosoa = mass_biosoa_f*xmas_sectj(isize)
  
                   vol_smoke = mass_smoke/dens_smoke
                   vol_oc = 0.9*mass_smoke/dens_smoke
@@ -371,15 +377,19 @@ CONTAINS
                   vol_unspc = mass_unspc/dens_unspc
                   vol_antsoa = mass_antsoa/dens_unspc
                   vol_bbsoa = mass_bbsoa/dens_unspc
+                  vol_biosoa = mass_biosoa/dens_unspc
  
-                  vol_dry_a = vol_smoke + vol_dust + vol_nh4so4 + vol_no3 + vol_unspc + vol_antsoa + vol_bbsoa
+                  vol_dry_a = vol_smoke + vol_dust + vol_nh4so4 + vol_no3 + &
+                              vol_unspc + vol_antsoa + vol_bbsoa + vol_biosoa
 ! Initial version of Mie code.
 ! Now we turn off this
 ! Treat hygroscopic growth
 !          vol_wet_a = vol_dry_a
                   IF ( vol_dry_a>1.0E-20 ) THEN
-                     kappa_avg = (KAPPA_SMOKE*vol_oc+KAPPA_DUST*vol_dust+KAPPA_NH4SO4*vol_nh4so4+ &
-                             KAPPA_SMOKE*vol_antsoa+KAPPA_SMOKE*vol_bbsoa+KAPPA_NO3*vol_no3)/vol_dry_a
+                     kappa_avg = (KAPPA_SMOKE*vol_oc+KAPPA_DUST*vol_dust+ &
+                             KAPPA_NH4SO4*vol_nh4so4 + KAPPA_SMOKE*vol_antsoa+ &
+                             KAPPA_SMOKE*vol_bbsoa+KAPPA_NO3*vol_no3+ &
+                             KAPPA_SMOKE*vol_biosoa)/vol_dry_a
                   ELSE
                      kappa_avg = 0.0
                   ENDIF
@@ -403,7 +413,7 @@ CONTAINS
                         ri_dum = swref_index_smoke(ns)*vol_smoke + swref_index_dust(ns)*vol_dust + swref_index_h2o(ns)*vol_h2o + &
                                  swref_index_unspc(ns)*vol_unspc + swref_index_nh4so4(ns)*vol_nh4so4 + &
                                  swref_index_no3(ns)*vol_no3 + swref_index_unspc(ns)*vol_antsoa + &
-                                 swref_index_unspc(ns)*vol_bbsoa
+                                 swref_index_unspc(ns)*vol_bbsoa + swref_index_unspc(ns)*vol_biosoa
  
                         ri_ave_a = ri_dum/vol_wet_a
                      ELSE
@@ -416,7 +426,8 @@ CONTAINS
                      IF ( vol_dry_a>1.0E-20 ) THEN
                         ri_dum = lwref_index_smoke(ns)*vol_smoke + lwref_index_dust(ns)*vol_dust + lwref_index_h2o(ns)*vol_h2o + &
                                  lwref_index_unspc(ns)*vol_unspc + lwref_index_nh4so4(ns)*vol_nh4so4 + &
-                                 lwref_index_no3(ns)*vol_no3 + lwref_index_unspc(ns)*vol_antsoa + lwref_index_unspc(ns)*vol_bbsoa
+                                 lwref_index_no3(ns)*vol_no3 + lwref_index_unspc(ns)*vol_antsoa + &
+                                 lwref_index_unspc(ns)*vol_bbsoa + lwref_index_unspc(ns)*vol_biosoa
                         ri_ave_a = ri_dum/vol_wet_a
                      ELSE
                         ri_ave_a = cmplx(1.5,0.0)
